@@ -1,0 +1,11 @@
+black
+check-manifest
+flake8
+mypy
+pre-commit
+pytest
+pytest-cov
+setuptools>=40.8.0
+sphinx
+sphinx_rtd_theme
+tox
