@@ -70,11 +70,14 @@ class Node(BaseModel):
 
     @property
     def children(self):
-        return {
-            name: getattr(self, name)
+        return {name: getattr(self, name) for name, value in self}
+
+    def __iter__(self):
+        return (
+            (name, getattr(self, name))
             for name, value in self.__fields__.items()
             if not name.endswith("_")
-        }
+        )
 
 
 class InmutableNode(Node):
@@ -159,7 +162,7 @@ class NodeTransformer(NodeVisitor):
             set_op = operator.setitem
             del_op = operator.delitem
         elif isinstance(node, Node):
-            items = node.children
+            items = node.children.items()
             set_op = setattr
             del_op = delattr
         elif isinstance(node, collections.abc.Iterable) and not isinstance(

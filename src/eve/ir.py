@@ -58,10 +58,10 @@ class DataType(enum.IntEnum):
     INVALID = -1
     AUTO = 0
     BOOLEAN = 1
-    INT32 = 11
-    UINT32 = 12
-    FLOAT32 = 21
-    FLOAT64 = 22
+    INT32 = 101
+    UINT32 = 102
+    FLOAT32 = 201
+    FLOAT64 = 202
 
 
 class Expr(Node):
@@ -88,7 +88,7 @@ class BinaryOpExpr(Expr):
 
 
 class TernaryOpExpr(Expr):
-    cond: BinaryOperator = Field(..., description="Condition")
+    cond: Expr = Field(..., description="Condition")
     left: Expr = Field(..., description="Left-hand side of the expression")
     right: Expr = Field(..., description="Right-hand side of the expression")
     loc: Optional[SourceLocation]

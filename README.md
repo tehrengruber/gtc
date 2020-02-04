@@ -25,4 +25,5 @@ Next, clone the repository and use an _editable_ installation of Eve:
     # adding the '-e' flag to get an editable installation
     pip install -e ./eve
 
-
+    # Finally, install the additional development tools
+    pip install -r ./eve/requirements_dev.txt

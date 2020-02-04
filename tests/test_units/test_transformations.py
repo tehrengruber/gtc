@@ -14,23 +14,19 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from devtools import debug
+import objectpath
 
-import copy
-
-from pydantic import Field, validator
-
-from .core import Node, NodeVisitor, NodeTransformer
+from eve import ir, transformations
 
 
-class TransformationPass(NodeTransformer):
-    @classmethod
-    def apply(cls, node: Node, **kwargs):
-        return cls(**kwargs).visit(node)
+def test_empty_transformation():
+    v_3 = ir.LiteralExpr(value="3", data_type=ir.DataType.INT32)
+    v_5 = ir.LiteralExpr(value="5", data_type=ir.DataType.INT32)
+    a = ir.BinaryOpExpr(op=ir.BinaryOperator.ADD, left=v_3, right=v_5)
+    s = ir.BinaryOpExpr(op=ir.BinaryOperator.SUB, left=v_3, right=v_5)
+    m = ir.BinaryOpExpr(op=ir.BinaryOperator.MUL, left=a, right=s)
 
-    def __init__(self, *, memo: dict = None, **kwargs):
-        assert memo is None or isinstance(memo, dict)
-        self.memo = memo or {}
-
-    def visit(self, node: Node, **kwargs):
-        node = copy.deepcopy(node, self.memo)
-        return super().visit(node, **kwargs)
+    m2 = transformations.TransformationPass.apply(m)
+    assert m == m2
+    assert m is not m2
