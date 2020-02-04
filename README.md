@@ -27,3 +27,17 @@ Next, clone the repository and use an _editable_ installation of Eve:
 
     # Finally, install the additional development tools
     pip install -r ./eve/requirements_dev.txt
+
+
+Development instructions
+-------------------------
+
+`Tox`, `py.test` and `pre-commit` (running several checks, including `black` formatter and `flake8`) are already configured and should run out of the box after installing the required development tools in `requirements_dev.txt`:
+
+    # Execute all the tests in the `tests` folder with py.test:
+    py.test -v ./tests
+
+    # Execute all pre-commit checks:
+    pre-commit run --all
+
+Additionally, editors compatible with the [Editorconfig](http://editorconfig.org) standard should also be properly configured (settings in `.editorconfig`).
