@@ -129,7 +129,7 @@ class NodeVisitor:
         ):
             items = enumerate(node)
         elif isinstance(node, Node):
-            items = list(node)
+            items = node
         else:
             pass
 
