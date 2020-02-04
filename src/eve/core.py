@@ -129,7 +129,7 @@ class NodeVisitor:
         ):
             items = enumerate(node)
         elif isinstance(node, Node):
-            items = node.children
+            items = list(node)
         else:
             pass
 
@@ -162,7 +162,7 @@ class NodeTransformer(NodeVisitor):
             set_op = operator.setitem
             del_op = operator.delitem
         elif isinstance(node, Node):
-            items = node.children.items()
+            items = node
             set_op = setattr
             del_op = delattr
         elif isinstance(node, collections.abc.Iterable) and not isinstance(
