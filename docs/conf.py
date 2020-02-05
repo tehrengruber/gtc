@@ -61,7 +61,7 @@ copyright = "2020, ETH Zurich"
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-with open(os.path.join(os.path.dirname(cwd), "VERSION.txt"), "r") as f:
+with open(os.path.join(os.path.dirname(cwd), "src", "eve", "_VERSION.txt"), "r") as f:
     full_version = f.read().strip()
 # The short X.Y version.
 version = eve.__version__  # ".".join(full_version.split(".")[:2])
@@ -104,6 +104,29 @@ pygments_style = "sphinx"
 
 # If true, keep warnings as "system message" paragraphs in the built documents.
 # keep_warnings = False
+
+
+# -- Extension configuration -------------------------------------------------
+
+# Options for autodoc extension
+autodoc_default_options = {
+    "undoc-members": True,
+    "special-members": "__call__"
+    # "member-order": "bysource",
+}
+
+# Options for Napoleon extension
+# napoleon_google_docstring = True
+napoleon_numpy_docstring = True
+napoleon_include_init_with_doc = False
+napoleon_include_private_with_doc = True
+# napoleon_include_special_with_doc = True
+# napoleon_use_admonition_for_examples = False
+# napoleon_use_admonition_for_notes = False
+# napoleon_use_admonition_for_references = False
+# napoleon_use_ivar = False
+# napoleon_use_param = True
+# napoleon_use_rtype = True
 
 
 # -- Options for HTML output ---------------------------------------------------

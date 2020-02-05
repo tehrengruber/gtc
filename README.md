@@ -34,10 +34,16 @@ Development instructions
 
 `Tox`, `py.test` and `pre-commit` (running several checks, including `black` formatter and `flake8`) are already configured and should run out of the box after installing the required development tools in `requirements_dev.txt`:
 
+    # Generate HTML documentation:
+    cd docs && make html
+
     # Execute all the tests in the `tests` folder with py.test:
     py.test -v ./tests
 
-    # Execute all pre-commit checks:
+    # Install pre-commit git hooks:
+    pre-commit install
+
+    # Or, alternatively, execute all pre-commit checks manually:
     pre-commit run --all
 
 Additionally, editors compatible with the [Editorconfig](http://editorconfig.org) standard should also be properly configured (settings in `.editorconfig`).

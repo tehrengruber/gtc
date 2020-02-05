@@ -6,4 +6,4 @@ API Documentation
 .. toctree::
    :maxdepth: 4
 
-   source/modules
+   _source/modules

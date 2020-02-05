@@ -10,15 +10,15 @@ Contents:
 
 .. toctree::
    :maxdepth: 2
+   :caption: Contents:
 
-    apiref
-    installation
-    usage
-    contributing
-    authors
-    history
+   apiref
+   indices
+   license
+   quickstart
+
 
 Feedback
 ========
 
-If you have any suggestions or questions about...
+If you have any suggestions or questions about this software, please let us lnow.

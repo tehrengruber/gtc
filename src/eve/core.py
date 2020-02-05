@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #
-# Eve Toolchain - GridTools Project
+# Eve Toolchain - GT4Py Project - GridTools Framework
 #
 # Copyright (c) 2020, CSCS - Swiss National Supercomputing Center, ETH Zurich
 # All rights reserved.
 #
-# This file is part the GT4Py project and the GridTools framework.
+# This file is part of the GT4Py project and the GridTools framework.
 # GT4Py is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the
 # Free Software Foundation, either version 3 of the License, or any later
@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-import collections
+import collections.abc
 import itertools
 import operator
 from enum import Enum
@@ -23,12 +23,14 @@ from enum import Enum
 from pydantic import BaseModel, Field, validator
 
 
+#: Marker value used to avoid confusion with `None`
+#: (specially in contexts where `None` could be a valid value)
 NOTHING = object()
 
 __unique_counter = itertools.count(1)
 
 
-def unique_id():
+def _unique_id():
     return next(__unique_counter)
 
 
@@ -47,19 +49,27 @@ class SourceLocation(BaseModel):
     column: int = Field(..., description="Column number (starting at 1)", ge=1)
 
 
-class _InmutableConfig:
-    allow_mutation = False
-
-
 class Node(BaseModel):
-    """Base node class."""
+    """Base node class.
+
+    Field values should be either:
+
+        * builtin types: `str`, `int`, `float`, `tuple`, `list`, `set`, `dict`
+        * other :class:`Node` subclasses
+        * supported collections (:class:`collections.abc.Sequence`,
+        :class:`collections.abc.Set`, :class:`collections.abc.Mapping`) of
+        any of the previous items
+
+    Using other classes as values would most likely work but it is not
+    explicitly supported.
+    """
 
     node_id_: int = Field(None, description="Unique node identifier")
     node_kind_: str = Field(None, description="Node kind")
 
     @validator("node_id_", pre=True, always=True)
     def _node_id_validator(cls, v):
-        return v or unique_id()
+        return v or _unique_id()
 
     @validator("node_kind_", pre=True, always=True)
     def _node_kind_validator(cls, v):
@@ -78,6 +88,10 @@ class Node(BaseModel):
             for name, value in self.__fields__.items()
             if not name.endswith("_")
         )
+
+
+class _InmutableConfig:
+    allow_mutation = False
 
 
 class InmutableNode(Node):
@@ -122,18 +136,17 @@ class NodeVisitor:
 
     def generic_visit(self, node: Node, **kwargs):
         items = []
-        if isinstance(node, collections.abc.Mapping):
-            items = node.items()
-        elif isinstance(node, collections.abc.Iterable) and not isinstance(
+        if isinstance(node, Node):
+            items = node
+        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
             items = enumerate(node)
-        elif isinstance(node, Node):
-            items = node
-        else:
-            pass
+        elif isinstance(node, collections.abc.Mapping):
+            items = node.items()
 
-        for key, value in items:
+        # Process selected items (if any)
+        for _, value in items:
             self.visit(value, **kwargs)
 
 
@@ -142,7 +155,7 @@ class NodeTransformer(NodeVisitor):
 
     The `NodeTransformer` will walk the tree and use the return value of the
     visitor methods to replace or remove the old node. If the return value of
-    the visitor method is ``NOTHING``, the node will be removed from its location,
+    the visitor method is :obj:`eve.core.NOTHING`, the node will be removed from its location,
     otherwise it is replaced with the return value. The return value may also be
     theoriginal node, in which case no replacement takes place.
 
@@ -156,32 +169,57 @@ class NodeTransformer(NodeVisitor):
     """
 
     def generic_visit(self, node: Node, **kwargs):
-        items = []
-        if isinstance(node, collections.abc.Mapping):
-            items = node.items()
-            set_op = operator.setitem
-            del_op = operator.delitem
-        elif isinstance(node, Node):
-            items = node
-            set_op = setattr
-            del_op = delattr
-        elif isinstance(node, collections.abc.Iterable) and not isinstance(
+        result = node
+        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
-            index_shift = 0
-            for idx, old_value in enumerate(node):
-                new_value = self.visit(old_value, **kwargs)
-                if new_value is NOTHING:
+            items = []
+            if isinstance(node, Node):
+                items = node
+                set_op = setattr
+                del_op = delattr
+            elif isinstance(node, collections.abc.MutableSequence):
+                items = enumerate(node)
+                index_shift = 0
+
+                def set_op(container, idx, value):
+                    container[idx - index_shift] = value
+
+                def del_op(container, idx):
+                    nonlocal index_shift
+                    del container[idx - index_shift]
                     index_shift += 1
-                    del node[idx - index_shift]
-                else:
-                    node[idx - index_shift] = new_value
 
-        for key, old_value in items:
-            new_value = self.visit(old_value, **kwargs)
-            if new_value is NOTHING:
-                del_op(node, key)
-            elif new_value != old_value:
-                set_op(node, key, new_value)
+            elif isinstance(node, collections.abc.MutableSet):
+                items = list(enumerate(node))
 
-        return node
+                def set_op(container, idx, value):
+                    container.add(value)
+
+                def del_op(container, idx):
+                    container.remove(items[idx])
+
+            elif isinstance(node, collections.abc.MutableMapping):
+                items = node.items()
+                set_op = operator.setitem
+                del_op = operator.delitem
+            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+                # Inmutable sequence or set: create a new container instance with the new values
+                new_items = [self.visit(value, **kwargs) for value in node]
+                result = node.__class__([value for value in new_items if value is not NOTHING])
+            elif isinstance(node, collections.abc.Mapping):
+                # Inmutable mapping: create a new mapping instance with the new values
+                new_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
+                result = node.__class__(
+                    {key: value for key, value in new_items.items() if value is not NOTHING}
+                )
+
+            # Finally, in case current node object is mutable, process selected items (if any)
+            for key, value in items:
+                new_value = self.visit(value, **kwargs)
+                if new_value is NOTHING:
+                    del_op(result, key)
+                elif new_value != value:
+                    set_op(result, key, new_value)
+
+        return result
