@@ -18,9 +18,9 @@
 import enum
 from typing import Optional
 
-from pydantic import Field, validator
+from pydantic import Field, validator  # noqa: F401
 
-from .core import Node, SourceLocation, StrEnum
+from ..core import Node, SourceLocation, StrEnum
 
 
 class AssignmentKind(StrEnum):

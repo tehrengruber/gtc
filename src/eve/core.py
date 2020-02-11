@@ -16,6 +16,7 @@
 
 
 import collections.abc
+import copy
 import itertools
 import operator
 from enum import Enum
@@ -62,32 +63,48 @@ class Node(BaseModel):
 
     Using other classes as values would most likely work but it is not
     explicitly supported.
+
+    Field names ending with "_"  are considered as hidden and
+    will not appear in the node iterators. Field names ending with
+    "_attr" are considered attributes of the node, not children.
     """
 
-    node_id_: int = Field(None, description="Unique node identifier")
-    node_kind_: str = Field(None, description="Node kind")
+    id_attr: int = Field(None, description="Unique node identifier")
+    kind_attr: str = Field(None, description="Node kind")
+    dialect_attr: str = Field(None, description="IR dialect of this node kind")
 
-    @validator("node_id_", pre=True, always=True)
-    def _node_id_validator(cls, v):
+    @validator("id_attr", pre=True, always=True)
+    def _id_attr_validator(cls, v):
         return v or _unique_id()
 
-    @validator("node_kind_", pre=True, always=True)
-    def _node_kind_validator(cls, v):
+    @validator("kind_attr", pre=True, always=True)
+    def _kind_attr_validator(cls, v):
         if v and v != cls.__name__:
-            raise ValueError(f"node_kind value '{v}' does not match cls.__name__ {cls.__name__}")
+            raise ValueError(f"kind_attr value '{v}' does not match cls.__name__ {cls.__name__}")
 
         return v or cls.__name__
 
+    @validator("dialect_attr", pre=True, always=True)
+    def _dialect_attr_validator(cls, v):
+        return v or cls.__module__.split(".")[-1]
+
+    @property
+    def attributes(self):
+        return {name: value for name, value in self.iter_attributes()}
+
     @property
     def children(self):
-        return {name: getattr(self, name) for name, value in self}
+        return {name: value for name, value in self.iter_children()}
 
-    def __iter__(self):
-        return (
-            (name, getattr(self, name))
-            for name, value in self.__fields__.items()
-            if not name.endswith("_")
-        )
+    def iter_attributes(self):
+        for name, value in self.__fields__.items():
+            if name.endswith("attr"):
+                yield (name, getattr(self, name))
+
+    def iter_children(self):
+        for name, value in self.__fields__.items():
+            if not (name.endswith("attr") or name.endswith("_")):
+                yield (name, getattr(self, name))
 
 
 class _InmutableConfig:
@@ -137,7 +154,7 @@ class NodeVisitor:
     def generic_visit(self, node: Node, **kwargs):
         items = []
         if isinstance(node, Node):
-            items = node
+            items = node.iter_children()
         elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
@@ -151,17 +168,19 @@ class NodeVisitor:
 
 
 class NodeTransformer(NodeVisitor):
-    """Simple :class:`NodeVisitor` subclass based on :class:`ast.NodeTransformer` to modify nodes.
+    """Simple :class:`NodeVisitor` subclass based on
+    :class:`ast.NodeTransformer` to modify nodes in place.
 
-    The `NodeTransformer` will walk the tree and use the return value of the
-    visitor methods to replace or remove the old node. If the return value of
-    the visitor method is :obj:`eve.core.NOTHING`, the node will be removed from its location,
-    otherwise it is replaced with the return value. The return value may also be
-    theoriginal node, in which case no replacement takes place.
+    The `NodeTransformer` will walk the tree and use the return value of
+    the visitor methods to replace or remove the old node. If the
+    return value of the visitor method is :obj:`eve.core.NOTHING`,
+    the node will be removed from its location, otherwise it is replaced
+    with the return value. The return value may also be the original
+    node, in which case no replacement takes place.
 
-    Keep in mind that if the node you're operating on has child nodes you must
-    either transform the child nodes yourself or call the :meth:`generic_visit`
-    method for the node first.
+    Keep in mind that if the node you're operating on has child nodes
+    you must either transform the child nodes yourself or call the
+    :meth:`generic_visit` method for the node first.
 
     Usually you use the transformer like this::
 
@@ -175,7 +194,7 @@ class NodeTransformer(NodeVisitor):
         ):
             items = []
             if isinstance(node, Node):
-                items = node
+                items = node.iter_children()
                 set_op = setattr
                 del_op = delattr
             elif isinstance(node, collections.abc.MutableSequence):
@@ -221,5 +240,58 @@ class NodeTransformer(NodeVisitor):
                     del_op(result, key)
                 elif new_value != value:
                     set_op(result, key, new_value)
+
+        return result
+
+
+class NodeTranslator(NodeVisitor):
+    """`NodeVisitor` subclass to modify nodes NOT in place.
+
+    The `NodeTranslator` will walk the tree and use the return value of
+    the visitor methods to replace or remove the old node in a new copy
+    of the tree. If the return value of the visitor method is
+    `eve.core.NOTHING`, the node will be removed from its location in the
+    result tree, otherwise it is replaced with the return value. In the default
+    case, a deepcopy of the original node is returned.
+
+    Keep in mind that if the node you're operating on has child nodes
+    you must either transform the child nodes yourself or call the
+    :meth:`generic_visit` method for the node first.
+
+    Usually you use the transformer like this::
+
+       node = YourTranslator().visit(node)
+    """
+
+    def __init__(self, *, memo: dict = None, **kwargs):
+        assert memo is None or isinstance(memo, dict)
+        self.memo = memo or {}
+
+    def generic_visit(self, node: Node, **kwargs):
+        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
+            node, (str, bytes, bytearray)
+        ):
+            if isinstance(node, Node):
+                new_items = {key: self.visit(value, **kwargs) for key, value in node}
+                result = node.__class__(
+                    node_id_=node.node_id_,
+                    node_kind_=node.node_kind_,
+                    **{key: value for key, value in new_items.items() if value is not NOTHING},
+                )
+
+            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+                # Sequence or set: create a new container instance with the new values
+                new_items = [self.visit(value, **kwargs) for value in node]
+                result = node.__class__([value for value in new_items if value is not NOTHING])
+
+            elif isinstance(node, collections.abc.Mapping):
+                # Mapping: create a new mapping instance with the new values
+                new_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
+                result = node.__class__(
+                    {key: value for key, value in new_items.items() if value is not NOTHING}
+                )
+
+        else:
+            result = copy.deepcopy(node, memo=self.memo)
 
         return result

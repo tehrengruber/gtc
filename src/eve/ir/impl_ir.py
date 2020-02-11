@@ -15,18 +15,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-# from devtools import debug
-# import objectpath
-from eve import ir, transformations
+# import enum
+# from typing import Optional
+
+# from pydantic import Field, validator
+
+# from ..core import Node, SourceLocation, StrEnum
+from . import gt_ir
 
 
-def test_empty_transformation():
-    v_3 = ir.LiteralExpr(value="3", data_type=ir.DataType.INT32)
-    v_5 = ir.LiteralExpr(value="5", data_type=ir.DataType.INT32)
-    a = ir.BinaryOpExpr(op=ir.BinaryOperator.ADD, left=v_3, right=v_5)
-    s = ir.BinaryOpExpr(op=ir.BinaryOperator.SUB, left=v_3, right=v_5)
-    m = ir.BinaryOpExpr(op=ir.BinaryOperator.MUL, left=a, right=s)
-
-    m2 = transformations.TransformationPass.apply(m)
-    assert m == m2
-    assert m is not m2
+class AssignmentKind(gt_ir.AssignmentKind):
+    pass

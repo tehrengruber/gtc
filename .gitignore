@@ -88,6 +88,9 @@ coverage.xml
 # mypy
 .mypy_cache/
 
+# pytype
+.pytype/
+
 # Rope project settings
 .ropeproject
 

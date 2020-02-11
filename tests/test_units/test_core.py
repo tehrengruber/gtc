@@ -14,9 +14,9 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from devtools import debug
-import objectpath
 
+# from devtools import debug
+# import objectpath
 from eve import ir
 
 
