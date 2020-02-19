@@ -5,7 +5,7 @@ mypy
 pre-commit
 pytest
 pytest-cov
-pytype
+#pytype
 setuptools>=40.8.0
 sphinx
 sphinx_rtd_theme

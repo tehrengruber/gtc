@@ -15,6 +15,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from ._version import __version__  # noqa
+from .version import __version__, __versioninfo__  # noqa
 
 from .core import *  # noqa

@@ -17,5 +17,9 @@
 
 import os
 
+import semver
+
+
 with open(os.path.join(os.path.dirname(__file__), "_VERSION.txt"), "r") as version_file:
     __version__ = version_file.read().strip()
+    __versioninfo__ = semver.parse_version_info(__version__.replace(".dev", "-dev"))

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=40.8.0", "wheel"]
+requires = ["setuptools>=40.8.0", "setuptools_scm[toml]>=3.4", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
@@ -20,3 +20,7 @@ exclude = '''
   | dist
 )/
 '''
+
+[tool.setuptools_scm]
+version_scheme = "python-simplified-semver"
+write_to = "src/eve/_VERSION.txt"
