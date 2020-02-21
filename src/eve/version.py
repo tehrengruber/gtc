@@ -14,12 +14,22 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Version specification."""
+
 
 import os
 
-import semver
+from packaging.version import parse
 
 
-with open(os.path.join(os.path.dirname(__file__), "_VERSION.txt"), "r") as version_file:
-    __version__ = version_file.read().strip()
-    __versioninfo__ = semver.parse_version_info(__version__.replace(".dev", "-dev"))
+try:
+    with open(os.path.join(os.path.dirname(__file__), "_VERSION.txt"), "r") as version_file:
+        __version__ = version_file.read().strip()
+        __versioninfo__ = parse(__version__)
+
+except IOError:
+    __version__ = ""
+    __versioninfo__ = None
+
+finally:
+    del os, parse

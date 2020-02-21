@@ -14,6 +14,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Eve: a stencil toolchain in pure Python."""
 
 from .version import __version__, __versioninfo__  # noqa
 
