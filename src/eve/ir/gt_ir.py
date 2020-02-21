@@ -20,7 +20,7 @@ from typing import Optional
 
 from pydantic import Field, validator  # noqa: F401
 
-from ..core import Node, SourceLocation, StrEnum
+from eve.core import Node, SourceLocation, StrEnum
 
 
 class AssignmentKind(StrEnum):

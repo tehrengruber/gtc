@@ -20,7 +20,7 @@ import copy
 
 from pydantic import Field, validator  # noqa: F401
 
-from .core import Node, NodeVisitor, NodeTransformer, NOTHING  # noqa: F401
+from .core import Node, NodeTransformer, NodeVisitor, NOTHING  # noqa: F401
 
 
 class TransformationPass(NodeVisitor):

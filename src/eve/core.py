@@ -14,11 +14,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""Definitions of basic infrastructure classes and functions."""
 
-import collections.abc
+
 import copy
 import itertools
 import operator
+from collections import abc as col_abc
 from enum import Enum
 
 from pydantic import BaseModel, Field, validator
@@ -28,14 +30,15 @@ from pydantic import BaseModel, Field, validator
 #: (specially in contexts where `None` could be a valid value)
 NOTHING = object()
 
+#: Constantly increasing counter for generation of unique ids
 __unique_counter = itertools.count(1)
 
 
-def _unique_id():
+def get_unique_id() -> int:
+    """Generate a new globally unique `int` for the current session."""
     return next(__unique_counter)
 
 
-# ---- Definitions -----
 class StrEnum(str, Enum):
     """Basic :class:`enum.Enum` subclass compatible with string operations."""
 
@@ -44,7 +47,7 @@ class StrEnum(str, Enum):
 
 
 class SourceLocation(BaseModel):
-    """Source code location (line, column)"""
+    """Source code location (line, column)."""
 
     line: int = Field(..., description="Line number (starting at 1)", ge=1)
     column: int = Field(..., description="Column number (starting at 1)", ge=1)
@@ -75,7 +78,7 @@ class Node(BaseModel):
 
     @validator("id_attr", pre=True, always=True)
     def _id_attr_validator(cls, v):
-        return v or _unique_id()
+        return v or get_unique_id()
 
     @validator("kind_attr", pre=True, always=True)
     def _kind_attr_validator(cls, v):
@@ -108,6 +111,8 @@ class Node(BaseModel):
 
 
 class _InmutableConfig:
+    """Pydantic Config class for inmutable models."""
+
     allow_mutation = False
 
 
@@ -118,8 +123,7 @@ class InmutableNode(Node):
 
 
 class NodeVisitor:
-    """
-    Simple node visitor class based on :class:`ast.NodeVisitor`.
+    """Simple node visitor class based on :class:`ast.NodeVisitor`.
 
     The base class walks the tree and calls a visitor function for every
     node found. This function may return a value which is forwarded by
@@ -155,11 +159,11 @@ class NodeVisitor:
         items = []
         if isinstance(node, Node):
             items = node.iter_children()
-        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
+        elif isinstance(node, (col_abc.Sequence, col_abc.Set)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
             items = enumerate(node)
-        elif isinstance(node, collections.abc.Mapping):
+        elif isinstance(node, col_abc.Mapping):
             items = node.items()
 
         # Process selected items (if any)
@@ -168,8 +172,7 @@ class NodeVisitor:
 
 
 class NodeTransformer(NodeVisitor):
-    """Simple :class:`NodeVisitor` subclass based on
-    :class:`ast.NodeTransformer` to modify nodes in place.
+    """Simple :class:`NodeVisitor` subclass based on :class:`ast.NodeTransformer` to modify nodes in place.
 
     The `NodeTransformer` will walk the tree and use the return value of
     the visitor methods to replace or remove the old node. If the
@@ -189,7 +192,7 @@ class NodeTransformer(NodeVisitor):
 
     def generic_visit(self, node: Node, **kwargs):
         result = node
-        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
+        if isinstance(node, (Node, col_abc.Collection)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
             items = []
@@ -197,7 +200,7 @@ class NodeTransformer(NodeVisitor):
                 items = node.iter_children()
                 set_op = setattr
                 del_op = delattr
-            elif isinstance(node, collections.abc.MutableSequence):
+            elif isinstance(node, col_abc.MutableSequence):
                 items = enumerate(node)
                 index_shift = 0
 
@@ -209,7 +212,7 @@ class NodeTransformer(NodeVisitor):
                     del container[idx - index_shift]
                     index_shift += 1
 
-            elif isinstance(node, collections.abc.MutableSet):
+            elif isinstance(node, col_abc.MutableSet):
                 items = list(enumerate(node))
 
                 def set_op(container, idx, value):
@@ -218,15 +221,15 @@ class NodeTransformer(NodeVisitor):
                 def del_op(container, idx):
                     container.remove(items[idx])
 
-            elif isinstance(node, collections.abc.MutableMapping):
+            elif isinstance(node, col_abc.MutableMapping):
                 items = node.items()
                 set_op = operator.setitem
                 del_op = operator.delitem
-            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+            elif isinstance(node, (col_abc.Sequence, col_abc.Set)):
                 # Inmutable sequence or set: create a new container instance with the new values
                 new_items = [self.visit(value, **kwargs) for value in node]
                 result = node.__class__([value for value in new_items if value is not NOTHING])
-            elif isinstance(node, collections.abc.Mapping):
+            elif isinstance(node, col_abc.Mapping):
                 # Inmutable mapping: create a new mapping instance with the new values
                 new_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
                 result = node.__class__(
@@ -251,8 +254,8 @@ class NodeTranslator(NodeVisitor):
     the visitor methods to replace or remove the old node in a new copy
     of the tree. If the return value of the visitor method is
     `eve.core.NOTHING`, the node will be removed from its location in the
-    result tree, otherwise it is replaced with the return value. In the default
-    case, a deepcopy of the original node is returned.
+    result tree, otherwise it is replaced with the return value. In the
+    default case, a `deepcopy` of the original node is returned.
 
     Keep in mind that if the node you're operating on has child nodes
     you must either transform the child nodes yourself or call the
@@ -268,7 +271,7 @@ class NodeTranslator(NodeVisitor):
         self.memo = memo or {}
 
     def generic_visit(self, node: Node, **kwargs):
-        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
+        if isinstance(node, (Node, col_abc.Collection)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
             if isinstance(node, Node):
@@ -279,12 +282,12 @@ class NodeTranslator(NodeVisitor):
                     **{key: value for key, value in new_items.items() if value is not NOTHING},
                 )
 
-            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+            elif isinstance(node, (col_abc.Sequence, col_abc.Set)):
                 # Sequence or set: create a new container instance with the new values
                 new_items = [self.visit(value, **kwargs) for value in node]
                 result = node.__class__([value for value in new_items if value is not NOTHING])
 
-            elif isinstance(node, collections.abc.Mapping):
+            elif isinstance(node, col_abc.Mapping):
                 # Mapping: create a new mapping instance with the new values
                 new_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
                 result = node.__class__(
