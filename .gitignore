@@ -55,6 +55,7 @@ var/
 .python-version
 
 # Environments
+.env
 .venv
 venv/
 VENV/

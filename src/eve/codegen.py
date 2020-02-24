@@ -23,15 +23,14 @@ import string
 import textwrap
 from collections import abc as col_abc
 from types import MappingProxyType, SimpleNamespace
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import jinja2
 
-from .core import Node, NodeVisitor, StrEnum
+from .core import Node, NodeVisitor, StrEnum, ValidNodeType
 
 
-TextLineType = Union[str, Sequence[Any]]
-TextSequenceType = Union[TextLineType, Sequence[TextLineType], "TextBlock"]
+TextSequenceType = Union[Sequence[str], "TextBlock"]
 
 
 class TextBlock:
@@ -49,45 +48,35 @@ class TextBlock:
         self.indent_size = indent_size
         self.indent_char = indent_char
         self.end_line = end_line
-        self.lines = []
+        self.lines: List[str] = []
 
-    def append(self, new_line: TextLineType, *, update_indent: int = 0) -> "TextBlock":
+    def append(self, new_line: str, *, update_indent: int = 0) -> "TextBlock":
         if update_indent > 0:
             self.indent(update_indent)
         elif update_indent < 0:
             self.dedent(-update_indent)
 
-        if isinstance(new_line, str):
-            new_line = [new_line]
-
-        built_line = [self.indent_char * (self.indent_level * self.indent_size)]
-        for item in new_line:
-            if isinstance(item, str) and isinstance(built_line[-1], str):
-                built_line[-1] += item
-            else:
-                built_line.append(item)
-
-        self.lines.append(built_line)
+        self.lines.append(self.indent_str + new_line)
 
         return self
 
-    def extend(self, new_lines: TextSequenceType, *, dedent: bool = False) -> "TextBlock":
-        assert isinstance(new_lines, (str, col_abc.Sequence, TextBlock))
+    def extend(
+        self, new_lines: Union[Sequence[str], "TextBlock"], *, dedent: bool = False
+    ) -> "TextBlock":
+        assert isinstance(new_lines, (col_abc.Sequence, TextBlock))
 
         if dedent:
             if isinstance(new_lines, TextBlock):
-                new_lines = new_lines.text
-            elif not isinstance(new_lines, str):
-                new_lines = "\n".join(new_lines)
-            new_lines = textwrap.dedent(new_lines)
+                new_lines = textwrap.dedent(new_lines.text).splitlines()
+            else:
+                new_lines = textwrap.dedent("\n".join(new_lines)).splitlines()
 
-        if isinstance(new_lines, str):
-            new_lines = new_lines.splitlines()
         elif isinstance(new_lines, TextBlock):
             new_lines = new_lines.lines
 
         for line in new_lines:
             self.append(line)
+
         return self
 
     def empty_line(self, count: int = 1) -> "TextBlock":
@@ -113,6 +102,10 @@ class TextBlock:
     def text(self) -> str:
         lines = ["".join([str(item) for item in line]) for line in self.lines]
         return self.end_line.join(lines)
+
+    @property
+    def indent_str(self):
+        return self.indent_char * (self.indent_level * self.indent_size)
 
     def __iadd__(self, source_line: str):
         return self.append(source_line)
@@ -200,23 +193,23 @@ class TextTemplate:
         return getattr(self, f"render_{self.kind}")(**mapping)
 
     def render_fmt(self, **kwargs) -> str:
-        return self.definition.format(**kwargs)
+        return self.definition.format(**kwargs)  # type: ignore
 
     def render_jinja(self, **kwargs) -> str:
-        return self.definition.render(**kwargs)
+        return self.definition.render(**kwargs)  # type: ignore
 
     def render_tpl(self, **kwargs) -> str:
-        return self.definition.substitute(**kwargs)
+        return self.definition.substitute(**kwargs)  # type: ignore
 
 
 class NodeDumper(NodeVisitor):
     @classmethod
     def apply(
         cls,
-        root: Node,
+        root: ValidNodeType,
         *,
         node_templates: Optional[Dict[str, TextTemplate]] = None,
-        dump_func: Optional[Callable[[Node], str]] = None,
+        dump_func: Optional[Callable[[ValidNodeType], str]] = None,
         **kwargs,
     ) -> str:
         return cls(node_templates, dump_func).visit(root, **kwargs)
@@ -224,13 +217,13 @@ class NodeDumper(NodeVisitor):
     def __init__(
         self,
         node_templates: Optional[Dict[str, TextTemplate]] = None,
-        dump_func: Optional[Callable[[Node], str]] = None,
+        dump_func: Optional[Callable[[ValidNodeType], str]] = None,
     ):
         self.node_templates = node_templates or {}
         self.dump_func = dump_func if dump_func is not None else str
 
-    def generic_visit(self, node: Node, **kwargs):
-        attrs = {}
+    def generic_visit(self, node: ValidNodeType, **kwargs) -> str:
+        attrs: Dict[str, Any] = {}
         this = node
         template = self.node_templates.get(node.__class__.__name__, None)
         template_kwargs = {}
@@ -255,12 +248,12 @@ class NodeDumper(NodeVisitor):
 
             return template.render(
                 _node_instance=node,
-                _this=SimpleNamespace(**this),
-                _attrs=SimpleNamespace(**attrs),
+                _this=SimpleNamespace(**this),  # type: ignore
+                _attrs=SimpleNamespace(**attrs),  # type: ignore
                 **template_kwargs,
             )
         else:
-            return self.dump_func(this)
+            return self.dump_func(this)  # type: ignore
 
 
 class TemplatedGenerator(NodeDumper):
@@ -269,7 +262,7 @@ class TemplatedGenerator(NodeDumper):
     DUMP_FUNCTION = None
 
     @classmethod
-    def apply(cls, root: Node, **kwargs) -> str:
+    def apply(cls, root: ValidNodeType, **kwargs) -> str:
         return super().apply(
             root, node_templates=cls.NODE_TEMPLATES, dump_func=cls.DUMP_FUNCTION, **kwargs
         )

@@ -15,87 +15,87 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-import enum
-from typing import Optional
+# import enum
+# from typing import Optional
 
-from pydantic import Field, validator  # noqa: F401
+# from pydantic import Field, validator  # noqa: F401
 
-from eve.core import Node, SourceLocation, StrEnum
-
-
-class AssignmentKind(StrEnum):
-    """Kind of assignment: plain or combined with operations."""
-
-    PLAIN = "="
-    ADD = "+="
-    SUB = "-="
-    MUL = "*="
-    DIV = "/="
+# from eve.core import Node, SourceLocation, StrEnum
 
 
-@enum.unique
-class UnaryOperator(StrEnum):
-    """Kind of assignment: plain or combined with operations."""
+# class AssignmentKind(StrEnum):
+#     """Kind of assignment: plain or combined with operations."""
 
-    POS = "+"
-    NEG = "-"
-
-
-@enum.unique
-class BinaryOperator(StrEnum):
-    """Binary operator identifier."""
-
-    ADD = "+"
-    SUB = "-"
-    MUL = "*"
-    DIV = "/"
+#     PLAIN = "="
+#     ADD = "+="
+#     SUB = "-="
+#     MUL = "*="
+#     DIV = "/="
 
 
-@enum.unique
-class DataType(enum.IntEnum):
-    """Data type identifier."""
+# @enum.unique
+# class UnaryOperator(StrEnum):
+#     """Kind of assignment: plain or combined with operations."""
 
-    INVALID = -1
-    AUTO = 0
-    BOOLEAN = 1
-    INT32 = 101
-    UINT32 = 102
-    FLOAT32 = 201
-    FLOAT64 = 202
+#     POS = "+"
+#     NEG = "-"
 
 
-class Expr(Node):
-    pass
+# @enum.unique
+# class BinaryOperator(StrEnum):
+#     """Binary operator identifier."""
+
+#     ADD = "+"
+#     SUB = "-"
+#     MUL = "*"
+#     DIV = "/"
 
 
-class LiteralExpr(Expr):
-    value: str = Field(..., description="Value definition")
-    data_type: DataType = Field(DataType.AUTO, description="Value data type")
-    loc: Optional[SourceLocation]
+# @enum.unique
+# class DataType(enum.IntEnum):
+#     """Data type identifier."""
+
+#     INVALID = -1
+#     AUTO = 0
+#     BOOLEAN = 1
+#     INT32 = 101
+#     UINT32 = 102
+#     FLOAT32 = 201
+#     FLOAT64 = 202
 
 
-class UnaryOpExpr(Expr):
-    op: UnaryOperator = Field(..., description="Operator")
-    operand: Expr = Field(..., description="Expression affected by the operator")
-    loc: Optional[SourceLocation]
+# class Expr(Node):
+#     pass
 
 
-class BinaryOpExpr(Expr):
-    op: BinaryOperator = Field(..., description="Operator")
-    left: Expr = Field(..., description="Left-hand side of the expression")
-    right: Expr = Field(..., description="Right-hand side of the expression")
-    loc: Optional[SourceLocation]
+# class LiteralExpr(Expr):
+#     value: str = Field(..., description="Value definition")
+#     data_type: DataType = Field(DataType.AUTO, description="Value data type")
+#     loc: Optional[SourceLocation]
 
 
-class TernaryOpExpr(Expr):
-    cond: Expr = Field(..., description="Condition")
-    left: Expr = Field(..., description="Left-hand side of the expression")
-    right: Expr = Field(..., description="Right-hand side of the expression")
-    loc: Optional[SourceLocation]
+# class UnaryOpExpr(Expr):
+#     op: UnaryOperator = Field(..., description="Operator")
+#     operand: Expr = Field(..., description="Expression affected by the operator")
+#     loc: Optional[SourceLocation]
 
 
-class AssignmentExpr(Expr):
-    kind: AssignmentKind
-    left: Expr = Field(..., description="Left-hand side")
-    right: Expr = Field(..., description="Right-hand side")
-    loc: Optional[SourceLocation]
+# class BinaryOpExpr(Expr):
+#     op: BinaryOperator = Field(..., description="Operator")
+#     left: Expr = Field(..., description="Left-hand side of the expression")
+#     right: Expr = Field(..., description="Right-hand side of the expression")
+#     loc: Optional[SourceLocation]
+
+
+# class TernaryOpExpr(Expr):
+#     cond: Expr = Field(..., description="Condition")
+#     left: Expr = Field(..., description="Left-hand side of the expression")
+#     right: Expr = Field(..., description="Right-hand side of the expression")
+#     loc: Optional[SourceLocation]
+
+
+# class AssignmentExpr(Expr):
+#     kind: AssignmentKind
+#     left: Expr = Field(..., description="Left-hand side")
+#     right: Expr = Field(..., description="Right-hand side")
+#     loc: Optional[SourceLocation]

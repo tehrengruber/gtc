@@ -4,7 +4,7 @@ flake8
 flake8-builtins
 flake8-docstrings
 flake8-import-order
-mypy
+mypy=0.761
 pre-commit
 pytest
 pytest-cov

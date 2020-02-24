@@ -22,8 +22,22 @@ import itertools
 import operator
 from collections import abc as col_abc
 from enum import Enum
+from typing import (
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    Generator,
+    Iterable,
+    MutableSequence,
+    MutableSet,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, PositiveInt, validator
 
 
 #: Marker value used to avoid confusion with `None`
@@ -42,24 +56,25 @@ def get_unique_id() -> int:
 class StrEnum(str, Enum):
     """Basic :class:`enum.Enum` subclass compatible with string operations."""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
 
 class SourceLocation(BaseModel):
     """Source code location (line, column)."""
 
-    line: int = Field(..., description="Line number (starting at 1)", ge=1)
-    column: int = Field(..., description="Column number (starting at 1)", ge=1)
+    line: PositiveInt
+    column: PositiveInt
 
 
-class Node(BaseModel):
+class BaseNode(BaseModel):
     """Base node class.
 
     Field values should be either:
 
-        * builtin types: `str`, `int`, `float`, `tuple`, `list`, `set`, `dict`
-        * other :class:`Node` subclasses
+        * builtin types: `str`, `int`, `float`, `bytes`?
+        * other :class:`BaseNode` subclasses
+        * other :class:`pydantic.BaseModel` subclasses
         * supported collections (:class:`collections.abc.Sequence`,
         :class:`collections.abc.Set`, :class:`collections.abc.Mapping`) of
         any of the previous items
@@ -67,59 +82,68 @@ class Node(BaseModel):
     Using other classes as values would most likely work but it is not
     explicitly supported.
 
-    Field names ending with "_"  are considered as hidden and
+    Field names ending with "_"  are considered hidden fields and
     will not appear in the node iterators. Field names ending with
     "_attr" are considered attributes of the node, not children.
     """
 
-    id_attr: int = Field(None, description="Unique node identifier")
-    kind_attr: str = Field(None, description="Node kind")
-    dialect_attr: str = Field(None, description="IR dialect of this node kind")
+    id_attr: Optional[int] = None
+    kind_attr: Optional[str] = None
+    dialect_attr: Optional[str] = None
 
     @validator("id_attr", pre=True, always=True)
-    def _id_attr_validator(cls, v):
+    def _id_attr_validator(cls: Type[BaseModel], v: Optional[int]) -> int:  # type: ignore
         return v or get_unique_id()
 
     @validator("kind_attr", pre=True, always=True)
-    def _kind_attr_validator(cls, v):
+    def _kind_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
         if v and v != cls.__name__:
             raise ValueError(f"kind_attr value '{v}' does not match cls.__name__ {cls.__name__}")
 
         return v or cls.__name__
 
     @validator("dialect_attr", pre=True, always=True)
-    def _dialect_attr_validator(cls, v):
+    def _dialect_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
         return v or cls.__module__.split(".")[-1]
 
     @property
-    def attributes(self):
+    def attributes(self) -> Dict[str, Any]:
         return {name: value for name, value in self.iter_attributes()}
 
     @property
-    def children(self):
+    def children(self) -> Dict[str, Any]:
         return {name: value for name, value in self.iter_children()}
 
-    def iter_attributes(self):
+    def iter_attributes(self) -> Generator[Tuple[str, Any], None, None]:
         for name, value in self.__fields__.items():
             if name.endswith("attr"):
                 yield (name, getattr(self, name))
 
-    def iter_children(self):
+    def iter_children(self) -> Generator[Tuple[str, Any], None, None]:
         for name, value in self.__fields__.items():
             if not (name.endswith("attr") or name.endswith("_")):
                 yield (name, getattr(self, name))
 
 
-class _InmutableConfig:
-    """Pydantic Config class for inmutable models."""
+class MutableNode(BaseNode):
+    """Base mutable node class."""
 
-    allow_mutation = False
+    class Config:
+        allow_mutation = True
 
 
-class InmutableNode(Node):
+class InmutableNode(BaseNode):
     """Base inmutable node class."""
 
-    Config = _InmutableConfig
+    class Config:
+        allow_mutation = False
+
+
+Node = MutableNode
+
+
+ValidLeafNodeType = Optional[Union[int, float, str, BaseNode, BaseModel]]
+ValidNodeType = Optional[Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]]
 
 
 class NodeVisitor:
@@ -144,7 +168,7 @@ class NodeVisitor:
     allows modifications.
     """
 
-    def visit(self, node: Node, **kwargs):
+    def visit(self, node: ValidNodeType, **kwargs) -> Any:
         visitor = self.generic_visit
         if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
@@ -155,8 +179,8 @@ class NodeVisitor:
 
         return visitor(node, **kwargs)
 
-    def generic_visit(self, node: Node, **kwargs):
-        items = []
+    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+        items: Iterable[Tuple[Any, Any]] = []
         if isinstance(node, Node):
             items = node.iter_children()
         elif isinstance(node, (col_abc.Sequence, col_abc.Set)) and not isinstance(
@@ -190,12 +214,16 @@ class NodeTransformer(NodeVisitor):
        node = YourTransformer().visit(node)
     """
 
-    def generic_visit(self, node: Node, **kwargs):
-        result = node
+    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+        result: Any = node
         if isinstance(node, (Node, col_abc.Collection)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
-            items = []
+            items: Iterable[Tuple[Any, Any]] = []
+            tmp_items: Collection[ValidNodeType] = []
+            set_op: Union[Callable[[Any, str, Any], None], Callable[[Any, int, Any], None]]
+            del_op: Union[Callable[[Any, str], None], Callable[[Any, int], None]]
+
             if isinstance(node, Node):
                 items = node.iter_children()
                 set_op = setattr
@@ -204,10 +232,10 @@ class NodeTransformer(NodeVisitor):
                 items = enumerate(node)
                 index_shift = 0
 
-                def set_op(container, idx, value):
+                def set_op(container: MutableSequence, idx: int, value: ValidNodeType) -> None:
                     container[idx - index_shift] = value
 
-                def del_op(container, idx):
+                def del_op(container: MutableSequence, idx: int) -> None:
                     nonlocal index_shift
                     del container[idx - index_shift]
                     index_shift += 1
@@ -215,11 +243,11 @@ class NodeTransformer(NodeVisitor):
             elif isinstance(node, col_abc.MutableSet):
                 items = list(enumerate(node))
 
-                def set_op(container, idx, value):
+                def set_op(container: MutableSet, idx: Any, value: ValidNodeType) -> None:
                     container.add(value)
 
-                def del_op(container, idx):
-                    container.remove(items[idx])
+                def del_op(container: MutableSet, idx: int) -> None:
+                    container.remove(items[idx])  # type: ignore
 
             elif isinstance(node, col_abc.MutableMapping):
                 items = node.items()
@@ -227,13 +255,15 @@ class NodeTransformer(NodeVisitor):
                 del_op = operator.delitem
             elif isinstance(node, (col_abc.Sequence, col_abc.Set)):
                 # Inmutable sequence or set: create a new container instance with the new values
-                new_items = [self.visit(value, **kwargs) for value in node]
-                result = node.__class__([value for value in new_items if value is not NOTHING])
+                tmp_items = [self.visit(value, **kwargs) for value in node]
+                result = node.__class__(  # type: ignore
+                    [value for value in tmp_items if value is not NOTHING]
+                )
             elif isinstance(node, col_abc.Mapping):
                 # Inmutable mapping: create a new mapping instance with the new values
-                new_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
-                result = node.__class__(
-                    {key: value for key, value in new_items.items() if value is not NOTHING}
+                tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
+                result = node.__class__(  # type: ignore
+                    {key: value for key, value in tmp_items.items() if value is not NOTHING}
                 )
 
             # Finally, in case current node object is mutable, process selected items (if any)
@@ -243,7 +273,6 @@ class NodeTransformer(NodeVisitor):
                     del_op(result, key)
                 elif new_value != value:
                     set_op(result, key, new_value)
-
         return result
 
 
@@ -270,28 +299,32 @@ class NodeTranslator(NodeVisitor):
         assert memo is None or isinstance(memo, dict)
         self.memo = memo or {}
 
-    def generic_visit(self, node: Node, **kwargs):
+    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+        result: Any
         if isinstance(node, (Node, col_abc.Collection)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
+            tmp_items: Collection[ValidNodeType] = []
             if isinstance(node, Node):
-                new_items = {key: self.visit(value, **kwargs) for key, value in node}
-                result = node.__class__(
+                tmp_items = {key: self.visit(value, **kwargs) for key, value in node}
+                result = node.__class__(  # type: ignore
                     node_id_=node.node_id_,
                     node_kind_=node.node_kind_,
-                    **{key: value for key, value in new_items.items() if value is not NOTHING},
+                    **{key: value for key, value in tmp_items.items() if value is not NOTHING},
                 )
 
             elif isinstance(node, (col_abc.Sequence, col_abc.Set)):
                 # Sequence or set: create a new container instance with the new values
-                new_items = [self.visit(value, **kwargs) for value in node]
-                result = node.__class__([value for value in new_items if value is not NOTHING])
+                tmp_items = [self.visit(value, **kwargs) for value in node]
+                result = node.__class__(  # type: ignore
+                    [value for value in tmp_items if value is not NOTHING]
+                )
 
             elif isinstance(node, col_abc.Mapping):
                 # Mapping: create a new mapping instance with the new values
-                new_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
-                result = node.__class__(
-                    {key: value for key, value in new_items.items() if value is not NOTHING}
+                tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
+                result = node.__class__(  # type: ignore
+                    {key: value for key, value in tmp_items.items() if value is not NOTHING}
                 )
 
         else:

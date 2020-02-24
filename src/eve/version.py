@@ -22,14 +22,11 @@ import os
 from packaging.version import parse
 
 
-try:
-    with open(os.path.join(os.path.dirname(__file__), "_VERSION.txt"), "r") as version_file:
-        __version__ = version_file.read().strip()
-        __versioninfo__ = parse(__version__)
+version_file_path = os.path.join(os.path.dirname(__file__), "_SCM_VERSION.txt")
+if not os.path.isfile(version_file_path):
+    # Fallback to static version file
+    version_file_path = os.path.join(os.path.dirname(__file__), "_VERSION.txt")
 
-except IOError:
-    __version__ = ""
-    __versioninfo__ = None
-
-finally:
-    del os, parse
+with open(version_file_path, "r") as version_file:
+    __version__: str = version_file.read().strip()
+    __versioninfo__ = parse(__version__)

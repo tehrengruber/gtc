@@ -15,51 +15,51 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-import collections.abc
-import copy
+# import collections.abc
+# import copy
 
-from pydantic import Field, validator  # noqa: F401
+# from pydantic import Field, validator  # noqa: F401
 
-from .core import Node, NodeTransformer, NodeVisitor, NOTHING  # noqa: F401
+# from .core import Node, NodeTransformer, NodeVisitor, NOTHING  # noqa: F401
 
 
-class TransformationPass(NodeVisitor):
-    @classmethod
-    def apply(cls, node: Node, **kwargs):
-        return cls(**kwargs).visit(node)
+# class TransformationPass(NodeVisitor):
+#     @classmethod
+#     def apply(cls, node: Node, **kwargs):
+#         return cls(**kwargs).visit(node)
 
-    def __init__(self, *, memo: dict = None, **kwargs):
-        assert memo is None or isinstance(memo, dict)
-        self.memo = memo or {}
+#     def __init__(self, *, memo: dict = None, **kwargs):
+#         assert memo is None or isinstance(memo, dict)
+#         self.memo = memo or {}
 
-    def generic_visit(self, node: Node, **kwargs):
-        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
-            node, (str, bytes, bytearray)
-        ):
-            if isinstance(node, Node):
-                new_items = {key: self.visit(value, **kwargs) for key, value in node}
-                result = node.__class__(
-                    node_id_=node.node_id_,
-                    node_kind_=node.node_kind_,
-                    **{key: value for key, value in new_items.items() if value is not NOTHING},
-                )
+#     def generic_visit(self, node: Node, **kwargs):
+#         if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
+#             node, (str, bytes, bytearray)
+#         ):
+#             if isinstance(node, Node):
+#                 new_items = {key: self.visit(value, **kwargs) for key, value in node}
+#                 result = node.__class__(
+#                     node_id_=node.node_id_,
+#                     node_kind_=node.node_kind_,
+#                     **{key: value for key, value in new_items.items() if value is not NOTHING},
+#                 )
 
-            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
-                # Sequence or set: create a new container instance with the new values
-                new_items = [self.visit(value, **kwargs) for value in node]
-                result = node.__class__([value for value in new_items if value is not NOTHING])
+#             elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+#                 # Sequence or set: create a new container instance with the new values
+#                 new_items = [self.visit(value, **kwargs) for value in node]
+#                 result = node.__class__([value for value in new_items if value is not NOTHING])
 
-            elif isinstance(node, collections.abc.Mapping):
-                # Mapping: create a new mapping instance with the new values
-                new_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
-                result = node.__class__(
-                    {key: value for key, value in new_items.items() if value is not NOTHING}
-                )
+#             elif isinstance(node, collections.abc.Mapping):
+#                 # Mapping: create a new mapping instance with the new values
+#                 new_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
+#                 result = node.__class__(
+#                     {key: value for key, value in new_items.items() if value is not NOTHING}
+#                 )
 
-        else:
-            result = copy.deepcopy(node, memo=self.memo)
+#         else:
+#             result = copy.deepcopy(node, memo=self.memo)
 
-        return result
+#         return result
 
 
 # Alternative implementation: clone and modify the copy in-place

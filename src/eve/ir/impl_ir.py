@@ -21,8 +21,8 @@
 # from pydantic import Field, validator
 
 # from ..core import Node, SourceLocation, StrEnum
-from . import gt_ir
+# from . import gt_ir
 
 
-class AssignmentKind(gt_ir.AssignmentKind):
-    pass
+# class AssignmentKind(gt_ir.AssignmentKind):
+#     pass

@@ -23,4 +23,4 @@ exclude = '''
 
 [tool.setuptools_scm]
 version_scheme = "python-simplified-semver"
-write_to = "src/eve/_VERSION.txt"
+write_to = "src/eve/_SCM_VERSION.txt"
