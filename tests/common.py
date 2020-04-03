@@ -28,8 +28,8 @@ from eve.core import (  # type: ignore
     Float,
     Int,
     Str,
-    InmutableNode,
-    MutableNode,
+    FrozenNode,
+    Node,
     SourceLocation,
     StrEnum,
 )
@@ -174,15 +174,15 @@ class IntKind(enum.IntEnum):
     PLUS = 1
 
 
-class EmptyNode(InmutableNode):
+class EmptyNode(FrozenNode):
     pass
 
 
-class LocationNode(InmutableNode):
+class LocationNode(FrozenNode):
     loc: SourceLocation
 
 
-class SimpleNode(InmutableNode):
+class SimpleNode(FrozenNode):
     bool_value: Bool
     int_value: Int
     float_value: Float
@@ -192,34 +192,40 @@ class SimpleNode(InmutableNode):
     str_kind: StrKind
 
 
-class SimpleNodeWithOptionals(InmutableNode):
+class SimpleNodeWithOptionals(FrozenNode):
     int_value: Optional[Int]
     float_value: Optional[Float]
     str_value: Optional[Str]
 
 
-class SimpleNodeWithLoc(InmutableNode):
+class SimpleNodeWithHiddenMembers(FrozenNode):
+    hidden_attr_: Int
+    int_value: Int
+    hidden_value_: Int
+
+
+class SimpleNodeWithLoc(FrozenNode):
     int_value: Int
     float_value: Float
     str_value: Str
     loc: Optional[SourceLocation]
 
 
-class SimpleNodeWithCollections(InmutableNode):
+class SimpleNodeWithCollections(FrozenNode):
     int_list: List[Int]
     str_set: Set[Str]
     str_to_int_dict: Dict[Str, Int]
     loc: Optional[SourceLocation]
 
 
-class SimpleNodeWithAbstractCollections(InmutableNode):
+class SimpleNodeWithAbstractCollections(FrozenNode):
     int_sequence: Sequence[Int]
     str_set: Set[Str]
     str_to_int_mapping: Mapping[Str, Int]
     loc: Optional[SourceLocation]
 
 
-class CompoundNode(InmutableNode):
+class CompoundNode(FrozenNode):
     location: LocationNode
     simple: SimpleNode
     simple_loc: SimpleNodeWithLoc
@@ -227,23 +233,24 @@ class CompoundNode(InmutableNode):
     other_simple_opt: Optional[SimpleNodeWithOptionals]
 
 
-class CompoundNodeWithCollections(InmutableNode):
+class CompoundNodeWithCollections(FrozenNode):
     simple_col: Optional[SimpleNodeWithCollections]
     simple_abscol: Optional[SimpleNodeWithAbstractCollections]
     compound_col: Sequence[CompoundNode]
     compound_all: Optional[Mapping[Str, CompoundNode]]
 
 
-class MutableSimpleNode(MutableNode):
+class MutableSimpleNode(Node):
     bool_value: Bool
     int_value: Int
     float_value: Float
     str_value: Str
+    bytes_value: Bytes
     int_kind: IntKind
     str_kind: StrKind
 
 
-class MutableCompoundNode(MutableNode):
+class MutableCompoundNode(Node):
     location: LocationNode
     simple: SimpleNode
     simple_loc: SimpleNodeWithLoc
@@ -293,6 +300,15 @@ def simple_node_with_optionals_maker(randomize: bool = True) -> SimpleNodeWithOp
     float_value = factories.make_float()
 
     return SimpleNodeWithOptionals(int_value=int_value, float_value=float_value)
+
+
+def simple_node_with_hidden_members_maker(randomize: bool = True) -> SimpleNodeWithHiddenMembers:
+    factories = RandomFactories if randomize else Factories
+    int_value = factories.make_int()
+
+    return SimpleNodeWithHiddenMembers(
+        hidden_attr_=int_value, int_value=int_value, hidden_value_=int_value
+    )
 
 
 def simple_node_with_loc_maker(randomize: bool = True) -> SimpleNodeWithLoc:
@@ -353,6 +369,30 @@ def compound_node_with_collections_maker(randomize: bool = True) -> CompoundNode
         simple_abscol=simple_node_with_abstractcollections_maker(),
         compound_col=[compound_node_1, compound_node_2],
         compound_all={"node_3": compound_node_3, "node_4": compound_node_4},
+    )
+
+
+def mutable_simple_node_maker(randomize: bool = True) -> MutableSimpleNode:
+    template_node = simple_node_maker(randomize)
+    return MutableSimpleNode(
+        bool_value=template_node.bool_value,
+        int_value=template_node.int_value,
+        float_value=template_node.float_value,
+        str_value=template_node.str_value,
+        bytes_value=template_node.bytes_value,
+        int_kind=template_node.int_kind,
+        str_kind=template_node.str_kind,
+    )
+
+
+def mutable_compound_node_maker(randomize: bool = True) -> MutableCompoundNode:
+    template_node = compound_node_maker(randomize)
+    return MutableCompoundNode(
+        location=template_node.location,
+        simple=template_node.simple,
+        simple_loc=template_node.simple_loc,
+        simple_opt=template_node.simple_opt,
+        other_simple_opt=template_node.other_simple_opt,
     )
 
 

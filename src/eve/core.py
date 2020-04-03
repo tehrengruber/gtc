@@ -20,13 +20,12 @@
 import copy
 import itertools
 import operator
-from collections import abc as col_abc
+import collections.abc
 from enum import Enum
 from typing import (
     Any,
     Callable,
     Collection,
-    Dict,
     Generator,
     Iterable,
     MutableSequence,
@@ -84,14 +83,12 @@ class StrEnum(str, Enum):
         return self.value
 
 
-class InmutableModelConfig:
+class BaseModelConfig:
+    extra = "forbid"
+
+
+class FrozenModelConfig(BaseModelConfig):
     allow_mutation = False
-    extra = "forbid"
-
-
-class MutableModelConfig:
-    allow_mutation = True
-    extra = "forbid"
 
 
 class SourceLocation(BaseModel):
@@ -101,7 +98,7 @@ class SourceLocation(BaseModel):
     column: PositiveInt
     source: Str
 
-    class Config(InmutableModelConfig):
+    class Config(FrozenModelConfig):
         pass
 
     def __str__(self):
@@ -143,40 +140,29 @@ class BaseNode(BaseModel):
     def _dialect_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
         return v or cls.__module__.split(".")[-1]
 
-    @property
-    def attributes(self) -> Dict[str, Any]:
-        return {name: value for name, value in self.iter_attributes()}
-
-    @property
-    def children(self) -> Dict[str, Any]:
-        return {name: value for name, value in self.iter_children()}
-
-    def iter_attributes(self) -> Generator[Tuple[str, Any], None, None]:
+    def attributes(self) -> Generator[Tuple[str, Any], None, None]:
         for name, value in self.__fields__.items():
             if name.endswith("_attr"):
                 yield (name, getattr(self, name))
 
-    def iter_children(self) -> Generator[Tuple[str, Any], None, None]:
+    def children(self) -> Generator[Tuple[str, Any], None, None]:
         for name, value in self.__fields__.items():
             if not (name.endswith("_attr") or name.endswith("_")):
                 yield (name, getattr(self, name))
 
-
-class MutableNode(BaseNode):
-    """Base mutable node class."""
-
-    class Config(MutableModelConfig):
+    class Config(BaseModelConfig):
         pass
 
 
-class InmutableNode(BaseNode):
+class Node(BaseNode):
+    pass
+
+
+class FrozenNode(Node):
     """Base inmutable node class."""
 
-    class Config(InmutableModelConfig):
+    class Config(FrozenModelConfig):
         pass
-
-
-Node = MutableNode
 
 
 ValidLeafNodeType = Optional[
@@ -207,112 +193,36 @@ class NodeVisitor:
     allows modifications.
     """
 
+    ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
+
     def visit(self, node: ValidNodeType, **kwargs) -> Any:
         visitor = self.generic_visit
-        if isinstance(node, Node):
+        if isinstance(node, BaseNode):
             for node_class in node.__class__.__mro__:
                 method_name = "visit_" + node_class.__name__
                 if hasattr(self, method_name):
                     visitor = getattr(self, method_name)
                     break
 
+                if node_class is BaseNode:
+                    break
+
         return visitor(node, **kwargs)
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
         items: Iterable[Tuple[Any, Any]] = []
-        if isinstance(node, Node):
-            items = node.iter_children()
-        elif isinstance(node, (col_abc.Sequence, col_abc.Set)) and not isinstance(
-            node, (str, bytes, bytearray)
+        if isinstance(node, BaseNode):
+            items = node.children()
+        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
+            node, self.ATOMIC_COLLECTION_TYPES
         ):
             items = enumerate(node)
-        elif isinstance(node, col_abc.Mapping):
+        elif isinstance(node, collections.abc.Mapping):
             items = node.items()
 
         # Process selected items (if any)
         for _, value in items:
             self.visit(value, **kwargs)
-
-
-class NodeTransformer(NodeVisitor):
-    """Simple :class:`NodeVisitor` subclass based on :class:`ast.NodeTransformer` to modify nodes in place.
-
-    The `NodeTransformer` will walk the tree and use the return value of
-    the visitor methods to replace or remove the old node. If the
-    return value of the visitor method is :obj:`eve.core.NOTHING`,
-    the node will be removed from its location, otherwise it is replaced
-    with the return value. The return value may also be the original
-    node, in which case no replacement takes place.
-
-    Keep in mind that if the node you're operating on has child nodes
-    you must either transform the child nodes yourself or call the
-    :meth:`generic_visit` method for the node first.
-
-    Usually you use the transformer like this::
-
-       node = YourTransformer().visit(node)
-    """
-
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
-        result: Any = node
-        if isinstance(node, (BaseNode, col_abc.Collection)) and not isinstance(
-            node, (str, bytes, bytearray)
-        ):
-            items: Iterable[Tuple[Any, Any]] = []
-            tmp_items: Collection[ValidNodeType] = []
-            set_op: Union[Callable[[Any, str, Any], None], Callable[[Any, int, Any], None]]
-            del_op: Union[Callable[[Any, str], None], Callable[[Any, int], None]]
-
-            if isinstance(node, Node):
-                items = node.iter_children()
-                set_op = setattr
-                del_op = delattr
-            elif isinstance(node, col_abc.MutableSequence):
-                items = enumerate(node)
-                index_shift = 0
-
-                def set_op(container: MutableSequence, idx: int, value: ValidNodeType) -> None:
-                    container[idx - index_shift] = value
-
-                def del_op(container: MutableSequence, idx: int) -> None:
-                    nonlocal index_shift
-                    del container[idx - index_shift]
-                    index_shift += 1
-
-            elif isinstance(node, col_abc.MutableSet):
-                items = list(enumerate(node))
-
-                def set_op(container: MutableSet, idx: Any, value: ValidNodeType) -> None:
-                    container.add(value)
-
-                def del_op(container: MutableSet, idx: int) -> None:
-                    container.remove(items[idx])  # type: ignore
-
-            elif isinstance(node, col_abc.MutableMapping):
-                items = node.items()
-                set_op = operator.setitem
-                del_op = operator.delitem
-            elif isinstance(node, (col_abc.Sequence, col_abc.Set)):
-                # Inmutable sequence or set: create a new container instance with the new values
-                tmp_items = [self.visit(value, **kwargs) for value in node]
-                result = node.__class__(  # type: ignore
-                    [value for value in tmp_items if value is not NOTHING]
-                )
-            elif isinstance(node, col_abc.Mapping):
-                # Inmutable mapping: create a new mapping instance with the new values
-                tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
-                result = node.__class__(  # type: ignore
-                    {key: value for key, value in tmp_items.items() if value is not NOTHING}
-                )
-
-            # Finally, in case current node object is mutable, process selected items (if any)
-            for key, value in items:
-                new_value = self.visit(value, **kwargs)
-                if new_value is NOTHING:
-                    del_op(result, key)
-                elif new_value != value:
-                    set_op(result, key, new_value)
-        return result
 
 
 class NodeTranslator(NodeVisitor):
@@ -340,25 +250,25 @@ class NodeTranslator(NodeVisitor):
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
         result: Any
-        if isinstance(node, (Node, col_abc.Collection)) and not isinstance(
-            node, (str, bytes, bytearray)
+        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
+            node, self.ATOMIC_COLLECTION_TYPES
         ):
             tmp_items: Collection[ValidNodeType] = []
             if isinstance(node, BaseNode):
                 tmp_items = {key: self.visit(value, **kwargs) for key, value in node}
                 result = node.__class__(  # type: ignore
-                    **{key: value for key, value in node.iter_attributes()},
+                    **{key: value for key, value in node.attributes()},
                     **{key: value for key, value in tmp_items.items() if value is not NOTHING},
                 )
 
-            elif isinstance(node, (col_abc.Sequence, col_abc.Set)):
+            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
                 # Sequence or set: create a new container instance with the new values
                 tmp_items = [self.visit(value, **kwargs) for value in node]
                 result = node.__class__(  # type: ignore
                     [value for value in tmp_items if value is not NOTHING]
                 )
 
-            elif isinstance(node, col_abc.Mapping):
+            elif isinstance(node, collections.abc.Mapping):
                 # Mapping: create a new mapping instance with the new values
                 tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
                 result = node.__class__(  # type: ignore
@@ -368,4 +278,85 @@ class NodeTranslator(NodeVisitor):
         else:
             result = copy.deepcopy(node, memo=self.memo)
 
+        return result
+
+
+class NodeModifier(NodeVisitor):
+    """Simple :class:`NodeVisitor` subclass based on :class:`ast.NodeTransformer` to modify nodes in place.
+
+    The `NodeTransformer` will walk the tree and use the return value of
+    the visitor methods to replace or remove the old node. If the
+    return value of the visitor method is :obj:`eve.core.NOTHING`,
+    the node will be removed from its location, otherwise it is replaced
+    with the return value. The return value may also be the original
+    node, in which case no replacement takes place.
+
+    Keep in mind that if the node you're operating on has child nodes
+    you must either transform the child nodes yourself or call the
+    :meth:`generic_visit` method for the node first.
+
+    Usually you use the transformer like this::
+
+       node = YourTransformer().visit(node)
+    """
+
+    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+        result: Any = node
+        if isinstance(node, (BaseNode, collections.abc.Collection)) and not isinstance(
+            node, self.ATOMIC_COLLECTION_TYPES
+        ):
+            items: Iterable[Tuple[Any, Any]] = []
+            tmp_items: Collection[ValidNodeType] = []
+            set_op: Union[Callable[[Any, str, Any], None], Callable[[Any, int, Any], None]]
+            del_op: Union[Callable[[Any, str], None], Callable[[Any, int], None]]
+
+            if isinstance(node, Node):
+                items = node.children()
+                set_op = setattr
+                del_op = delattr
+            elif isinstance(node, collections.abc.MutableSequence):
+                items = enumerate(node)
+                index_shift = 0
+
+                def set_op(container: MutableSequence, idx: int, value: ValidNodeType) -> None:
+                    container[idx - index_shift] = value
+
+                def del_op(container: MutableSequence, idx: int) -> None:
+                    nonlocal index_shift
+                    del container[idx - index_shift]
+                    index_shift += 1
+
+            elif isinstance(node, collections.abc.MutableSet):
+                items = list(enumerate(node))
+
+                def set_op(container: MutableSet, idx: Any, value: ValidNodeType) -> None:
+                    container.add(value)
+
+                def del_op(container: MutableSet, idx: int) -> None:
+                    container.remove(items[idx])  # type: ignore
+
+            elif isinstance(node, collections.abc.MutableMapping):
+                items = node.items()
+                set_op = operator.setitem
+                del_op = operator.delitem
+            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+                # Inmutable sequence or set: create a new container instance with the new values
+                tmp_items = [self.visit(value, **kwargs) for value in node]
+                result = node.__class__(  # type: ignore
+                    [value for value in tmp_items if value is not NOTHING]
+                )
+            elif isinstance(node, collections.abc.Mapping):
+                # Inmutable mapping: create a new mapping instance with the new values
+                tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
+                result = node.__class__(  # type: ignore
+                    {key: value for key, value in tmp_items.items() if value is not NOTHING}
+                )
+
+            # Finally, in case current node object is mutable, process selected items (if any)
+            for key, value in items:
+                new_value = self.visit(value, **kwargs)
+                if new_value is NOTHING:
+                    del_op(result, key)
+                elif new_value != value:
+                    set_op(result, key, new_value)
         return result

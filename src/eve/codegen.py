@@ -18,16 +18,16 @@
 
 
 import contextlib
+import collections.abc
 import os
 import string
 import textwrap
-from collections import abc as col_abc
 from types import MappingProxyType, SimpleNamespace
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Sequence, Union
 
 import jinja2
 
-from .core import Node, NodeVisitor, StrEnum, ValidNodeType
+from .core import BaseNode, NodeVisitor, StrEnum, ValidNodeType
 
 
 TextSequenceType = Union[Sequence[str], "TextBlock"]
@@ -63,7 +63,7 @@ class TextBlock:
     def extend(
         self, new_lines: Union[Sequence[str], "TextBlock"], *, dedent: bool = False
     ) -> "TextBlock":
-        assert isinstance(new_lines, (col_abc.Sequence, TextBlock))
+        assert isinstance(new_lines, (collections.abc.Sequence, TextBlock))
 
         if dedent:
             if isinstance(new_lines, TextBlock):
@@ -131,12 +131,16 @@ ValidTemplateType = Union[str, jinja2.Template, string.Template]
 class TextTemplate:
     """A generic text template class abstracting different template engines."""
 
-    _TEMPLATE_TYPES = MappingProxyType(
+    KIND_TO_TYPES_MAPPING: ClassVar[Mapping[TemplateKind, ValidTemplateType]] = MappingProxyType(
         {
             TemplateKind.FMT: str,
             TemplateKind.JINJA: jinja2.Template,
             TemplateKind.TPL: string.Template,
         }
+    )
+
+    TYPES_TO_KIND_MAPPING: ClassVar[Mapping[ValidTemplateType, TemplateKind]] = MappingProxyType(
+        {type_.__name__: kind for kind, type_ in KIND_TO_TYPES_MAPPING.items()}
     )
 
     @classmethod
@@ -161,12 +165,14 @@ class TextTemplate:
             definition = string.Template(definition)
         return cls(definition, TemplateKind.TPL)
 
-    def __init__(self, definition: ValidTemplateType, kind: TemplateKind):
+    def __init__(self, definition: ValidTemplateType, kind: Optional[TemplateKind] = None):
+        if kind is None:
+            kind = self.TYPES_TO_KIND_MAPPING.get(type(definition).__name__, None)
         if not isinstance(kind, TemplateKind):
             raise TypeError(
                 f"'kind' argument must be an instance of {TemplateKind} ({type(kind)} provided))"
             )
-        if not isinstance(definition, self._TEMPLATE_TYPES[kind]):
+        if not isinstance(definition, self.KIND_TO_TYPES_MAPPING[kind]):
             raise TypeError(
                 f"Invalid 'definition' type for '{kind}' template kind ({type(definition)})"
             )
@@ -208,7 +214,7 @@ class NodeDumper(NodeVisitor):
         cls,
         root: ValidNodeType,
         *,
-        node_templates: Optional[Dict[str, TextTemplate]] = None,
+        node_templates: Optional[Dict[str, Union[TextTemplate, ValidTemplateType]]] = None,
         dump_func: Optional[Callable[[ValidNodeType], str]] = None,
         **kwargs,
     ) -> str:
@@ -216,44 +222,50 @@ class NodeDumper(NodeVisitor):
 
     def __init__(
         self,
-        node_templates: Optional[Dict[str, TextTemplate]] = None,
+        node_templates: Optional[Dict[str, Union[TextTemplate, ValidTemplateType]]] = None,
         dump_func: Optional[Callable[[ValidNodeType], str]] = None,
     ):
-        self.node_templates = node_templates or {}
-        self.dump_func = dump_func if dump_func is not None else str
+        node_templates = node_templates or {}
+        self.node_templates = {
+            key: value if isinstance(value, TextTemplate) else TextTemplate(value)
+            for key, value in node_templates.items()
+        }
+        self.dump_func = dump_func
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> str:
-        attrs: Dict[str, Any] = {}
-        this = node
-        template = self.node_templates.get(node.__class__.__name__, None)
-        template_kwargs = {}
+        template: TextTemplate = self.node_templates.get(node.__class__.__name__, None)
+        attrs_strings: Dict[str, Any] = {}
+        child_strings: Dict[str, Any] = {}
 
-        if isinstance(node, (Node, col_abc.Collection)) and not isinstance(
+        if isinstance(node, (BaseNode, collections.abc.Collection)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
-            if isinstance(node, Node):
-                attrs = {key: self.visit(value, **kwargs) for key, value in node.iter_attributes()}
-                this = {key: self.visit(value, **kwargs) for key, value in node.iter_children()}
+            if isinstance(node, BaseNode):
+                attrs_strings = {
+                    key: self.visit(value, **kwargs) for key, value in node.attributes()
+                }
+                child_strings = {key: self.visit(value, **kwargs) for key, value in node.children()}
 
-            elif isinstance(node, (col_abc.Sequence, col_abc.Set)):
-                this = {f"_{i}": self.visit(value, **kwargs) for i, value in enumerate(node)}
+            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+                child_strings = {
+                    f"_{i}": self.visit(value, **kwargs) for i, value in enumerate(node)
+                }
 
-            elif isinstance(node, col_abc.Mapping):
-                this = {key: self.visit(value, **kwargs) for key, value in node.items()}
+            elif isinstance(node, collections.abc.Mapping):
+                child_strings = {key: self.visit(value, **kwargs) for key, value in node.items()}
 
         if template:
-            template_kwargs.update(attrs)
-            if isinstance(this, dict):
-                template_kwargs.update(this)
-
             return template.render(
-                _node_instance=node,
-                _this=SimpleNamespace(**this),  # type: ignore
-                _attrs=SimpleNamespace(**attrs),  # type: ignore
-                **template_kwargs,
+                _instance=node,
+                _this=SimpleNamespace(**child_strings),  # type: ignore
+                _attrs=SimpleNamespace(**attrs_strings),  # type: ignore
+                **attrs_strings,
+                **child_strings,
             )
+        elif self.dump_func:
+            return self.dump_func(child_strings or node)  # type: ignore
         else:
-            return self.dump_func(this)  # type: ignore
+            return ""
 
 
 class TemplatedGenerator(NodeDumper):

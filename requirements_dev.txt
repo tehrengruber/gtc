@@ -4,7 +4,11 @@ flake8
 flake8-builtins
 flake8-docstrings
 flake8-import-order
+ipykernel
+ipython
 isort[requirements]>=4.3
+jupyter
+jupyterlab
 mypy==0.761
 pre-commit
 pytest

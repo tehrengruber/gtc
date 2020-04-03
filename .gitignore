@@ -57,7 +57,7 @@ var/
 # Environments
 .env
 .venv
-venv/
+*.venv/
 VENV/
 env.bak/
 

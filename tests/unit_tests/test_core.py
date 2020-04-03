@@ -14,13 +14,19 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# from devtools import debug
+import collections.abc
+
 import pydantic
 import pytest  # type: ignore
 
 import eve  # type: ignore
 
 from .. import common
+
+
+@pytest.fixture(params=[eve.NodeVisitor, eve.NodeTranslator, eve.NodeTranslator])
+def visitor_base_class(request):
+    return request.param
 
 
 class TestSourceLocation:
@@ -74,7 +80,85 @@ class TestNodeMetaAttributes:
         assert my_node.dialect_attr == custom_dialect != location_node.dialect_attr
 
 
-class TestNodeValidation:
-    def test_invalid_nodes(self, invalid_sample_node_maker):
+class TestNodeFeatures:
+    def test_validation(self, invalid_sample_node_maker):
         with pytest.raises(pydantic.ValidationError):
             invalid_sample_node_maker()
+
+    def test_mutability(self, mutable_sample_node):
+        mutable_sample_node.id_attr = None
+        mutable_sample_node.kind_attr = None
+        mutable_sample_node.dialect_attr = None
+
+    def test_inmutability(self, sample_node):
+        with pytest.raises(TypeError):
+            sample_node.kind_attr = None
+        with pytest.raises(TypeError):
+            sample_node.kind_attr = None
+        with pytest.raises(TypeError):
+            sample_node.dialect_attr = None
+
+    def test_attributes(self, sample_node):
+        attribute_names = set(name for name, _ in sample_node.attributes())
+
+        assert all(name.endswith("_attr") for name in attribute_names)
+        assert not any(name.endswith("_") for name in attribute_names)
+        assert (
+            set(name for name in sample_node.__fields__.keys() if name.endswith("_attr"))
+            == attribute_names
+        )
+
+    def test_children(self, sample_node):
+        attribute_names = set(name for name, _ in sample_node.attributes())
+        children_names = set(name for name, _ in sample_node.children())
+        public_names = attribute_names | children_names
+        field_names = set(sample_node.__fields__.keys())
+
+        assert not any(name.endswith("_attr") for name in children_names)
+        assert not any(name.endswith("_") for name in children_names)
+
+        assert public_names <= field_names
+        assert all(name.endswith("_") for name in field_names - public_names)
+
+
+class TestNodeVisitor:
+    def test_reach_base_nodes(self, sample_node, visitor_base_class):
+
+        print(visitor_base_class, type(visitor_base_class))
+
+        class _Visitor(eve.NodeVisitor):
+            def __init__(self):
+                self.collected_objects = set()
+                self.collected_nodes = set()
+
+            def generic_visit(self, node, **kwargs):
+                self.collected_objects.add(id(node))
+                super().generic_visit(node, **kwargs)
+
+            def visit_BaseNode(self, node, **kwargs):
+                self.collected_nodes.add(id(node))
+                for _, child in node.children():
+                    self.visit(child, **kwargs)
+
+        visitor = _Visitor()
+        visitor.visit(sample_node)
+
+        pending = [sample_node]
+        collected_objects = set()
+        collected_nodes = set()
+        while pending:
+            node = pending.pop(0)
+            if isinstance(node, eve.BaseNode):
+                collected_nodes.add(id(node))
+                pending.extend(child for _, child in node.children())
+            else:
+                collected_objects.add(id(node))
+                if isinstance(
+                    node, (collections.abc.Sequence, collections.abc.Set)
+                ) and not isinstance(node, (str, bytes, bytearray)):
+                    pending.extend(node)
+                elif isinstance(node, collections.abc.Mapping):
+                    pending.extend(node.values())
+
+        assert collected_nodes == visitor.collected_nodes
+        assert collected_objects == visitor.collected_objects

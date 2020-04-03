@@ -29,7 +29,16 @@ collect_ignore_glob = [".*"]  # ignore hidden folders
 NODE_MAKERS = [
     value
     for key, value in common.__dict__.items()
-    if "node" in key and "invalid" not in key and key.endswith("_maker")
+    if "node" in key and "invalid" not in key and "mutable" not in key and key.endswith("_maker")
+]
+
+MUTABLE_NODE_MAKERS = [
+    value
+    for key, value in common.__dict__.items()
+    if "node" in key
+    and "invalid" not in key
+    and key.startswith("mutable")
+    and key.endswith("_maker")
 ]
 
 INVALID_NODE_MAKERS = [
@@ -80,6 +89,16 @@ def simple_node_with_optionals(simple_node_with_optionals_maker):
 
 
 @pytest.fixture
+def simple_node_with_hidden_members_maker():
+    return common.simple_node_with_hidden_members_maker
+
+
+@pytest.fixture
+def simple_node_with_hidden_members(simple_node_with_hidden_members_maker):
+    return simple_node_with_hidden_members_maker()
+
+
+@pytest.fixture
 def simple_node_with_loc_maker():
     return common.simple_node_with_loc_maker
 
@@ -121,12 +140,32 @@ def compound_node(compound_node_maker):
 
 @pytest.fixture
 def compound_node_with_collections_maker():
-    return common.compound_node_maker
+    return common.compound_node_with_collections_maker
 
 
 @pytest.fixture
-def compound_node_with_collections(compound_node_with_collections):
-    return compound_node_maker()
+def compound_node_with_collections(compound_node_with_collections_maker):
+    return compound_node_with_collections_maker()
+
+
+@pytest.fixture
+def mutable_simple_node_maker():
+    return common.mutable_simple_node_maker
+
+
+@pytest.fixture
+def mutable_simple_node(mutable_simple_node_maker):
+    return mutable_simple_node_maker()
+
+
+@pytest.fixture
+def mutable_compound_node_maker():
+    return common.mutable_compound_node_maker
+
+
+@pytest.fixture
+def mutable_compound_node(mutable_compound_node_maker):
+    return mutable_compound_node_maker()
 
 
 @pytest.fixture
@@ -166,6 +205,16 @@ def sample_node_maker(request):
 
 @pytest.fixture(params=NODE_MAKERS)
 def sample_node(request):
+    return request.param()
+
+
+@pytest.fixture(params=MUTABLE_NODE_MAKERS)
+def mutable_sample_node_maker(request):
+    return request.param
+
+
+@pytest.fixture(params=MUTABLE_NODE_MAKERS)
+def mutable_sample_node(request):
     return request.param()
 
 
