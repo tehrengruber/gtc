@@ -19,7 +19,7 @@
 
 import os
 
-from packaging.version import parse
+from packaging.version import parse  # type: ignore
 
 
 version_file_path = os.path.join(os.path.dirname(__file__), "_SCM_VERSION.txt")

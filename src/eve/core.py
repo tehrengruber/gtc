@@ -37,20 +37,44 @@ from typing import (
     Union,
 )
 
-from pydantic import BaseModel, PositiveInt, validator
+from pydantic import (
+    BaseModel,
+    PositiveInt,
+    validator,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+)
 
+
+Bool = StrictBool  # noqa
+Bytes = bytes  # noqa
+Float = StrictFloat  # noqa
+Int = StrictInt  # noqa
+Str = StrictStr  # noqa
 
 #: Marker value used to avoid confusion with `None`
 #: (specially in contexts where `None` could be a valid value)
 NOTHING = object()
 
-#: Constantly increasing counter for generation of unique ids
-__unique_counter = itertools.count(1)
 
+class UIDGenerator:
+    #: Prefix for unique ids
+    prefix = ""
 
-def get_unique_id() -> int:
-    """Generate a new globally unique `int` for the current session."""
-    return next(__unique_counter)
+    #: Constantly increasing counter for generation of unique ids
+    __unique_counter = itertools.count(1)
+
+    @classmethod
+    def get_unique_id(cls) -> str:
+        """Generate a new globally unique `int` for the current session."""
+        return f"{cls.prefix}_{next(cls.__unique_counter)}"
+
+    @classmethod
+    def reset(cls, start: int = 1) -> None:
+        """Reset generator."""
+        cls.__unique_counter = itertools.count(start)
 
 
 class StrEnum(str, Enum):
@@ -60,11 +84,28 @@ class StrEnum(str, Enum):
         return self.value
 
 
+class InmutableModelConfig:
+    allow_mutation = False
+    extra = "forbid"
+
+
+class MutableModelConfig:
+    allow_mutation = True
+    extra = "forbid"
+
+
 class SourceLocation(BaseModel):
     """Source code location (line, column)."""
 
     line: PositiveInt
     column: PositiveInt
+    source: Str
+
+    class Config(InmutableModelConfig):
+        pass
+
+    def __str__(self):
+        return f"<{self.source}: Line {self.line}, Col {self.column}>"
 
 
 class BaseNode(BaseModel):
@@ -72,28 +113,24 @@ class BaseNode(BaseModel):
 
     Field values should be either:
 
-        * builtin types: `str`, `int`, `float`, `bytes`?
+        * builtin types: `bool`, `bytes`, `int`, `float`, `str`
         * other :class:`BaseNode` subclasses
         * other :class:`pydantic.BaseModel` subclasses
-        * supported collections (:class:`collections.abc.Sequence`,
-        :class:`collections.abc.Set`, :class:`collections.abc.Mapping`) of
-        any of the previous items
-
-    Using other classes as values would most likely work but it is not
-    explicitly supported.
+        * supported collections (:class:`List`, :class:`Dict`, :class:`Set`)
+            of any of the previous items
 
     Field names ending with "_"  are considered hidden fields and
     will not appear in the node iterators. Field names ending with
-    "_attr" are considered attributes of the node, not children.
+    "_attr" are considered meta-attributes of the node, not children.
     """
 
-    id_attr: Optional[int] = None
-    kind_attr: Optional[str] = None
-    dialect_attr: Optional[str] = None
+    id_attr: Optional[Str] = None
+    kind_attr: Optional[Str] = None
+    dialect_attr: Optional[Str] = None
 
     @validator("id_attr", pre=True, always=True)
-    def _id_attr_validator(cls: Type[BaseModel], v: Optional[int]) -> int:  # type: ignore
-        return v or get_unique_id()
+    def _id_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
+        return v or UIDGenerator.get_unique_id()
 
     @validator("kind_attr", pre=True, always=True)
     def _kind_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
@@ -116,33 +153,35 @@ class BaseNode(BaseModel):
 
     def iter_attributes(self) -> Generator[Tuple[str, Any], None, None]:
         for name, value in self.__fields__.items():
-            if name.endswith("attr"):
+            if name.endswith("_attr"):
                 yield (name, getattr(self, name))
 
     def iter_children(self) -> Generator[Tuple[str, Any], None, None]:
         for name, value in self.__fields__.items():
-            if not (name.endswith("attr") or name.endswith("_")):
+            if not (name.endswith("_attr") or name.endswith("_")):
                 yield (name, getattr(self, name))
 
 
 class MutableNode(BaseNode):
     """Base mutable node class."""
 
-    class Config:
-        allow_mutation = True
+    class Config(MutableModelConfig):
+        pass
 
 
 class InmutableNode(BaseNode):
     """Base inmutable node class."""
 
-    class Config:
-        allow_mutation = False
+    class Config(InmutableModelConfig):
+        pass
 
 
 Node = MutableNode
 
 
-ValidLeafNodeType = Optional[Union[int, float, str, BaseNode, BaseModel]]
+ValidLeafNodeType = Optional[
+    Union[bool, bytes, int, float, str, Bool, Bytes, Int, Float, Str, BaseNode, BaseModel]
+]
 ValidNodeType = Optional[Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]]
 
 
@@ -216,7 +255,7 @@ class NodeTransformer(NodeVisitor):
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
         result: Any = node
-        if isinstance(node, (Node, col_abc.Collection)) and not isinstance(
+        if isinstance(node, (BaseNode, col_abc.Collection)) and not isinstance(
             node, (str, bytes, bytearray)
         ):
             items: Iterable[Tuple[Any, Any]] = []
@@ -305,11 +344,10 @@ class NodeTranslator(NodeVisitor):
             node, (str, bytes, bytearray)
         ):
             tmp_items: Collection[ValidNodeType] = []
-            if isinstance(node, Node):
+            if isinstance(node, BaseNode):
                 tmp_items = {key: self.visit(value, **kwargs) for key, value in node}
                 result = node.__class__(  # type: ignore
-                    node_id_=node.node_id_,
-                    node_kind_=node.node_kind_,
+                    **{key: value for key, value in node.iter_attributes()},
                     **{key: value for key, value in tmp_items.items() if value is not NOTHING},
                 )
 
