@@ -34,7 +34,18 @@ TextSequenceType = Union[Sequence[str], "TextBlock"]
 
 
 class TextBlock:
-    """A block of source code represented as a sequence of text lines."""
+    """A block of source code represented as a sequence of text lines.
+
+    This class also contains a context manager method (:meth:`indented`)
+    for simple `indent - append - dedent` workflows.
+
+    Args:
+        indent_level: Initial indentation level
+        indent_size: Number of characters per indentation level
+        indent_char: Character used in the indentation
+        end_line: Character or string used as new-line separator
+
+    """
 
     def __init__(
         self,
@@ -44,6 +55,11 @@ class TextBlock:
         indent_char: str = " ",
         end_line: str = "\n",
     ):
+        if not isinstance(indent_char, str) or len(indent_char) != 1:
+            raise ValueError("'indent_char' must be a single-character string")
+        if not isinstance(end_line, str):
+            raise ValueError("'end_line' must be a string")
+
         self.indent_level = indent_level
         self.indent_size = indent_size
         self.indent_char = indent_char
@@ -100,11 +116,13 @@ class TextBlock:
 
     @property
     def text(self) -> str:
+        """Single string with the whole block contents."""
         lines = ["".join([str(item) for item in line]) for line in self.lines]
         return self.end_line.join(lines)
 
     @property
     def indent_str(self):
+        """Indentation string for new lines (in the current state)."""
         return self.indent_char * (self.indent_level * self.indent_size)
 
     def __iadd__(self, source_line: str):
@@ -129,7 +147,17 @@ ValidTemplateType = Union[str, jinja2.Template, string.Template]
 
 
 class TextTemplate:
-    """A generic text template class abstracting different template engines."""
+    """A generic text template class abstracting different template engines.
+
+    This class supports all the template types represented in the
+    :class:`TemplateKind` class.
+
+    Args:
+        definition: Template definition (actual type depends on the kind)
+        kind: Template engine. It not provided, is guessed based on the
+            type of the ``definition`` value
+
+    """
 
     KIND_TO_TYPES_MAPPING: ClassVar[Mapping[TemplateKind, ValidTemplateType]] = MappingProxyType(
         {
@@ -179,12 +207,14 @@ class TextTemplate:
         self.kind = kind
         self.definition = definition
 
-    def render(self, mapping: Optional[Dict[str, str]] = None, **kwargs) -> str:
+    def render(self, mapping: Optional[Mapping[str, str]] = None, **kwargs) -> str:
         """Render the template.
 
-        `mapping` is a `dict` object with keys matching the template placeholders.
-        Alternatively, placeholder values might be provided using keyword arguments
-        (kwargs take precedence over mapping values for duplicated keys).
+        Args:
+            mapping (optional): A `dict` whose keys match the template placeholders.
+            **kwargs: placeholder values might be also provided as
+                keyword arguments, and they take precedence over ``mapping``
+                values for duplicated keys.
 
         """
         if isinstance(mapping, dict):
@@ -193,7 +223,7 @@ class TextTemplate:
             mapping = kwargs
         else:
             raise TypeError(
-                f"'mappint' argument must be an instance of 'dict' ({type(mapping)} provided))"
+                f"'mapping' argument must be an instance of 'dict' ({type(mapping)} provided))"
             )
 
         return getattr(self, f"render_{self.kind}")(**mapping)
@@ -209,20 +239,55 @@ class TextTemplate:
 
 
 class NodeDumper(NodeVisitor):
+    """A subclass of :class:`eve.NodeVisitor` to dump IR contents.
+
+    Args:
+        node_templates (optional): Mapping from `NODE_TYPE_NAME` (str) keys
+            to the template object that should be used for that node
+        dump_func (optional): Generic `dump()` function for nodes
+            without more specific matches.
+
+    """
+
     @classmethod
     def apply(
         cls,
         root: ValidNodeType,
         *,
-        node_templates: Optional[Dict[str, Union[TextTemplate, ValidTemplateType]]] = None,
+        node_templates: Optional[Mapping[str, Union[TextTemplate, ValidTemplateType]]] = None,
         dump_func: Optional[Callable[[ValidNodeType], str]] = None,
         **kwargs,
     ) -> str:
+        """Public method to build a class instance and visit an IR node.
+
+        The order followed to choose a `dump()` function used for each node is
+        the following:
+
+            1. A `self.visit_NODE_TYPE_NAME()` method matching the actual `NODE_TYPE_NAME`
+            2. A `node_templates[NODE_TYPE_NAME]` member matching the actual `NODE_TYPE_NAME`
+            3. The provided `dump_func()`
+
+        When a template is used, the following keys will be passed to the template
+        instance:
+
+            - `**node_children`: all the node children by name
+            - `**node_attributes`: all the node attributes by name
+            - `_this`: a :class:`types.SimpleNamespace` instance with the results of visiting all the node children
+            - `_attrs`: a :class:`types.SimpleNamespace` instance with the results of visiting all the node attributes
+            - `_instance`: the actual node instance
+
+        Args:
+            root: An IR node
+            node_templates (optiona): see :class:`NodeDumper`
+            dump_func (optiona): see :class:`NodeDumper`
+
+        """
+
         return cls(node_templates, dump_func).visit(root, **kwargs)
 
     def __init__(
         self,
-        node_templates: Optional[Dict[str, Union[TextTemplate, ValidTemplateType]]] = None,
+        node_templates: Optional[Mapping[str, Union[TextTemplate, ValidTemplateType]]] = None,
         dump_func: Optional[Callable[[ValidNodeType], str]] = None,
     ):
         node_templates = node_templates or {}
@@ -269,8 +334,12 @@ class NodeDumper(NodeVisitor):
 
 
 class TemplatedGenerator(NodeDumper):
+    """A subclass of :class:`NodeDumper` with automatic use of ``node_templates`` and ``dump_func``."""
 
+    #: Class-specific ``node_templates`` dictionary
     NODE_TEMPLATES = None
+
+    #: Class-specific ``dump()`` function
     DUMP_FUNCTION = None
 
     @classmethod

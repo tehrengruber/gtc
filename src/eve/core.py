@@ -165,10 +165,11 @@ class FrozenNode(Node):
         pass
 
 
-ValidLeafNodeType = Optional[
-    Union[bool, bytes, int, float, str, Bool, Bytes, Int, Float, Str, BaseNode, BaseModel]
+ValidLeafNodeType = Union[
+    bool, bytes, int, float, str, Bool, Bytes, Int, Float, Str, BaseNode, BaseModel, None
 ]
-ValidNodeType = Optional[Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]]
+
+ValidNodeType = Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]
 
 
 class NodeVisitor:

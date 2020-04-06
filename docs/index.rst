@@ -21,4 +21,4 @@ Contents:
 Feedback
 ========
 
-If you have any suggestions or questions about this software, please let us lnow.
+If you have any suggestions or questions about this software, please let us now.

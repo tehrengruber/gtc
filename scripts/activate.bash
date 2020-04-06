@@ -1,8 +1,9 @@
 # This file should be sourced by a Bash-compatible shell
 
 EVE_PYTHON_CMD=${EVE_PYTHON_CMD:-python3}
-EVE_ROOT="$(dirname $(dirname $(readlink -e $BASH_SOURCE)))"
 EVE_VENV_NAME=${EVE_VENV_NAME:-".eve.venv"}
+
+EVE_ROOT="$(dirname $(dirname $(readlink -e $BASH_SOURCE)))"
 EVE_VENV_PATH=${EVE_ROOT}/${EVE_VENV_NAME}
 
 if [ "$0" = ${BASH_SOURCE} ]; then
@@ -31,6 +32,8 @@ if [ ! -f ${EVE_VENV_PATH}/bin/activate ]; then
 else
     source ${EVE_VENV_PATH}/bin/activate
 fi
+
+unset EVE_ROOT EVE_VENV_PATH
 
 echo -e "\nDeactivate by:"
 echo -e "    $> deactivate"
