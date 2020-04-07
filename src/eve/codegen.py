@@ -244,8 +244,8 @@ class NodeDumper(NodeVisitor):
     Args:
         node_templates (optional): Mapping from `NODE_TYPE_NAME` (str) keys
             to the template object that should be used for that node
-        dump_func (optional): Generic `dump()` function for nodes
-            without more specific matches.
+        dump_func (optional): Generic `dump()` function for primitive types
+            without more specific matches
 
     """
 
@@ -263,18 +263,23 @@ class NodeDumper(NodeVisitor):
         The order followed to choose a `dump()` function used for each node is
         the following:
 
-            1. A `self.visit_NODE_TYPE_NAME()` method matching the actual `NODE_TYPE_NAME`
-            2. A `node_templates[NODE_TYPE_NAME]` member matching the actual `NODE_TYPE_NAME`
-            3. The provided `dump_func()`
+            1. A `self.visit_NODE_TYPE_NAME()` method matching the actual `NODE_TYPE_NAME`.
+            2. A `node_templates[NODE_TYPE_NAME]` member matching the actual `NODE_TYPE_NAME`.
+            3. If the node is a primitive type (not a :class:`eve.BaseNode` subclass),
+               the provided `dump_func()`.
+
 
         When a template is used, the following keys will be passed to the template
         instance:
 
-            - `**node_children`: all the node children by name
-            - `**node_attributes`: all the node attributes by name
-            - `_this`: a :class:`types.SimpleNamespace` instance with the results of visiting all the node children
-            - `_attrs`: a :class:`types.SimpleNamespace` instance with the results of visiting all the node attributes
-            - `_instance`: the actual node instance
+            * `**node_fields`: all the node children and attributes by name
+            * `_attrs`: a `dict` instance with the results of visiting all
+              the node attributes
+            * `_children`: a `dict` instance with the results of visiting all
+              the node children
+            * `_this`: a :class:`types.SimpleNamespace` instance with the results
+              of visiting all the node fields (nodes and attributes)
+            * `_this_instance`: the actual node instance
 
         Args:
             root: An IR node
@@ -298,9 +303,19 @@ class NodeDumper(NodeVisitor):
         self.dump_func = dump_func
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> str:
-        template: TextTemplate = self.node_templates.get(node.__class__.__name__, None)
+        template_key: Optional[str] = None
+        template: Optional[TextTemplate] = None
         attrs_strings: Dict[str, Any] = {}
         child_strings: Dict[str, Any] = {}
+
+        for node_class in node.__class__.__mro__:
+            template_key = node_class.__name__
+            template = self.node_templates.get(template_key, None)
+            if template is not None or node_class is BaseNode:
+                template_key = None if template is None else template_key
+                break
+        else:
+            template_key = None
 
         if isinstance(node, (BaseNode, collections.abc.Collection)) and not isinstance(
             node, (str, bytes, bytearray)
@@ -321,13 +336,14 @@ class NodeDumper(NodeVisitor):
 
         if template:
             return template.render(
-                _instance=node,
-                _this=SimpleNamespace(**child_strings),  # type: ignore
-                _attrs=SimpleNamespace(**attrs_strings),  # type: ignore
+                _this_instance=node,
+                _this=SimpleNamespace(**child_strings, **attrs_strings),  # type: ignore
+                _children=child_strings,  # type: ignore
+                _attrs=attrs_strings,  # type: ignore
                 **attrs_strings,
                 **child_strings,
             )
-        elif self.dump_func:
+        elif not isinstance(node, BaseNode) and self.dump_func:
             return self.dump_func(child_strings or node)  # type: ignore
         else:
             return ""
@@ -340,7 +356,7 @@ class TemplatedGenerator(NodeDumper):
     NODE_TEMPLATES = None
 
     #: Class-specific ``dump()`` function
-    DUMP_FUNCTION = None
+    DUMP_FUNCTION = str
 
     @classmethod
     def apply(cls, root: ValidNodeType, **kwargs) -> str:

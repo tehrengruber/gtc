@@ -114,7 +114,7 @@ class BaseNode(BaseModel):
         * other :class:`BaseNode` subclasses
         * other :class:`pydantic.BaseModel` subclasses
         * supported collections (:class:`List`, :class:`Dict`, :class:`Set`)
-            of any of the previous items
+          of any of the previous items
 
     Field names ending with "_"  are considered hidden fields and
     will not appear in the node iterators. Field names ending with
