@@ -22,8 +22,8 @@ import collections.abc
 import os
 import string
 import textwrap
-from types import MappingProxyType, SimpleNamespace
-from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Sequence, Union
+from types import MappingProxyType
+from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import jinja2
 
@@ -264,9 +264,16 @@ class NodeDumper(NodeVisitor):
         the following:
 
             1. A `self.visit_NODE_TYPE_NAME()` method matching the actual `NODE_TYPE_NAME`.
-            2. A `node_templates[NODE_TYPE_NAME]` member matching the actual `NODE_TYPE_NAME`.
-            3. If the node is a primitive type (not a :class:`eve.BaseNode` subclass),
-               the provided `dump_func()`.
+            2. A `node_templates[NODE_TYPE_NAME]` member where
+               `NODE_TYPE_NAME` = `type(node_instance).__name__`.
+            3. Depending on the node type:
+
+               a. If the node is a :class:`eve.BaseNode` subclass,
+                  a `node_templates[NODE_TYPE_NAME]` member where
+                  `NODE_TYPE_NAME` = `NODE_PARENT_TYPE_NAME` following MRO order.
+
+               b. If the node is a primitive type (not a :class:`eve.BaseNode` subclass),
+                  the provided `dump_func()`.
 
 
         When a template is used, the following keys will be passed to the template
@@ -277,9 +284,7 @@ class NodeDumper(NodeVisitor):
               the node attributes
             * `_children`: a `dict` instance with the results of visiting all
               the node children
-            * `_this`: a :class:`types.SimpleNamespace` instance with the results
-              of visiting all the node fields (nodes and attributes)
-            * `_this_instance`: the actual node instance
+            * `_this_instance`: the actual node instance (before visiting children)
 
         Args:
             root: An IR node
@@ -302,12 +307,11 @@ class NodeDumper(NodeVisitor):
         }
         self.dump_func = dump_func
 
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> str:
-        template_key: Optional[str] = None
-        template: Optional[TextTemplate] = None
-        attrs_strings: Dict[str, Any] = {}
-        child_strings: Dict[str, Any] = {}
+    def get_template(self, node: ValidNodeType) -> Tuple[Optional[TextTemplate], Optional[str]]:
+        """Get a template for a node instance (see :meth:`apply`)."""
 
+        template: Optional[TextTemplate] = None
+        template_key: Optional[str] = None
         for node_class in node.__class__.__mro__:
             template_key = node_class.__name__
             template = self.node_templates.get(template_key, None)
@@ -317,34 +321,67 @@ class NodeDumper(NodeVisitor):
         else:
             template_key = None
 
+        return template, template_key
+
+    def render_template(
+        self,
+        template: TextTemplate,
+        node: ValidTemplateType,
+        visited_children: Mapping[str, Any],
+        visited_attrs: Mapping[str, Any],
+    ) -> str:
+        """Render a template using node instance data (see :meth:`apply`)."""
+
+        return template.render(
+            **visited_attrs,
+            **visited_children,
+            _attrs=visited_children,  # type: ignore
+            _children=visited_attrs,  # type: ignore
+            _this_instance=node,
+        )
+
+    def render_node_template(
+        self,
+        node: ValidTemplateType,
+        visited_children: Mapping[str, Any],
+        visited_attrs: Mapping[str, Any],
+    ) -> str:
+        """Render the corresponding template using node instance data (see :meth:`apply`)."""
+
+        result = ""
+        template: Optional[TextTemplate]
+        template, _ = self.get_template(node)
+        if template is not None:
+            result = self.render_template(template, node, visited_children, visited_attrs)
+
+        return result
+
+    def generic_visit(self, node: ValidNodeType, **kwargs) -> str:
+        visited_attrs: Dict[str, Any] = {}
+        visited_children: Dict[str, Any] = {}
+        template: Optional[TextTemplate]
+        template_key: Optional[str]
+        template, template_key = self.get_template(node)
+
         if isinstance(node, (BaseNode, collections.abc.Collection)) and not isinstance(
-            node, (str, bytes, bytearray)
+            node, self.ATOMIC_COLLECTION_TYPES
         ):
             if isinstance(node, BaseNode):
-                attrs_strings = {
+                visited_children = {
+                    key: self.visit(value, **kwargs) for key, value in node.children()
+                }
+                visited_attrs = {
                     key: self.visit(value, **kwargs) for key, value in node.attributes()
                 }
-                child_strings = {key: self.visit(value, **kwargs) for key, value in node.children()}
-
             elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
-                child_strings = {
-                    f"_{i}": self.visit(value, **kwargs) for i, value in enumerate(node)
-                }
-
+                visited_children = [self.visit(value, **kwargs) for value in node]
             elif isinstance(node, collections.abc.Mapping):
-                child_strings = {key: self.visit(value, **kwargs) for key, value in node.items()}
+                visited_children = {key: self.visit(value, **kwargs) for key, value in node.items()}
 
         if template:
-            return template.render(
-                _this_instance=node,
-                _this=SimpleNamespace(**child_strings, **attrs_strings),  # type: ignore
-                _children=child_strings,  # type: ignore
-                _attrs=attrs_strings,  # type: ignore
-                **attrs_strings,
-                **child_strings,
-            )
+            return self.render_template(template, node, visited_children, visited_attrs)
         elif not isinstance(node, BaseNode) and self.dump_func:
-            return self.dump_func(child_strings or node)  # type: ignore
+            return self.dump_func(visited_children or node)  # type: ignore
         else:
             return ""
 
