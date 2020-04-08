@@ -333,10 +333,10 @@ class NodeDumper(NodeVisitor):
         """Render a template using node instance data (see :meth:`apply`)."""
 
         return template.render(
-            **visited_attrs,
             **visited_children,
-            _attrs=visited_children,  # type: ignore
-            _children=visited_attrs,  # type: ignore
+            **visited_attrs,
+            _children=visited_children,  # type: ignore
+            _attrs=visited_attrs,  # type: ignore
             _this_instance=node,
         )
 
@@ -357,8 +357,8 @@ class NodeDumper(NodeVisitor):
         return result
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> str:
-        visited_attrs: Dict[str, Any] = {}
         visited_children: Dict[str, Any] = {}
+        visited_attrs: Dict[str, Any] = {}
         template: Optional[TextTemplate]
         template_key: Optional[str]
         template, template_key = self.get_template(node)
