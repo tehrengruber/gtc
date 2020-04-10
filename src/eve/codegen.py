@@ -23,7 +23,19 @@ import os
 import string
 import textwrap
 from types import MappingProxyType
-from typing import Any, Callable, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Collection,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import jinja2
 
@@ -143,7 +155,7 @@ class TemplateKind(StrEnum):
     TPL = "tpl"
 
 
-ValidTemplateType = Union[str, jinja2.Template, string.Template]
+ValidTemplateDefType = Union[str, jinja2.Template, string.Template]
 
 
 class TextTemplate:
@@ -159,7 +171,7 @@ class TextTemplate:
 
     """
 
-    KIND_TO_TYPES_MAPPING: ClassVar[Mapping[TemplateKind, ValidTemplateType]] = MappingProxyType(
+    KIND_TO_TYPES_MAPPING: ClassVar[Mapping[TemplateKind, ValidTemplateDefType]] = MappingProxyType(
         {
             TemplateKind.FMT: str,
             TemplateKind.JINJA: jinja2.Template,
@@ -167,7 +179,7 @@ class TextTemplate:
         }
     )
 
-    TYPES_TO_KIND_MAPPING: ClassVar[Mapping[ValidTemplateType, TemplateKind]] = MappingProxyType(
+    TYPES_TO_KIND_MAPPING: ClassVar[Mapping[ValidTemplateDefType, TemplateKind]] = MappingProxyType(
         {type_.__name__: kind for kind, type_ in KIND_TO_TYPES_MAPPING.items()}
     )
 
@@ -193,7 +205,7 @@ class TextTemplate:
             definition = string.Template(definition)
         return cls(definition, TemplateKind.TPL)
 
-    def __init__(self, definition: ValidTemplateType, kind: Optional[TemplateKind] = None):
+    def __init__(self, definition: ValidTemplateDefType, kind: Optional[TemplateKind] = None):
         if kind is None:
             kind = self.TYPES_TO_KIND_MAPPING.get(type(definition).__name__, None)
         if not isinstance(kind, TemplateKind):
@@ -243,9 +255,9 @@ class NodeDumper(NodeVisitor):
 
     Args:
         node_templates (optional): Mapping from `NODE_TYPE_NAME` (str) keys
-            to the template object that should be used for that node
-        dump_func (optional): Generic `dump()` function for primitive types
-            without more specific matches
+            to the template that should be used for rendering node instances
+            of that type.
+        dump_function (optional): Generic `dump()` function for primitive types.
 
     """
 
@@ -254,149 +266,176 @@ class NodeDumper(NodeVisitor):
         cls,
         root: ValidNodeType,
         *,
-        node_templates: Optional[Mapping[str, Union[TextTemplate, ValidTemplateType]]] = None,
-        dump_func: Optional[Callable[[ValidNodeType], str]] = None,
+        node_templates: Optional[Mapping[str, Union[TextTemplate, ValidTemplateDefType]]] = None,
+        dump_function: Optional[Callable[[ValidNodeType], str]] = None,
         **kwargs,
     ) -> str:
         """Public method to build a class instance and visit an IR node.
 
-        The order followed to choose a `dump()` function used for each node is
-        the following:
+        The order followed to choose a `dump()` function for instances of
+        :class:`eve.BaseNode` is the following:
 
-            1. A `self.visit_NODE_TYPE_NAME()` method matching the actual `NODE_TYPE_NAME`.
-            2. A `node_templates[NODE_TYPE_NAME]` member where
-               `NODE_TYPE_NAME` = `type(node_instance).__name__`.
-            3. Depending on the node type:
-
-               a. If the node is a :class:`eve.BaseNode` subclass,
-                  a `node_templates[NODE_TYPE_NAME]` member where
-                  `NODE_TYPE_NAME` = `NODE_PARENT_TYPE_NAME` following MRO order.
-
-               b. If the node is a primitive type (not a :class:`eve.BaseNode` subclass),
-                  the provided `dump_func()`.
-
+            1. A `self.visit_NODE_TYPE_NAME()` method where `NODE_TYPE_NAME`
+               matches `NODE_CLASS.__name__`, and `NODE_CLASS` is the
+               actual type of the node or any of its superclasses
+               following MRO order.
+            2. A `node_templates[NODE_TYPE_NAME]` template where `NODE_TYPE_NAME`
+               matches `NODE_CLASS.__name__`, and `NODE_CLASS` is the
+               actual type of the node or any of its superclasses
+               following MRO order.
 
         When a template is used, the following keys will be passed to the template
         instance:
 
-            * `**node_fields`: all the node children and attributes by name
+            * `**node_fields`: all the node children and attributes by name.
             * `_attrs`: a `dict` instance with the results of visiting all
-              the node attributes
+              the node attributes.
             * `_children`: a `dict` instance with the results of visiting all
-              the node children
-            * `_this_instance`: the actual node instance (before visiting children)
+              the node children.
+            * `_this_instance`: the actual node instance (before visiting children).
+
+        For primitive types (not :class:`eve.BaseNode` subclasses),
+        the `dump_function()` will be used when provided.
 
         Args:
-            root: An IR node
-            node_templates (optiona): see :class:`NodeDumper`
-            dump_func (optiona): see :class:`NodeDumper`
+            root: An IR node.
+            node_templates (optiona): see :class:`NodeDumper`.
+            dump_function (optiona): see :class:`NodeDumper`.
+            **kwargs (optional): custom extra parameters forwarded to
+                `visit_NODE_TYPE_NAME()`.
+
+        Returns:
+            Dumped version of the input IR node.
 
         """
-
-        return cls(node_templates, dump_func).visit(root, **kwargs)
+        return cls(node_templates, dump_function).visit(root, **kwargs)
 
     def __init__(
         self,
-        node_templates: Optional[Mapping[str, Union[TextTemplate, ValidTemplateType]]] = None,
-        dump_func: Optional[Callable[[ValidNodeType], str]] = None,
+        node_templates: Optional[Mapping[str, Union[TextTemplate, ValidTemplateDefType]]] = None,
+        dump_function: Optional[Callable[[ValidNodeType], str]] = None,
     ):
         node_templates = node_templates or {}
         self.node_templates = {
             key: value if isinstance(value, TextTemplate) else TextTemplate(value)
             for key, value in node_templates.items()
         }
-        self.dump_func = dump_func
+        self.dump_function = dump_function
+
+    def generic_visit(self, node: ValidNodeType, **kwargs) -> str:
+        result = ""
+        if isinstance(node, BaseNode):
+            template, _ = self.get_template(node)
+            if template:
+                result = self.render_template(
+                    template,
+                    node,
+                    self.transform_children(node, **kwargs),
+                    self.transform_attrs(node, **kwargs),
+                )
+        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
+            node, self.ATOMIC_COLLECTION_TYPES
+        ):
+            node = [self.visit(value, **kwargs) for value in node]
+        elif isinstance(node, collections.abc.Mapping):
+            node = {key: self.visit(value, **kwargs) for key, value in node.items()}
+
+        if self.dump_function:
+            result = self.dump_function(node, **kwargs)
+
+        return result
 
     def get_template(self, node: ValidNodeType) -> Tuple[Optional[TextTemplate], Optional[str]]:
         """Get a template for a node instance (see :meth:`apply`)."""
-
         template: Optional[TextTemplate] = None
         template_key: Optional[str] = None
-        for node_class in node.__class__.__mro__:
-            template_key = node_class.__name__
-            template = self.node_templates.get(template_key, None)
-            if template is not None or node_class is BaseNode:
-                template_key = None if template is None else template_key
-                break
-        else:
-            template_key = None
+        if isinstance(node, BaseNode):
+            for node_class in node.__class__.__mro__:
+                template_key = node_class.__name__
+                template = self.node_templates.get(template_key, None)
+                if template is not None or node_class is BaseNode:
+                    break
 
-        return template, template_key
+        return template, None if template is None else template_key
 
     def render_template(
         self,
         template: TextTemplate,
-        node: ValidTemplateType,
-        visited_children: Mapping[str, Any],
-        visited_attrs: Mapping[str, Any],
+        node: ValidTemplateDefType,
+        transformed_children: Mapping[str, Any],
+        transformed_attrs: Mapping[str, Any],
+        **kwargs,
     ) -> str:
         """Render a template using node instance data (see :meth:`apply`)."""
 
         return template.render(
-            **visited_children,
-            **visited_attrs,
-            _children=visited_children,  # type: ignore
-            _attrs=visited_attrs,  # type: ignore
+            **transformed_children,
+            **transformed_attrs,
+            _children=transformed_children,  # type: ignore
+            _attrs=transformed_attrs,  # type: ignore
             _this_instance=node,
+            **kwargs,
         )
 
-    def render_node_template(
-        self,
-        node: ValidTemplateType,
-        visited_children: Mapping[str, Any],
-        visited_attrs: Mapping[str, Any],
+    def render_node(
+        self, node: ValidTemplateDefType, custom_data: Mapping[str, Any], **kwargs,
     ) -> str:
         """Render the corresponding template using node instance data (see :meth:`apply`)."""
 
         result = ""
-        template: Optional[TextTemplate]
         template, _ = self.get_template(node)
+
         if template is not None:
-            result = self.render_template(template, node, visited_children, visited_attrs)
+            transformed_children = {
+                key: custom_data.get(key, self.visit(value, **kwargs))
+                for key, value in node.children()
+            }
+            transformed_attrs = {
+                key: custom_data.get(key, self.visit(value, **kwargs))
+                for key, value in node.attributes()
+            }
+            transformed_keys = set(transformed_children.keys() | transformed_attrs.keys())
+            extra_data = {
+                key: value for key, value in custom_data.items() if key not in transformed_keys
+            }
+            result = self.render_template(
+                template, node, transformed_children, transformed_attrs, **extra_data
+            )
 
         return result
 
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> str:
-        visited_children: Dict[str, Any] = {}
-        visited_attrs: Dict[str, Any] = {}
-        template: Optional[TextTemplate]
-        template_key: Optional[str]
-        template, template_key = self.get_template(node)
+    def transform_children(self, node: ValidNodeType, **kwargs) -> Dict[str, Any]:
+        return {key: self.visit(value, **kwargs) for key, value in node.children()}
 
-        if isinstance(node, (BaseNode, collections.abc.Collection)) and not isinstance(
+    def transform_attrs(self, node: ValidNodeType, **kwargs) -> Dict[str, Any]:
+        return {key: self.visit(value, **kwargs) for key, value in node.attributes()}
+
+    def transform_collection(self, node: Collection, **kwargs) -> Collection:
+        if isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
-            if isinstance(node, BaseNode):
-                visited_children = {
-                    key: self.visit(value, **kwargs) for key, value in node.children()
-                }
-                visited_attrs = {
-                    key: self.visit(value, **kwargs) for key, value in node.attributes()
-                }
-            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
-                visited_children = [self.visit(value, **kwargs) for value in node]
-            elif isinstance(node, collections.abc.Mapping):
-                visited_children = {key: self.visit(value, **kwargs) for key, value in node.items()}
-
-        if template:
-            return self.render_template(template, node, visited_children, visited_attrs)
-        elif not isinstance(node, BaseNode) and self.dump_func:
-            return self.dump_func(visited_children or node)  # type: ignore
+            transformed_node = [self.visit(value, **kwargs) for value in node]
+        elif isinstance(node, collections.abc.Mapping):
+            transformed_node = {key: self.visit(value, **kwargs) for key, value in node.items()}
         else:
-            return ""
+            transformed_node = node
+
+        return transformed_node
 
 
 class TemplatedGenerator(NodeDumper):
-    """A subclass of :class:`NodeDumper` with automatic use of ``node_templates`` and ``dump_func``."""
+    """A subclass of :class:`NodeDumper` with automatic use of ``node_templates`` and ``dump_function``."""
 
     #: Class-specific ``node_templates`` dictionary
     NODE_TEMPLATES = None
 
-    #: Class-specific ``dump()`` function
-    DUMP_FUNCTION = str
+    @classmethod
+    def generic_dump(cls, node: ValidNodeType, **kwargs):
+        """Generic ``dump()`` function for primitive types."""
+        return str(node)
 
     @classmethod
     def apply(cls, root: ValidNodeType, **kwargs) -> str:
         return super().apply(
-            root, node_templates=cls.NODE_TEMPLATES, dump_func=cls.DUMP_FUNCTION, **kwargs
+            root, node_templates=cls.NODE_TEMPLATES, dump_function=cls.generic_dump, **kwargs
         )
