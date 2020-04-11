@@ -17,10 +17,10 @@
 """Definitions of basic infrastructure classes and functions."""
 
 
+import collections.abc
 import copy
 import itertools
 import operator
-import collections.abc
 from enum import Enum
 from typing import (
     Any,
@@ -39,11 +39,11 @@ from typing import (
 from pydantic import (
     BaseModel,
     PositiveInt,
-    validator,
     StrictBool,
     StrictFloat,
     StrictInt,
     StrictStr,
+    validator,
 )
 
 
@@ -141,12 +141,12 @@ class BaseNode(BaseModel):
         return v or cls.__module__.split(".")[-1]
 
     def attributes(self) -> Generator[Tuple[str, Any], None, None]:
-        for name, value in self.__fields__.items():
+        for name, _ in self.__fields__.items():
             if name.endswith("_attr"):
                 yield (name, getattr(self, name))
 
     def children(self) -> Generator[Tuple[str, Any], None, None]:
-        for name, value in self.__fields__.items():
+        for name, _ in self.__fields__.items():
             if not (name.endswith("_attr") or name.endswith("_")):
                 yield (name, getattr(self, name))
 

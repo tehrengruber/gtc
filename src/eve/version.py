@@ -17,16 +17,16 @@
 """Version specification."""
 
 
-import os
+from pathlib import Path
 
-from packaging.version import parse  # type: ignore
+from packaging.version import parse
 
 
-version_file_path = os.path.join(os.path.dirname(__file__), "_SCM_VERSION.txt")
-if not os.path.isfile(version_file_path):
-    # Fallback to static version file
-    version_file_path = os.path.join(os.path.dirname(__file__), "_VERSION.txt")
+try:
+    with open(Path(__file__).parent.absolute() / "_VERSION.txt", "r") as version_file:
+        __version__ = version_file.read().strip()
 
-with open(version_file_path, "r") as version_file:
-    __version__: str = version_file.read().strip()
-    __versioninfo__ = parse(__version__)
+except OSError:
+    __version__ = "X.X.X.unknown"
+
+__versioninfo__ = parse(__version__)

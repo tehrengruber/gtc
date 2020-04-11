@@ -24,7 +24,7 @@ if [ ! -f ${EVE_VENV_PATH}/bin/activate ]; then
         echo -e "Exiting...\n"
         return
     fi
-    pip install --upgrade setuptools wheel
+    pip install --upgrade pip setuptools wheel
     pip install -r ${EVE_ROOT}/requirements_dev.txt
     pip install -e ${EVE_ROOT}[cpp]
     echo -e "\nDone!"

@@ -1,7 +1,0 @@
-include *.md
-include *.rst
-include *.toml
-include *.txt
-include *.yaml
-recursive-include src *.txt
-

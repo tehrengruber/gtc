@@ -17,8 +17,8 @@
 """Tools for code generation."""
 
 
-import contextlib
 import collections.abc
+import contextlib
 import os
 import string
 import textwrap

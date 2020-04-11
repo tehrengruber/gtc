@@ -26,11 +26,11 @@ from eve.core import (  # type: ignore
     Bool,
     Bytes,
     Float,
-    Int,
-    Str,
     FrozenNode,
+    Int,
     Node,
     SourceLocation,
+    Str,
     StrEnum,
 )
 

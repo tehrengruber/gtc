@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=40.8.0", "setuptools_scm[toml]>=3.4", "wheel"]
+requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=3.4"]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
 line-length = 100
-target_version = ['py36', 'py37', 'py38']
+target_version = ["py36", "py37", "py38"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -22,5 +22,8 @@ exclude = '''
 '''
 
 [tool.setuptools_scm]
+fallback_version = "X.X.X.unknown"
+local_scheme = "node-and-date"
 version_scheme = "python-simplified-semver"
-write_to = "src/eve/_SCM_VERSION.txt"
+write_to = "src/eve/_VERSION.txt"
+write_to_template = "{version}\n"

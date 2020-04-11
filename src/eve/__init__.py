@@ -16,6 +16,5 @@
 
 """Eve: a stencil toolchain in pure Python."""
 
-from .version import __version__, __versioninfo__  # noqa
-
+from .version import __version__, __versioninfo__  # noqa isort:skip
 from .core import *  # noqa
