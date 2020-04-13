@@ -1,5 +1,5 @@
 # Custom project ignores
-_local_/
+_local/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -22,9 +22,6 @@ import pytest  # type: ignore
 from . import common
 
 
-collect_ignore_glob = [".*"]  # ignore hidden folders
-
-
 # -- Fixtures --
 NODE_MAKERS = [
     value

@@ -1,2 +1,4 @@
+#  darglint settings (docstring linting)
+
 [darglint]
 docstring_style = google

@@ -17,16 +17,9 @@
 """Version specification."""
 
 
-from pathlib import Path
-
 from packaging.version import parse
 
+from ._version import __version__
 
-try:
-    with open(Path(__file__).parent.absolute() / "_VERSION.txt", "r") as version_file:
-        __version__ = version_file.read().strip()
-
-except OSError:
-    __version__ = "X.X.X.unknown"
 
 __versioninfo__ = parse(__version__)

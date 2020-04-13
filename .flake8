@@ -1,12 +1,16 @@
+# flake8 settings (code linting)
+
 [flake8]
-exclude=.svn,CVS,.bzr,.hg,.git,__pycache__,.tox,.ipynb_checkpoints,.pytest_cache,.hypothesis,.coverage,.cache,_local_,*.venv
+exclude=.svn,CVS,.bzr,.hg,.git,__pycache__,.tox,.ipynb_checkpoints,.pytest_cache,.hypothesis,.coverage,.cache,_local,*.venv
 max-line-length = 100
-#show-source = true
 max-complexity = 16
+doctests = true
+#show-source = true
 ignore =
   D     # Disable docstrings errors by default
   DAR   # Disable dargling errors by default
   E501  # Line too long (using Bugbear's B950 warning)
   W503  # line break before binary operator
+
 #-- flake8-docstrings --
 docstring-convention = google

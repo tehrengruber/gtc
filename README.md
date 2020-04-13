@@ -5,28 +5,34 @@ Installation instructions
 -------------------------
 
 Eve contains a standard `setup.py` installation script which can be
-used to install the package with *pip*. As usual, create first a new
-virtual environment for your project and then clone the repository and
-use an _editable_ installation of Eve:
+used to install the package with *pip*. The simplest way to start working
+with Eve is using the provided scripts in the `scripts/` folder. The standard
+`activate` script will properly initialize the virtual environment if it does
+not exist yet:
 
-    # First, clone the repository
+    git clone https://github.com/egparedes/eve.git
+    cd eve
+    source scripts/activate
+
+
+If you know how to deal with virtual environments yourself, create first as usual
+a new environment for your project, and then clone the repository and install Eve
+(use _editable_ mode if you plan to contribute to Eve):
+
+    # Create the virtual environment
+    python -m venv .eve.venv
+    source .eve.venv/bin/activate
+    pip install --upgrade pip setuptools wheel
+
+    # Clone the repository
     git clone https://github.com/egparedes/eve.git
 
-    # Then install the Python package directly from the local repository
+    # Install the Python package directly from the local repository
     # adding the '-e' flag to get an editable installation
     pip install -e ./eve
 
     # Finally, install the additional development tools
     pip install -r ./eve/requirements_dev.txt
-
-
-Alternatively, you can use the provided activation script in the `scripts/`
-folder which will properly initialize the virtual environment if it does
-not exist:
-
-    git clone https://github.com/egparedes/eve.git
-    cd eve
-    source scripts/activate.bash
 
 
 Development instructions

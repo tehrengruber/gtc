@@ -19,4 +19,12 @@ from setuptools import setup
 
 
 if __name__ == "__main__":
-    setup()
+    setup(
+        use_scm_version={
+            "fallback_version": "X.X.X.unknown",
+            "local_scheme": "dirty-tag",
+            "version_scheme": "python-simplified-semver",
+            "write_to": "src/eve/_version.py",
+            "write_to_template": '__version__ = "{version}"\n',
+        }
+    )

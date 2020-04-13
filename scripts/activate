@@ -1,0 +1,4 @@
+# This file should be sourced from a compatible shell
+
+shell_suffix=`ps -o command= -p $$ | rev | cut -d '/' -f 1 | rev`
+source "$(dirname $(readlink -e $BASH_SOURCE))/activate.$shell_suffix"
