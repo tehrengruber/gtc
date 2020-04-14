@@ -113,15 +113,13 @@ void run() {{
         return self.render_node(
             node,
             dict(loctype=location_type_to_str_singular_lower(node.location_type),
-                 name=node.name,
                  data_type=data_type_to_c(node.data_type))
         )
 
     def visit_FieldAccessExpr(self, node, **kwargs) -> str:
         return self.render_node(
             node,
-            dict(iter_var=self.iter_var_stack[-1],
-                 name=node.name)
+            dict(iter_var=self.iter_var_stack[-1])
         )
 
     def visit_ForK(self, node, **kwargs) -> str:
@@ -187,7 +185,7 @@ void run() {{
         k_loops = "".join(self.visit(l) for l in node.k_loops)
         return self.render_node(
             node,
-            dict(k_loops=k_loops, name=node.name)
+            dict(k_loops=k_loops)
         )
 
     def visit_Computation(self, node, **kwargs) -> str:

@@ -65,19 +65,19 @@ generated_code = NaiveCodeGenerator.apply(comp)
 print(generated_code)
 
 # try compile the generated code
-p = Popen(
-    [
-        "g++",
-        "-I",
-        "/home/vogtha/projects/toolchain/dawn/dawn/src",
-        "-x",
-        "c++",
-        "-c",
-        "-o",
-        "out.o",
-        "-",
-    ],
-    stdin=PIPE,
-    encoding="utf8",
-)
-p.communicate(input=generated_code)[0]
+# p = Popen(
+#     [
+#         "g++",
+#         "-I",
+#         "/home/vogtha/projects/toolchain/dawn/dawn/src",
+#         "-x",
+#         "c++",
+#         "-c",
+#         "-o",
+#         "out.o",
+#         "-",
+#     ],
+#     stdin=PIPE,
+#     encoding="utf8",
+# )
+# p.communicate(input=generated_code)[0]
