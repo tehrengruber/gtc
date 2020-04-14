@@ -16,7 +16,7 @@
 
 
 import enum
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 from pydantic import root_validator, validator  # noqa: F401
 
