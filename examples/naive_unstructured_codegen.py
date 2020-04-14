@@ -1,13 +1,12 @@
+# -*- coding: utf-8 -*-
 # Eve toolchain
-import eve
-from gt_toolchain.unstructured import naive
-from gt_toolchain.unstructured import common
+
+from devtools import debug  # noqa: F401
+
+import eve  # noqa: F401
+from gt_toolchain.unstructured import common, naive
 from gt_toolchain.unstructured.naive_codegen import NaiveCodeGenerator
 
-import devtools
-from devtools import debug
-
-from subprocess import Popen, PIPE
 
 # ### Reduce edge to node
 #

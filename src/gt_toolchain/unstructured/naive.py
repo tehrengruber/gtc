@@ -16,11 +16,11 @@
 
 
 import enum
-from typing import Optional, List, Tuple, Union
+from typing import List, Optional, Tuple, Union  # noqa: F401
 
-from pydantic import Field, validator, root_validator  # noqa: F401
+from pydantic import Field, root_validator, validator  # noqa: F401
 
-from eve.core import Node, SourceLocation, StrEnum, NodeVisitor
+from eve.core import Node, NodeVisitor, SourceLocation, StrEnum  # noqa: F401
 
 from . import common
 
