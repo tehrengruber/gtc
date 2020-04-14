@@ -16,16 +16,17 @@
 
 
 import enum
-from typing import Optional, List, Tuple, Union
+from typing import List, Union
 
-from pydantic import validator, root_validator  # noqa: F401
+from pydantic import root_validator, validator  # noqa: F401
 
-from eve.core import Node, SourceLocation, StrEnum, NodeVisitor
+from eve.core import Node
 
 from . import common
 
 
 # = statements.proto =
+
 
 class Expr(Node):
     pass
@@ -79,8 +80,9 @@ class BuiltinType:
 
 # TODO class Dimension
 
+
 class Type(Node):
-    type: Union[str, BuiltinType]
+    data_type: Union[str, BuiltinType]
     is_const: bool
     is_volatile: bool
 
@@ -99,6 +101,7 @@ class VerticalRegion(Node):
 
 # = statements.proto = AST
 
+
 class BlockStmt(Stmt):
     statements: List[Stmt]
 
@@ -111,7 +114,7 @@ class ExprStmt(Stmt):
 
 
 class VarDeclStmt(Stmt):
-    type: Type
+    data_type: Type
     name: str
     dimension: int
     op: str
@@ -125,6 +128,7 @@ class VerticalRegionDeclStmt(Stmt):
 # TODO class StencilCallDeclStmt(Stmt)
 # TODO class BoundaryConditionDeclStmt(Stmt)
 # TODO class IfStmt(Stmt)
+
 
 class UnaryOperator(Expr):
     op: str
@@ -176,7 +180,7 @@ class FieldAccessExpr(Expr):
 
 class LiteralExpr(Expr):
     value: str
-    type: BuiltinType
+    data_type: BuiltinType
     # TODO AccessExprData and ID probably unused in SIR
 
 
