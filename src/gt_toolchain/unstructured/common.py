@@ -51,13 +51,14 @@ class BinaryOperator(StrEnum):
 class DataType(enum.IntEnum):
     """Data type identifier."""
 
-    INVALID = -1
-    AUTO = 0
-    BOOLEAN = 1
-    INT32 = 101
-    UINT32 = 102
-    FLOAT32 = 201
-    FLOAT64 = 202
+    # IDs from dawn
+    INVALID = 0
+    AUTO = 1
+    BOOLEAN = 2
+    INT32 = 3
+    FLOAT32 = 4
+    FLOAT64 = 5
+    UINT32 = 6
 
 
 # TODO not really common
