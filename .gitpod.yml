@@ -4,3 +4,5 @@ tasks:
           pyenv local 3.7.7
       init: |
           ./scripts/init_env.sh -i
+      command: |
+          gp preview file:///workspace/eve/docs/_build/html/index.html
