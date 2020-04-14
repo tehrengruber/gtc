@@ -16,4 +16,6 @@
 
 """GT Toolchain: Eve toolchains for stencils in structured and unstructured grids."""
 
-from .version import __version__, __versioninfo__  # noqa isort:skip
+from eve.version import __version__, __versioninfo__  # noqa
+
+from . import structured, unstructured  # noqa
