@@ -1,8 +1,9 @@
 tasks:
     - before: |
           cd /workspace/eve
-          pyenv local 3.7.7
+          alias pre-commit="PIP_USER=no pre-commit"
       init: |
           ./scripts/init_env.sh -i
+          pre-commit install
       command: |
           gp preview file:///workspace/eve/docs/_build/html/index.html
