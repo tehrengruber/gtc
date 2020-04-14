@@ -30,6 +30,7 @@ class LocationType(enum.IntEnum):
     Node = 0
     Edge = 1
     Face = 2
+    NoLocation = 3
 
 
 class Expr(Node):
@@ -45,14 +46,7 @@ class Stmt(Node):
 class FieldAccessExpr(Expr):
     name: str
     offset: Tuple[bool, int]
-    # TODO need to lookup the symbol table for the field's location type
-
-    # @root_validator
-    # def check_location_type(cls, values):
-    #     left, right, loctype = values.get('left'), values.get('right'), values.get('location_type')
-    #     if left.location_type is not loctype or right.location_type is not loctype:
-    #         raise ValueError('Location type mismatch')
-    #     return values
+    # TODO to add a validator we need to lookup a symbol table for the field's location type
 
 
 class LiteralExpr(Expr):
@@ -64,53 +58,68 @@ class AssignmentExpr(Expr):
     left: Expr
     right: Expr
 
-    # @root_validator # TODO pre!
-    # def check_location_type(cls, values):
-    #     if not(values['left'] == values['right']):
-    #         raise ValueError('Location type mismatch')
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        if not (values["left"].location_type == values["right"].location_type):
+            raise ValueError("Location type mismatch")
 
-    #     if "location_type" not in values:
-    #         values['location_type'] = values['left']
-    #     else:
-    #         if not(values['left'] == values['location_type']):
-    #             raise ValueError('Location type mismatch')
+        if "location_type" not in values:
+            values["location_type"] = values["left"].location_type
+        else:
+            if not (values["left"] == values["location_type"]):
+                raise ValueError("Location type mismatch")
+
+        return values
 
 
 class ReduceOverNeighbourExpr(Expr):
     operation: common.BinaryOperator
     right: Expr
     init: Expr
-    right_location_type: LocationType
+    right_location_type: LocationType  # TODO Doesn't make sense?
 
-    # @root_validator
-    # def check_location_type(cls, values):
-    #     right, init, right_loctype = values.get('right'), values.get('init'), values.get('right_location_type')
-    #     if right.location_type is not right_loctype and init.location_type is not right_loctype:
-    #         raise ValueError('Location type mismatch')
-    #     return values
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        # TODO location type of init? Do we need a `NoLocation` location type?
+        if "right_location_type" not in values:
+            values["right_location_type"] = values["right"].location_type
+        else:
+            if not (values["right_location_type"] == values["right"].location_type):
+                raise ValueError("Location type mismatch")
+        return values
 
 
 class BlockStmt(Stmt):
     statements: List[Stmt]
 
-    # @root_validator
-    # def check_location_type(cls, values):
-    #     statements, loctype = values.get('statements'), values.get('location_type')
-    #     for stmt in statements:
-    #         if(stmt.location_type is not loctype):
-    #             raise ValueError('Location type mismatch')
-    #     return values
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        statements = values.get("statements")
+        if len(statements) == 0:
+            raise ValueError("BlockStmt is empty")
+
+        if not all(s == statements[0] for s in statements):
+            raise ValueError("Location type mismatch")
+
+        if "location_type" not in values:
+            values["location_type"] = statements[0].location_type
+        else:
+            if not (statements[0].location_type == values["location_type"]):
+                raise ValueError("Location type mismatch")
+        return values
 
 
 class ExprStmt(Stmt):
     expr: AssignmentExpr
 
-    # @root_validator
-    # def check_location_type(cls, values):
-    #     expr, loctype = values.get('expr'), values.get('location_type')
-    #     if expr.location_type is not loctype:
-    #         raise ValueError('Location type mismatch')
-    #     return values
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        if "location_type" not in values:
+            values["location_type"] = values["expr"].location_type
+        else:
+            if not (values["expr"].location_type == values["location_type"]):
+                raise ValueError("Location type mismatch")
+        return values
 
 
 class UnstructuredField(Node):
@@ -123,12 +132,14 @@ class HorizontalLoop(Node):
     location_type: LocationType
     ast: BlockStmt
 
-    # @root_validator
-    # def check_location_type(cls, values):
-    #     ast, loctype = values.get('ast'), values.get('location_type')
-    #     if ast.location_type is not loctype:
-    #         raise ValueError('Location type mismatch')
-    #     return values
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        if "location_type" not in values:
+            values["location_type"] = values["ast"].location_type
+        else:
+            if not (values["ast"].location_type == values["location_type"]):
+                raise ValueError("Location type mismatch")
+        return values
 
 
 class ForK(Node):

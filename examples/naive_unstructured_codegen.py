@@ -4,6 +4,9 @@ from gt_toolchain.unstructured import naive
 from gt_toolchain.unstructured import common
 from gt_toolchain.unstructured.naive_codegen import NaiveCodeGenerator
 
+import devtools
+from devtools import debug
+
 from subprocess import Popen, PIPE
 
 # ### Reduce edge to node
@@ -27,23 +30,30 @@ from subprocess import Popen, PIPE
 # ```
 
 field_in = naive.UnstructuredField(
-    name="in", location_type=naive.LocationType.Edge, data_type=common.DataType.FLOAT64)
-field_out = naive.UnstructuredField(name="out", location_type=naive.LocationType.Node,
-                                    data_type=common.DataType.FLOAT64)
+    name="in", location_type=naive.LocationType.Edge, data_type=common.DataType.FLOAT64
+)
+field_out = naive.UnstructuredField(
+    name="out", location_type=naive.LocationType.Node, data_type=common.DataType.FLOAT64
+)
 
-zero = naive.LiteralExpr(value="0.0", data_type=common.DataType.FLOAT64,
-                         location_type=naive.LocationType.Node)
+zero = naive.LiteralExpr(
+    value="0.0", data_type=common.DataType.FLOAT64, location_type=naive.LocationType.Node
+)
 in_acc = naive.FieldAccessExpr(name="in", offset=[True, 0], location_type=naive.LocationType.Edge)
-red = naive.ReduceOverNeighbourExpr(operation=common.BinaryOperator.ADD, right=in_acc, init=zero,
-                                    right_location_type=naive.LocationType.Edge, location_type=naive.LocationType.Node)
+red = naive.ReduceOverNeighbourExpr(
+    operation=common.BinaryOperator.ADD,
+    right=in_acc,
+    init=zero,
+    location_type=naive.LocationType.Node,
+)
 
 out_acc = naive.FieldAccessExpr(
-    name="out", offset=[False, 0], location_type=naive.LocationType.Node)
+    name="out", offset=[False, 0], location_type=naive.LocationType.Node
+)
 
-assign = naive.ExprStmt(expr=naive.AssignmentExpr(left=out_acc, right=red,
-                                                  location_type=naive.LocationType.Node), location_type=naive.LocationType.Node)
-hori = naive.HorizontalLoop(location_type=naive.LocationType.Node, ast=naive.BlockStmt(
-    statements=[assign], location_type=naive.LocationType.Node))
+assign = naive.ExprStmt(expr=naive.AssignmentExpr(left=out_acc, right=red))
+
+hori = naive.HorizontalLoop(ast=naive.BlockStmt(statements=[assign]),)
 vert = naive.ForK(horizontal_loops=[hori], loop_order=common.LoopOrder.FORWARD)
 sten = naive.Stencil(name="reduce_to_node", k_loops=[vert])
 
@@ -55,6 +65,19 @@ generated_code = NaiveCodeGenerator.apply(comp)
 print(generated_code)
 
 # try compile the generated code
-p = Popen(['g++', '-I', '/home/vogtha/projects/toolchain/dawn/dawn/src',
-           '-x', 'c++', '-c', '-o', 'out.o', '-'], stdin=PIPE, encoding='utf8')
+p = Popen(
+    [
+        "g++",
+        "-I",
+        "/home/vogtha/projects/toolchain/dawn/dawn/src",
+        "-x",
+        "c++",
+        "-c",
+        "-o",
+        "out.o",
+        "-",
+    ],
+    stdin=PIPE,
+    encoding="utf8",
+)
 p.communicate(input=generated_code)[0]
