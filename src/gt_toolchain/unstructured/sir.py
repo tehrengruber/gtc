@@ -16,7 +16,7 @@
 
 
 import enum
-from typing import List, Union
+from typing import List, Union, Optional
 
 from pydantic import root_validator, validator  # noqa: F401
 
@@ -50,12 +50,12 @@ class LocationType(enum.IntEnum):
 
 class UnstructuredDimension(Node):
     dense_location_type: LocationType
-    sparse_part: Union[LocationType]
+    sparse_part: Optional[Union[LocationType]]
 
 
 class FieldDimensions(Node):
     horizontal_dimension: Union[UnstructuredDimension]  # TODO CartesianDimension
-    mask_k: int
+    # TODO mask_k: int
 
 
 class Field(Node):  # not to be confused with pydantic.Field
@@ -74,7 +74,7 @@ class Interval(Node):
     pass
 
 
-class BuiltinType:
+class BuiltinType(Node):
     type_id: common.DataType
 
 
@@ -118,7 +118,7 @@ class VarDeclStmt(Stmt):
     name: str
     dimension: int
     op: str
-    init_list = List[Expr]
+    init_list: List[Expr]
 
 
 class VerticalRegionDeclStmt(Stmt):
@@ -197,7 +197,7 @@ class ReductionOverNeighborExpr(Expr):
 
 class Stencil(Node):
     name: str
-    params: List[Field]
+    params: List[Field]  # TODO 'fields' would shadow base class 'fields'
     ast: AST
 
 
