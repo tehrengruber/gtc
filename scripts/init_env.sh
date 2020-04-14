@@ -68,9 +68,9 @@ fi
 set -e
 
 echo -e "\nInstalling Python packages..."
-pip install --upgrade pip setuptools wheel
-pip install -r ${EVE_ROOT}/requirements_dev.txt
-pip install -e ${EVE_ROOT}[cpp]
+${EVE_PYTHON_CMD} -m pip install --upgrade pip setuptools wheel
+${EVE_PYTHON_CMD} -m pip install -r ${EVE_ROOT}/requirements_dev.txt
+${EVE_PYTHON_CMD} -m pip install -e ${EVE_ROOT}[cpp]
 echo -e "\nDone!"
 
 echo -e "\nCreating local debug folder ('_local') ..."
