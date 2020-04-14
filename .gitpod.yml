@@ -1,7 +1,9 @@
 tasks:
     - before: |
-          cd /workspace/eve
+          mkdir -p /workspace/.caches/pre-commit
+          ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
           alias pre-commit="PIP_USER=no pre-commit"
+          cd /workspace/eve
       init: |
           ./scripts/init_env.sh -i
           pre-commit install
