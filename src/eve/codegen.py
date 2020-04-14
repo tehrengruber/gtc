@@ -333,15 +333,16 @@ class NodeDumper(NodeVisitor):
                     self.transform_children(node, **kwargs),
                     self.transform_attrs(node, **kwargs),
                 )
-        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
-            node, self.ATOMIC_COLLECTION_TYPES
-        ):
-            node = [self.visit(value, **kwargs) for value in node]
-        elif isinstance(node, collections.abc.Mapping):
-            node = {key: self.visit(value, **kwargs) for key, value in node.items()}
+        else:
+            if isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
+                node, self.ATOMIC_COLLECTION_TYPES
+            ):
+                node = [self.visit(value, **kwargs) for value in node]
+            elif isinstance(node, collections.abc.Mapping):
+                node = {key: self.visit(value, **kwargs) for key, value in node.items()}
 
-        if self.dump_function:
-            result = self.dump_function(node, **kwargs)
+            if self.dump_function:
+                result = self.dump_function(node, **kwargs)
 
         return result
 
