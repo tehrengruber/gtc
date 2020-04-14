@@ -1,3 +1,6 @@
 tasks:
     - before: |
-          source scripts/activate
+          cd /workspace/eve
+          pyenv local 3.7.7
+      init: |
+          ./scripts/init_env.sh -i

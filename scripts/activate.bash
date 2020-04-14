@@ -16,9 +16,12 @@ fi
 deactivate >/dev/null 2>/dev/null
 
 if [ ! -f ${EVE_VENV_PATH}/bin/activate ]; then
-    ${EVE_ROOT}/scripts/bootstrap.sh
+    ${EVE_ROOT}/scripts/init_env.sh
+    if [ "$?" != "0" ]; then
+        echo "venv activation failed!"
+        return -1
+    fi
 fi
-
 source ${EVE_VENV_PATH}/bin/activate
 
 unset EVE_ROOT EVE_VENV_PATH
