@@ -1,0 +1,3 @@
+tasks:
+    - before: |
+          source scripts/activate
