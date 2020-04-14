@@ -16,7 +16,7 @@
 
 import enum
 
-from ..core import StrEnum
+from eve import StrEnum
 
 
 class AssignmentKind(StrEnum):

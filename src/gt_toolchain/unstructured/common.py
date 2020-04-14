@@ -15,6 +15,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import enum
+
 from eve.core import StrEnum
 
 
@@ -57,6 +58,7 @@ class DataType(enum.IntEnum):
     UINT32 = 102
     FLOAT32 = 201
     FLOAT64 = 202
+
 
 # TODO not really common
 @enum.unique
