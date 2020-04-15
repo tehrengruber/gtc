@@ -54,7 +54,8 @@ class LiteralExpr(Expr):
     data_type: common.DataType
 
 
-class AssignmentExpr(Expr):
+class BinaryOp(Expr):
+    op: common.BinaryOperator
     left: Expr
     right: Expr
 
@@ -67,6 +68,36 @@ class AssignmentExpr(Expr):
             values["location_type"] = values["left"].location_type
         else:
             if not (values["left"] == values["location_type"]):
+                raise ValueError("Location type mismatch")
+
+        return values
+
+
+class VarDeclStmt(Stmt):
+    data_type: common.DataType
+    name: str
+    init: Expr
+
+    @root_validator
+    def check_location_type(cls, values):
+        if not (values["init"].location_type == values["location_type"]):
+            raise ValueError("Location type mismatch")
+        return values
+
+
+class AssignmentExpr(Expr):
+    left: Expr
+    right: Expr
+
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        if not (values["left"].location_type == values["right"].location_type):
+            raise ValueError("Location type mismatch")
+
+        if "location_type" not in values:
+            values["location_type"] = values["left"].location_type
+        else:
+            if not (values["left"].location_type == values["location_type"]):
                 raise ValueError("Location type mismatch")
 
         return values

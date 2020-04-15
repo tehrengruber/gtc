@@ -17,11 +17,25 @@ def sir2naiveLocationType(sir_loc: sir.LocationType):
         raise "unreachable"
 
 
+def opstring2enum(op: str):
+    if op == "+":
+        return common.BinaryOperator.ADD
+    elif op == "-":
+        return common.BinaryOperator.SUB
+    elif op == "*":
+        return common.BinaryOperator.MUL
+    elif op == "/":
+        return common.BinaryOperator.DIV
+    else:
+        raise "unreachable: unknown op"
+
+
 class SirToNaive(NodeTranslator):
     def __init__(self, *, memo: dict = None, **kwargs):
         super().__init__(memo=memo)
         self.isControlFlow = None
         self.sir_stencil_params = {}  # TODO this is a dummy symbol table for stencil parameters
+        self.current_loc_type_stack = []  # TODO experimental
 
     def _get_field_location_type(self, field: sir.Field):
         # TODO handle sparse location types
@@ -86,6 +100,59 @@ class SirToNaive(NodeTranslator):
                 print(res)
                 statements.append(res)
             return naive.BlockStmt(statements=statements)
+
+    def visit_BinaryOperator(self, node: Node, **kwargs):
+        return naive.BinaryOp(
+            op=opstring2enum(node.op), left=self.visit(node.left), right=self.visit(node.right)
+        )
+
+    def visit_VarDeclStmt(self, node: Node, **kwargs):
+        assert node.op == "="
+        assert node.dimension == 0
+        assert len(node.init_list) == 1
+        assert isinstance(node.data_type.data_type, sir.BuiltinType)
+
+        loctype = naive.LocationType.Node  # ""
+        if node.location_type:
+            loctype = sir2naiveLocationType(node.location_type)
+        elif self.current_loc_type_stack:
+            loctype = self.current_loc_type_stack[-1]
+        else:
+            raise ValueError("no location type")
+
+        init = self.visit(node.init_list[0])
+        return naive.VarDeclStmt(
+            data_type=node.data_type.data_type.type_id,
+            name=node.name,
+            init=init,
+            location_type=loctype,
+        )
+
+    def visit_LiteralAccessExpr(self, node: Node, **kwargs):
+        loctype = ""
+        if node.location_type:
+            loctype = sir2naiveLocationType(node.location_type)
+        elif self.current_loc_type_stack:
+            loctype = self.current_loc_type_stack[-1]
+        else:
+            raise ValueError("no location type")
+
+        return naive.LiteralExpr(
+            value=node.value, data_type=node.data_type.type_id, location_type=loctype,
+        )
+
+    def visit_ReductionOverNeighborExpr(self, node: Node, **kwargs):
+        self.current_loc_type_stack.append(sir2naiveLocationType(node.chain[-1]))
+        print(self.current_loc_type_stack[-1])
+        right = self.visit(node.rhs)
+        init = self.visit(node.init)
+        self.current_loc_type_stack.pop()
+        return naive.ReduceOverNeighbourExpr(
+            operation=opstring2enum(node.op),
+            right=right,
+            init=init,
+            location_type=sir2naiveLocationType(node.chain[0]),
+        )
 
     def visit_AST(self, node: Node, **kwargs):
         assert isinstance(node.root, sir.BlockStmt)  # TODO add check to IR

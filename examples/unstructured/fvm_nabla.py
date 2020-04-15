@@ -4,7 +4,7 @@
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from gt_toolchain.unstructured import common, sir
+from gt_toolchain.unstructured import common, naive, sir, sir_to_naive
 
 
 # fields = [
@@ -110,10 +110,33 @@ zavg_red = sir.ReductionOverNeighborExpr(
     op="+",
     rhs=sir.FieldAccessExpr(name="pp", vertical_offset=0, horizontal_offset=sir.ZeroOffset()),
     init=sir.LiteralAccessExpr(
-        value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32)
+        value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
     ),
-    chain=[sir.LocationType.Vertex],
-)  # TODO chain?
+    chain=[sir.LocationType.Edge, sir.LocationType.Vertex],
+)
+zavg_mul = sir.BinaryOperator(
+    op="*",
+    left=sir.LiteralAccessExpr(
+        value="0.5", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+    ),
+    right=zavg_red,
+)
+zavg_decl = sir.VarDeclStmt(
+    data_type=sir.Type(
+        data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+        is_const=False,
+        is_volatile=False,
+    ),
+    name="zavg",
+    dimension=0,
+    op="=",
+    init_list=[zavg_mul],
+)
+s2n = sir_to_naive.SirToNaive()
+s2n.sir_stencil_params["pp"] = pp
+s2n.current_loc_type_stack.append(naive.LocationType.Edge)
+debug(s2n.visit(zavg_decl))
+
 #             sir_utils.make_assignment_stmt(sir_utils.make_field_access_expr(
 #                 "zavgS_MXX"), sir_utils.make_binary_operator(sir_utils.make_field_access_expr("S_MXX"), "*", sir_utils.make_var_access_expr("zavg"))),
 #             sir_utils.make_assignment_stmt(sir_utils.make_field_access_expr(

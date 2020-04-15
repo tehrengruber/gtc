@@ -28,24 +28,24 @@ from . import common
 # = statements.proto =
 
 
-class Expr(Node):
-    pass
-
-
-class Stmt(Node):
-    pass
-
-
-class AST(Node):
-    root: Stmt
-
-
 @enum.unique
 class LocationType(enum.IntEnum):
     LocationTypeUnknown = 0
     Vertex = 1
     Cell = 2
     Edge = 3
+
+
+class Expr(Node):
+    location_type: Optional[LocationType]
+
+
+class Stmt(Node):
+    location_type: Optional[LocationType]
+
+
+class AST(Node):
+    root: Stmt
 
 
 class UnstructuredDimension(Node):
