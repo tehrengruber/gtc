@@ -7,5 +7,4 @@ tasks:
           ./scripts/init_env.sh -i
       init: |
           pre-commit install --install-hooks
-      command: |
           gp preview file:///workspace/eve/docs/_build/html/index.html
