@@ -50,7 +50,7 @@ class LocationType(enum.IntEnum):
 
 class UnstructuredDimension(Node):
     dense_location_type: LocationType
-    sparse_part: Optional[Union[LocationType]]
+    sparse_part: Optional[List[LocationType]]
 
 
 class FieldDimensions(Node):
@@ -178,7 +178,7 @@ class FieldAccessExpr(Expr):
     # TODO AccessExprData and ID probably unused in SIR
 
 
-class LiteralExpr(Expr):
+class LiteralAccessExpr(Expr):
     value: str
     data_type: BuiltinType
     # TODO AccessExprData and ID probably unused in SIR
