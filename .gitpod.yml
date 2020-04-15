@@ -6,6 +6,6 @@ tasks:
           cd /workspace/eve
           ./scripts/init_env.sh -i
       init: |
-          pre-commit install
+          pre-commit install --install-hooks
       command: |
           gp preview file:///workspace/eve/docs/_build/html/index.html
