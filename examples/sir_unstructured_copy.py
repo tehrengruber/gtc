@@ -4,7 +4,8 @@
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from gt_toolchain.unstructured import sir, common, naive_codegen, sir_to_naive
+from gt_toolchain.unstructured import common, naive_codegen, sir, sir_to_naive
+
 
 field_acc_a = sir.FieldAccessExpr(
     name="field_a", vertical_offset=0, horizontal_offset=sir.ZeroOffset()

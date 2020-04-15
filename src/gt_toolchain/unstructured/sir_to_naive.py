@@ -2,8 +2,8 @@
 # Eve toolchain
 
 import eve  # noqa: F401
-from eve.core import NodeTranslator, Node
-from gt_toolchain.unstructured import sir, common, naive
+from eve.core import Node, NodeTranslator
+from gt_toolchain.unstructured import common, naive, sir
 
 
 def sir2naiveLocationType(sir_loc: sir.LocationType):
