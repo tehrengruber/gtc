@@ -58,7 +58,7 @@ class FieldDimensions(Node):
     # TODO mask_k: int
 
 
-class Field(Node):  # not to be confused with pydantic.Field
+class Field(Node):
     name: str
     is_temporary: bool
     field_dimensions: FieldDimensions
