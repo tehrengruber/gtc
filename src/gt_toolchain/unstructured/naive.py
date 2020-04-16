@@ -54,6 +54,10 @@ class LiteralExpr(Expr):
     data_type: common.DataType
 
 
+class VarAccessExpr(Expr):
+    name: str
+
+
 class BinaryOp(Expr):
     op: common.BinaryOperator
     left: Expr
@@ -129,8 +133,8 @@ class BlockStmt(Stmt):
         if len(statements) == 0:
             raise ValueError("BlockStmt is empty")
 
-        if not all(s == statements[0] for s in statements):
-            raise ValueError("Location type mismatch")
+        if not all(s.location_type == statements[0].location_type for s in statements):
+            raise ValueError("Location type mismatch: not all statements have the same")
 
         if "location_type" not in values:
             values["location_type"] = statements[0].location_type
@@ -156,6 +160,7 @@ class ExprStmt(Stmt):
 class UnstructuredField(Node):
     name: str
     location_type: LocationType
+    sparse_location_type: Optional[LocationType]  # TODO chain?
     data_type: common.DataType
 
 

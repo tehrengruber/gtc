@@ -71,7 +71,10 @@ class NaiveCodeGenerator(TemplatedGenerator):
         UnstructuredField="\n  dawn::{loctype}_field_t<LibTag, {data_type}>& {name};",
         FieldAccessExpr="{name}(deref(LibTag{{}}, {iter_var}), k)",
         AssignmentExpr="{left} = {right}",
+        VarAccessExpr="{name}",
+        BinaryOp="{left} {op} {right}",
         ExprStmt="\n{expr};",
+        VarDeclStmt="\n{data_type} {name} = {init};",
         ForK="{k_loop} {{{horizontal_loops}\n}}",
         HorizontalLoop="\nfor(auto const & t: get{stringified_location_type}(LibTag{{}}, mesh)) {ast}",
         BlockStmt="{{{statements}\n}}",
@@ -120,6 +123,9 @@ void run() {{
                 data_type=data_type_to_c(node.data_type),
             ),
         )
+
+    def visit_VarDeclStmt(self, node, **kwargs) -> str:
+        return self.render_node(node, dict(data_type=data_type_to_c(node.data_type)),)
 
     def visit_FieldAccessExpr(self, node, **kwargs) -> str:
         return self.render_node(node, dict(iter_var=self.iter_var_stack[-1]))

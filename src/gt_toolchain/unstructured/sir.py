@@ -157,7 +157,12 @@ class TernaryOperator(Expr):
 # TODO class FunCallExpr
 # TODO class StencilFunCallExpr
 # TODO class StencilFunArgExpr
-# TODO class VarAccessExpr
+
+
+class VarAccessExpr(Expr):
+    name: str
+    # index: Expr # TODO
+    # is_external: bool # TODO
 
 
 class ZeroOffset(Node):
