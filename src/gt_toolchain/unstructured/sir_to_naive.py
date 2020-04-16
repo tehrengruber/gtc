@@ -48,6 +48,12 @@ class SirToNaive(NodeTranslator):
             field.field_dimensions.horizontal_dimension.dense_location_type
         )
 
+    def _is_sparse_field(self, field: sir.Field):
+        if field.field_dimensions.horizontal_dimension.sparse_part:
+            return True
+        else:
+            return False
+
     def visit_Field(self, node: Node, **kwargs):
         assert (not node.field_dimensions.horizontal_dimension.sparse_part) or (
             len(node.field_dimensions.horizontal_dimension.sparse_part) <= 1
@@ -92,6 +98,7 @@ class SirToNaive(NodeTranslator):
             name=node.name,
             offset=(horizontal_offset, node.vertical_offset),
             location_type=self._get_field_location_type(self.sir_stencil_params[node.name]),
+            is_sparse=self._is_sparse_field(self.sir_stencil_params[node.name]),
         )
 
     def visit_AssignmentExpr(self, node: Node, **kwargs):

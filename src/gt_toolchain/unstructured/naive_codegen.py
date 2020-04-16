@@ -69,18 +69,20 @@ class NaiveCodeGenerator(TemplatedGenerator):
 
     NODE_TEMPLATES = dict(
         UnstructuredField="\n  dawn::{loctype}_field_t<LibTag, {data_type}>& {name};",
-        FieldAccessExpr="{name}(deref(LibTag{{}}, {iter_var}), k)",
+        FieldAccessExpr="{name}(deref(LibTag{{}}, {iter_var}), {sparse_index} k)",
         AssignmentExpr="{left} = {right}",
         VarAccessExpr="{name}",
         BinaryOp="{left} {op} {right}",
         ExprStmt="\n{expr};",
         VarDeclStmt="\n{data_type} {name} = {init};",
-        ForK="{k_loop} {{{horizontal_loops}\n}}",
+        ForK="{k_loop} {{int m_sparse_dimension_idx;{horizontal_loops}\n}}",
         HorizontalLoop="\nfor(auto const & t: get{stringified_location_type}(LibTag{{}}, mesh)) {ast}",
         BlockStmt="{{{statements}\n}}",
-        ReduceOverNeighbourExpr="""reduce{right_loc_type}To{loc_type}(LibTag{{}}, mesh, {outer_iter_var}, {init}, [&](auto& lhs, auto const& {inner_iter_var}) {{
-return lhs {operation}= {right};
-}})""",
+        ReduceOverNeighbourExpr="""(m_sparse_dimension_idx=0,reduce{right_loc_type}To{loc_type}(LibTag{{}}, mesh, {outer_iter_var}, {init}, [&](auto& lhs, auto const& {inner_iter_var}) {{
+lhs {operation}= {right};
+m_sparse_dimension_idx++;
+return lhs;
+}}))""",
         LiteralExpr="({c_data_type}){value}",
         Stencil="""
 void {name}() {{
@@ -128,7 +130,12 @@ void run() {{
         return self.render_node(node, dict(data_type=data_type_to_c(node.data_type)),)
 
     def visit_FieldAccessExpr(self, node, **kwargs) -> str:
-        return self.render_node(node, dict(iter_var=self.iter_var_stack[-1]))
+        sparse_index = ""
+        if node.is_sparse:
+            sparse_index = "m_sparse_dimension_idx, "
+        return self.render_node(
+            node, dict(iter_var=self.iter_var_stack[-1], sparse_index=sparse_index)
+        )
 
     def visit_ForK(self, node, **kwargs) -> str:
         if node.loop_order == common.LoopOrder.FORWARD:

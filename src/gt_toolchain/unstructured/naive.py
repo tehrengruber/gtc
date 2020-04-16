@@ -46,6 +46,7 @@ class Stmt(Node):
 class FieldAccessExpr(Expr):
     name: str
     offset: Tuple[bool, int]
+    is_sparse = False
     # TODO to add a validator we need to lookup a symbol table for the field's location type
 
 
