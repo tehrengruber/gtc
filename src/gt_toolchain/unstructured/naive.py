@@ -16,17 +16,17 @@
 
 
 import enum
-from typing import List, Optional, Tuple, Union  # noqa: F401
+from typing import List, Tuple
 
-from pydantic import Field, root_validator, validator  # noqa: F401
+from pydantic import root_validator
 
-from eve.core import Node, NodeVisitor, SourceLocation, StrEnum  # noqa: F401
+from eve import Bool, Int, IntEnum, Node, Str
 
 from . import common
 
 
 @enum.unique
-class LocationType(enum.IntEnum):
+class LocationType(IntEnum):
     Node = 0
     Edge = 1
     Face = 2
@@ -44,13 +44,13 @@ class Stmt(Node):
 
 
 class FieldAccessExpr(Expr):
-    name: str
-    offset: Tuple[bool, int]
+    name: Str
+    offset: Tuple[Bool, Int]
     # TODO to add a validator we need to lookup a symbol table for the field's location type
 
 
 class LiteralExpr(Expr):
-    value: str
+    value: Str
     data_type: common.DataType
 
 
@@ -60,14 +60,13 @@ class AssignmentExpr(Expr):
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        if not (values["left"].location_type == values["right"].location_type):
+        if values["left"].location_type != values["right"].location_type:
             raise ValueError("Location type mismatch")
 
         if "location_type" not in values:
             values["location_type"] = values["left"].location_type
-        else:
-            if not (values["left"] == values["location_type"]):
-                raise ValueError("Location type mismatch")
+        elif values["left"] != values["location_type"]:
+            raise ValueError("Location type mismatch")
 
         return values
 
@@ -83,9 +82,8 @@ class ReduceOverNeighbourExpr(Expr):
         # TODO location type of init? Do we need a `NoLocation` location type?
         if "right_location_type" not in values:
             values["right_location_type"] = values["right"].location_type
-        else:
-            if not (values["right_location_type"] == values["right"].location_type):
-                raise ValueError("Location type mismatch")
+        elif values["right_location_type"] != values["right"].location_type:
+            raise ValueError("Location type mismatch")
         return values
 
 
@@ -94,18 +92,17 @@ class BlockStmt(Stmt):
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        statements = values.get("statements")
+        statements = values["statements"]
         if len(statements) == 0:
             raise ValueError("BlockStmt is empty")
 
-        if not all(s == statements[0] for s in statements):
+        if any(s.location_type != statements[0].location_type for s in statements):
             raise ValueError("Location type mismatch")
 
         if "location_type" not in values:
             values["location_type"] = statements[0].location_type
-        else:
-            if not (statements[0].location_type == values["location_type"]):
-                raise ValueError("Location type mismatch")
+        elif statements[0].location_type != values["location_type"]:
+            raise ValueError("Location type mismatch")
         return values
 
 
@@ -117,13 +114,13 @@ class ExprStmt(Stmt):
         if "location_type" not in values:
             values["location_type"] = values["expr"].location_type
         else:
-            if not (values["expr"].location_type == values["location_type"]):
+            if values["expr"].location_type != values["location_type"]:
                 raise ValueError("Location type mismatch")
         return values
 
 
 class UnstructuredField(Node):
-    name: str
+    name: Str
     location_type: LocationType
     data_type: common.DataType
 
@@ -136,9 +133,8 @@ class HorizontalLoop(Node):
     def check_location_type(cls, values):
         if "location_type" not in values:
             values["location_type"] = values["ast"].location_type
-        else:
-            if not (values["ast"].location_type == values["location_type"]):
-                raise ValueError("Location type mismatch")
+        elif values["ast"].location_type != values["location_type"]:
+            raise ValueError("Location type mismatch")
         return values
 
 
@@ -148,7 +144,7 @@ class ForK(Node):
 
 
 class Stencil(Node):
-    name: str
+    name: Str
     k_loops: List[ForK]
 
 

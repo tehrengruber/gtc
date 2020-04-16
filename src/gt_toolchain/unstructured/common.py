@@ -16,7 +16,7 @@
 
 import enum
 
-from eve.core import StrEnum
+from eve import IntEnum, StrEnum
 
 
 class AssignmentKind(StrEnum):
@@ -31,7 +31,7 @@ class AssignmentKind(StrEnum):
 
 @enum.unique
 class UnaryOperator(StrEnum):
-    """Kind of assignment: plain or combined with operations."""
+    """Unary operator indentifier."""
 
     POS = "+"
     NEG = "-"
@@ -48,7 +48,7 @@ class BinaryOperator(StrEnum):
 
 
 @enum.unique
-class DataType(enum.IntEnum):
+class DataType(IntEnum):
     """Data type identifier."""
 
     # IDs from dawn
@@ -63,7 +63,7 @@ class DataType(enum.IntEnum):
 
 # TODO not really common
 @enum.unique
-class LoopOrder(enum.IntEnum):
+class LoopOrder(IntEnum):
     """Loop order identifier."""
 
     FORWARD = 1

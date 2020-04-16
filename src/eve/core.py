@@ -21,7 +21,7 @@ import collections.abc
 import copy
 import itertools
 import operator
-from enum import Enum
+from enum import Enum, IntEnum  # noqa: F401
 from typing import (
     Any,
     Callable,
