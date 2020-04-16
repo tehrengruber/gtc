@@ -23,13 +23,91 @@ import os
 import string
 import sys
 import textwrap
+from subprocess import PIPE, Popen
 from types import MappingProxyType
-from typing import Any, ClassVar, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    ClassVar,
+    Collection,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
+import black
 import jinja2
 from mako import template as mako_tpl
 
 from .core import BaseNode, NodeVisitor, StrEnum, ValidNodeType
+
+
+try:
+    import clang_format
+
+    _CLANG_FORMAT_AVAILABLE = True
+    del clang_format
+except ImportError:
+    _CLANG_FORMAT_AVAILABLE = False
+
+
+def format_cpp_source(
+    source: str,
+    *,
+    style: Optional[str] = None,
+    fallback_style: Optional[str] = None,
+    sort_includes: bool = False,
+) -> str:
+    assert _CLANG_FORMAT_AVAILABLE
+
+    args = ["clang-format"]
+    if style:
+        args.append(f"--style={style}")
+    if fallback_style:
+        args.append(f"--fallback-style={style}")
+    if sort_includes:
+        args.append("--sort-includes")
+
+    p = Popen(args, stdout=PIPE, stdin=PIPE, encoding="utf8")
+    formatted_code, _ = p.communicate(input=source)
+    return formatted_code
+
+
+def format_python_source(
+    source: str,
+    *,
+    line_length: int = 100,
+    target_versions: Optional[Set[str]] = None,
+    string_normalization: bool = True,
+) -> str:
+    target_versions = target_versions or f"{sys.version_info.major}{sys.version_info.minor}"
+    target_versions = set(black.TargetVersion[f"PY{v.replace('.', '')}"] for v in target_versions)
+
+    return black.format_str(
+        source,
+        mode=black.FileMode(
+            line_length=line_length,
+            target_versions=target_versions,
+            string_normalization=string_normalization,
+        ),
+    )
+
+
+def format_source(language: str, source: str, *, skip_errors=True, **kwargs) -> str:
+    formatter = globals().get(f"format_{language.lower()}_source", None)
+    try:
+        return formatter(source, **kwargs)
+    except Exception:
+        if skip_errors:
+            return source
+        else:
+            raise RuntimeError(
+                f"Something went wrong when trying to format '{language}' source code!"
+            )
 
 
 ValidNameDefType = Union[str, Sequence[str]]

@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
-from subprocess import PIPE, Popen
 from types import MappingProxyType
 from typing import ClassVar, Mapping
 
 from mako import template as mako_tpl
 
-from eve.codegen import TemplatedGenerator
+from eve import codegen
 
 from . import common
 from .naive import LocationType
 
 
-class NaiveCodeGenerator(TemplatedGenerator):
+class NaiveCodeGenerator(codegen.TemplatedGenerator):
     LOCATION_TYPE_TO_STR: ClassVar[Mapping[LocationType, Mapping[str, str]]] = MappingProxyType(
         {
             LocationType.Node: MappingProxyType({"singular": "vertex", "plural": "vertices"}),
@@ -32,7 +31,7 @@ class NaiveCodeGenerator(TemplatedGenerator):
 
     class Templates:
         UnstructuredField = mako_tpl.Template(
-            """
+            """\
 <%
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"]
     data_type = _this_generator.DATA_TYPE_TO_STR[_this_node.data_type]
@@ -62,7 +61,7 @@ for (int k = ${k_init}; ${k_cond}; ${k_step}) {${ "".join(horizontal_loops) }\n}
         )
 
         HorizontalLoop = mako_tpl.Template(
-            """
+            """\
 <%
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['plural'].title()
 %>
@@ -72,7 +71,7 @@ for (int k = ${k_init}; ${k_cond}; ${k_step}) {${ "".join(horizontal_loops) }\n}
         BlockStmt = mako_tpl.Template("{${ ''.join(statements) }\n}")
 
         ReduceOverNeighbourExpr = mako_tpl.Template(
-            """
+            """\
 <%
     right_loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.right_location_type]["singular"].title()
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"].title()
@@ -141,8 +140,7 @@ void run() {
     @classmethod
     def apply(cls, root, **kwargs) -> str:
         generated_code = super().apply(root, **kwargs)
-        p = Popen(["clang-format"], stdout=PIPE, stdin=PIPE, encoding="utf8")
-        formatted_code = p.communicate(input=generated_code)[0]
+        formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
         return formatted_code
 
     def visit_HorizontalLoop(self, node, **kwargs) -> str:
