@@ -160,7 +160,7 @@ statements.append(zavg_decl)
 assign_zavgS_MXX = sir.ExprStmt(
     expr=sir.AssignmentExpr(
         left=sir.FieldAccessExpr(
-            name="zavgS_MYY", vertical_offset=0, horizontal_offset=sir.ZeroOffset()
+            name="zavgS_MXX", vertical_offset=0, horizontal_offset=sir.ZeroOffset()
         ),
         op="=",
         right=sir.BinaryOperator(

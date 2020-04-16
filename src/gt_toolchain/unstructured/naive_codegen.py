@@ -68,7 +68,7 @@ class NaiveCodeGenerator(TemplatedGenerator):
         return formatted_code
 
     NODE_TEMPLATES = dict(
-        UnstructuredField="\n  dawn::{loctype}_field_t<LibTag, {data_type}>& {name};",
+        UnstructuredField="\n  dawn::{sparse_loc}{loctype}_field_t<LibTag, {data_type}>& {name};",
         FieldAccessExpr="{name}(deref(LibTag{{}}, {iter_var}), {sparse_index} k)",
         AssignmentExpr="{left} = {right}",
         VarAccessExpr="{name}",
@@ -118,10 +118,14 @@ void run() {{
     )
 
     def visit_UnstructuredField(self, node, **kwargs) -> str:
+        sparse_loc = ""
+        if node.sparse_location_type:
+            sparse_loc = "sparse_"
         return self.render_node(
             node,
             dict(
                 loctype=location_type_to_str_singular_lower(node.location_type),
+                sparse_loc=sparse_loc,
                 data_type=data_type_to_c(node.data_type),
             ),
         )
@@ -195,10 +199,11 @@ void run() {{
         api_field_declarations = "".join(self.visit(p) for p in node.params)
         stencil_definitions = "".join(self.visit(s) for s in node.stencils)
         ctor_field_params = ", ".join(
-            "dawn::{loc_type}_field_t<LibTag, {data_type}>& {name}".format(
+            "dawn::{sparse_loc}{loc_type}_field_t<LibTag, {data_type}>& {name}".format(
                 loc_type=location_type_to_str_singular_lower(p.location_type),
                 name=p.name,
                 data_type=data_type_to_c(p.data_type),
+                sparse_loc="sparse_" if p.sparse_location_type else "",
             )
             for p in node.params
         )
