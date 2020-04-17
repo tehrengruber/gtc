@@ -19,9 +19,9 @@
 
 import collections.abc
 import copy
+import enum
 import itertools
 import operator
-from enum import Enum, IntEnum  # noqa: F401
 from typing import (
     Any,
     Callable,
@@ -45,6 +45,7 @@ from pydantic import (
     StrictStr,
     validator,
 )
+from pydantic.typing import AnyCallable
 
 
 Bool = StrictBool  # noqa
@@ -76,8 +77,56 @@ class UIDGenerator:
         cls.__unique_counter = itertools.count(start)
 
 
-class StrEnum(str, Enum):
-    """Basic :class:`enum.Enum` subclass compatible with string operations."""
+#: Typing hint for `__get_validators__()` methods (defined but not exported in `pydantic.typing`)
+CallableGenerator = Generator[AnyCallable, None, None]
+
+
+class Enum(enum.Enum):
+    """Basic :class:`enum.Enum` subclass with strict type validation."""
+
+    @classmethod
+    def __get_validators__(cls) -> CallableGenerator:
+        yield cls._strict_type_validator
+        if hasattr(super(), "__get_validators__"):
+            yield from super().__get_validators__()
+
+    @classmethod
+    def _strict_type_validator(cls, v: Any) -> enum.Enum:
+        if not isinstance(v, cls):
+            raise TypeError(f"Invalid value type [expected: {cls}, received: {v.__class__}]")
+        return v
+
+
+class IntEnum(enum.IntEnum):
+    """Basic :class:`enum.IntEnum` subclass with strict type validation."""
+
+    @classmethod
+    def __get_validators__(cls) -> CallableGenerator:
+        yield cls._strict_type_validator
+        if hasattr(super(), "__get_validators__"):
+            yield from super().__get_validators__()
+
+    @classmethod
+    def _strict_type_validator(cls, v: Any) -> enum.IntEnum:
+        if not isinstance(v, cls):
+            raise TypeError(f"Invalid value type [expected: {cls}, received: {v.__class__}]")
+        return v
+
+
+class StrEnum(str, enum.Enum):
+    """Basic :class:`enum.Enum` subclass with strict type validation and supporting string operations."""
+
+    @classmethod
+    def __get_validators__(cls) -> CallableGenerator:
+        yield cls._strict_type_validator
+        if hasattr(super(), "__get_validators__"):
+            yield from super().__get_validators__()
+
+    @classmethod
+    def _strict_type_validator(cls, v: Any) -> "StrEnum":
+        if not isinstance(v, cls):
+            raise TypeError(f"Invalid value type [expected: {cls}, received: {v.__class__}]")
+        return v
 
     def __str__(self) -> str:
         return self.value

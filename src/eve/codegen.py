@@ -74,6 +74,7 @@ def format_cpp_source(
 
     p = Popen(args, stdout=PIPE, stdin=PIPE, encoding="utf8")
     formatted_code, _ = p.communicate(input=source)
+
     return formatted_code
 
 
