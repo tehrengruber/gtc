@@ -1,35 +1,14 @@
 # -*- coding: utf-8 -*-
 # Eve toolchain
 
+from types import MappingProxyType
+from typing import ClassVar, Mapping
+
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
 from eve.core import Node, NodeTranslator
 from gt_toolchain.unstructured import common, naive, sir
-
-
-def sir2naiveLocationType(sir_loc: sir.LocationType):
-    if sir_loc == sir.LocationType.Cell:
-        return naive.LocationType.Face
-    elif sir_loc == sir.LocationType.Edge:
-        return naive.LocationType.Edge
-    elif sir_loc == sir.LocationType.Vertex:
-        return naive.LocationType.Node
-    else:
-        raise "unreachable"
-
-
-def opstring2enum(op: str):
-    if op == "+":
-        return common.BinaryOperator.ADD
-    elif op == "-":
-        return common.BinaryOperator.SUB
-    elif op == "*":
-        return common.BinaryOperator.MUL
-    elif op == "/":
-        return common.BinaryOperator.DIV
-    else:
-        raise "unreachable: unknown op"
 
 
 class SirToNaive(NodeTranslator):
@@ -41,12 +20,33 @@ class SirToNaive(NodeTranslator):
         )  # elements are sir.Field # TODO this is a dummy symbol table for stencil parameters
         self.current_loc_type_stack = []  # TODO experimental
 
+    BINOPSTR_TO_ENUM: ClassVar[Mapping[str, common.BinaryOperator]] = MappingProxyType(
+        {
+            "+": common.BinaryOperator.ADD,
+            "-": common.BinaryOperator.SUB,
+            "*": common.BinaryOperator.MUL,
+            "/": common.BinaryOperator.DIV,
+        }
+    )
+
+    SIR_TO_NAIVE_LOCATION_TYPE: ClassVar[
+        Mapping[sir.LocationType, naive.LocationType]
+    ] = MappingProxyType(
+        {
+            sir.LocationType.Edge: naive.LocationType.Edge,
+            sir.LocationType.Cell: naive.LocationType.Face,
+            sir.LocationType.Vertex: naive.LocationType.Node,
+        }
+    )
+
     def _get_field_location_type(self, field: sir.Field):
         if field.field_dimensions.horizontal_dimension.sparse_part:
-            return sir2naiveLocationType(field.field_dimensions.horizontal_dimension.sparse_part[0])
-        return sir2naiveLocationType(
+            return self.SIR_TO_NAIVE_LOCATION_TYPE[
+                field.field_dimensions.horizontal_dimension.sparse_part[0]
+            ]
+        return self.SIR_TO_NAIVE_LOCATION_TYPE[
             field.field_dimensions.horizontal_dimension.dense_location_type
-        )
+        ]
 
     def _is_sparse_field(self, field: sir.Field):
         if field.field_dimensions.horizontal_dimension.sparse_part:
@@ -60,14 +60,14 @@ class SirToNaive(NodeTranslator):
         )
         sparse_location_type = None
         if node.field_dimensions.horizontal_dimension.sparse_part:
-            sparse_location_type = sir2naiveLocationType(
+            sparse_location_type = self.SIR_TO_NAIVE_LOCATION_TYPE[
                 node.field_dimensions.horizontal_dimension.sparse_part[0]
-            )
+            ]
         return naive.UnstructuredField(
             name=node.name,
-            location_type=sir2naiveLocationType(
+            location_type=self.SIR_TO_NAIVE_LOCATION_TYPE[
                 node.field_dimensions.horizontal_dimension.dense_location_type
-            ),
+            ],
             sparse_location_type=sparse_location_type,
             data_type=common.DataType.FLOAT64,
         )
@@ -111,7 +111,7 @@ class SirToNaive(NodeTranslator):
     def visit_VarAccessExpr(self, node: Node, **kwargs):
         loctype = ""
         if node.location_type:
-            loctype = sir2naiveLocationType(node.location_type)
+            loctype = self.SIR_TO_NAIVE_LOCATION_TYPE[node.location_type]
         elif self.current_loc_type_stack:
             loctype = self.current_loc_type_stack[-1]
         else:
@@ -147,7 +147,9 @@ class SirToNaive(NodeTranslator):
 
     def visit_BinaryOperator(self, node: Node, **kwargs):
         return naive.BinaryOp(
-            op=opstring2enum(node.op), left=self.visit(node.left), right=self.visit(node.right)
+            op=self.BINOPSTR_TO_ENUM[node.op],
+            left=self.visit(node.left),
+            right=self.visit(node.right),
         )
 
     def visit_VarDeclStmt(self, node: Node, **kwargs):
@@ -158,7 +160,7 @@ class SirToNaive(NodeTranslator):
 
         loctype = ""
         if node.location_type:
-            loctype = sir2naiveLocationType(node.location_type)
+            loctype = self.SIR_TO_NAIVE_LOCATION_TYPE[node.location_type]
         elif self.current_loc_type_stack:
             loctype = self.current_loc_type_stack[-1]
         else:
@@ -175,7 +177,7 @@ class SirToNaive(NodeTranslator):
     def visit_LiteralAccessExpr(self, node: Node, **kwargs):
         loctype = ""
         if node.location_type:
-            loctype = sir2naiveLocationType(node.location_type)
+            loctype = self.SIR_TO_NAIVE_LOCATION_TYPE[node.location_type]
         elif self.current_loc_type_stack:
             loctype = self.current_loc_type_stack[-1]
         else:
@@ -186,15 +188,15 @@ class SirToNaive(NodeTranslator):
         )
 
     def visit_ReductionOverNeighborExpr(self, node: Node, **kwargs):
-        self.current_loc_type_stack.append(sir2naiveLocationType(node.chain[-1]))
+        self.current_loc_type_stack.append(self.SIR_TO_NAIVE_LOCATION_TYPE[node.chain[-1]])
         right = self.visit(node.rhs)
         init = self.visit(node.init)
         self.current_loc_type_stack.pop()
         return naive.ReduceOverNeighbourExpr(
-            operation=opstring2enum(node.op),
+            operation=self.BINOPSTR_TO_ENUM[node.op],
             right=right,
             init=init,
-            location_type=sir2naiveLocationType(node.chain[0]),
+            location_type=self.SIR_TO_NAIVE_LOCATION_TYPE[node.chain[0]],
         )
 
     def visit_AST(self, node: Node, **kwargs):
