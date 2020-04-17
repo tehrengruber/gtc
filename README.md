@@ -1,7 +1,7 @@
-[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/egparedes/eve)
+[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/eth-cscs/eve_toolchain)
 
-Eve: A stencil toolchain in pure Python
-=======================================
+Eve: A stencil DSL toolchain written in Python
+==============================================
 
 Installation instructions
 -------------------------
@@ -54,4 +54,4 @@ Development instructions
     # Or, alternatively, execute all pre-commit checks manually:
     pre-commit run --all
 
-Additionally, editors compatible with the [Editorconfig](http://editorconfig.org) standard should also be properly configured (settings in `.editorconfig`).
+Code editors supporting the [Editorconfig](http://editorconfig.org) standard should be automatically configured (settings in `.editorconfig`).
