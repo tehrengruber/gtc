@@ -25,8 +25,15 @@ RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
     rm -rf /tmp/*
 
 
-# ARG ATLAS_VERSION=0.20.1
-# RUN cd /tmp && \
-#     wget -q https://github.com/ecmwf/atlas/archive/${ATLAS_VERSION}.tar.gz && \
+ARG ATLAS_VERSION=0.20.1
+RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
+    cd /tmp && \
+    wget -q https://github.com/ecmwf/atlas/archive/${ATLAS_VERSION}.tar.gz && \
+    tar xzf ${ATLAS_VERSION}.tar.gz && \
+    cd atlas-${ATLAS_VERSION} && \
+    mkdir build && cd build && \
+    ecbuild .. && \
+    make -j$(nproc) install && \
+    rm -rf /tmp/*
 
 USER gitpod
