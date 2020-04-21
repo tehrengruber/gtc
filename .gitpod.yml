@@ -1,11 +1,12 @@
+image:
+    file: .gitpod.Dockerfile
+
 tasks:
     - before: |
           mkdir -p /workspace/.caches/pre-commit
           ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
-          alias pre-commit="PIP_USER=no pre-commit"
           cd $GITPOD_REPO_ROOT
           ./scripts/init_env.sh -i
       init: |
-          alias pre-commit="PIP_USER=no pre-commit"
           pre-commit install --install-hooks
           gp preview file://$GITPOD_REPO_ROOT/docs/_build/html/index.html
