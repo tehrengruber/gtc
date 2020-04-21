@@ -35,15 +35,30 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
 <%
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"]
     data_type = _this_generator.DATA_TYPE_TO_STR[_this_node.data_type]
+    sparseloc = "sparse_" if _this_node.sparse_location_type else ""
 %>
-  dawn::${ loc_type }_field_t<LibTag, ${ data_type }>& ${ name };"""
+  dawn::${ sparseloc }${ loc_type }_field_t<LibTag, ${ data_type }>& ${ name };"""
         )
 
-        FieldAccessExpr = "{name}(deref(LibTag{{}}, {iter_var}), k)"
+        FieldAccessExpr = mako_tpl.Template(
+            """
+<%
+    sparse_index = "m_sparse_dimension_idx, " if _this_node.is_sparse else ""
+%>
+  ${ name }(deref(LibTag{}, ${ iter_var }), ${ sparse_index } k)"""
+        )
 
         AssignmentExpr = "{left} = {right}"
 
+        VarAccessExpr = "{name}"
+
+        BinaryOp = "{left} {op} {right}"
+
         ExprStmt = "\n{expr};"
+
+        VarDeclStmt = mako_tpl.Template(
+            "\n${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] } ${ name } = ${ init };"
+        )  # TODO datatype
 
         ForK = mako_tpl.Template(
             """
@@ -57,7 +72,9 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         k_cond = 'k >= 0'
         k_step = '--k'
 %>
-for (int k = ${k_init}; ${k_cond}; ${k_step}) {${ "".join(horizontal_loops) }\n}"""
+for (int k = ${k_init}; ${k_cond}; ${k_step}) {
+    int m_sparse_dimension_idx;
+    ${ "".join(horizontal_loops) }\n}"""
         )
 
         HorizontalLoop = mako_tpl.Template(
@@ -76,9 +93,11 @@ for (int k = ${k_init}; ${k_cond}; ${k_step}) {${ "".join(horizontal_loops) }\n}
     right_loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.right_location_type]["singular"].title()
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"].title()
 %>
-            reduce${ right_loc_type }To${ loc_type }(LibTag{}, mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
-return lhs ${ operation } = ${ right };
-})"""
+            (m_sparse_dimension_idx=0,reduce${ right_loc_type }To${ loc_type }(LibTag{}, mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
+lhs ${ operation }= ${ right };
+m_sparse_dimension_idx++;
+return lhs;
+}))"""
         )
 
         LiteralExpr = mako_tpl.Template(
@@ -99,10 +118,11 @@ ${ "".join(k_loops) }
 <%
     stencil_calls = '\\n'.join("{name}();".format(name=s.name) for s in _this_node.stencils)
     ctor_field_params = ', '.join(
-        'dawn::{loc_type}_field_t<LibTag, {data_type}>& {name}'.format(
+        'dawn::{sparse_loc}{loc_type}_field_t<LibTag, {data_type}>& {name}'.format(
             loc_type=_this_generator.LOCATION_TYPE_TO_STR[p.location_type]['singular'],
             name=p.name,
             data_type=_this_generator.DATA_TYPE_TO_STR[p.data_type],
+            sparse_loc="sparse_" if p.sparse_location_type else ""
         )
         for p in _this_node.params
     )

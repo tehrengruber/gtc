@@ -16,7 +16,7 @@
 
 
 import enum
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from pydantic import root_validator
 
@@ -46,6 +46,7 @@ class Stmt(Node):
 class FieldAccessExpr(Expr):
     name: Str
     offset: Tuple[Bool, Int]
+    is_sparse = False
     # TODO to add a validator we need to lookup a symbol table for the field's location type
 
 
@@ -54,7 +55,12 @@ class LiteralExpr(Expr):
     data_type: common.DataType
 
 
-class AssignmentExpr(Expr):
+class VarAccessExpr(Expr):
+    name: str
+
+
+class BinaryOp(Expr):
+    op: common.BinaryOperator
     left: Expr
     right: Expr
 
@@ -67,6 +73,36 @@ class AssignmentExpr(Expr):
             values["location_type"] = values["left"].location_type
         elif values["left"] != values["location_type"]:
             raise ValueError("Location type mismatch")
+
+        return values
+
+
+class VarDeclStmt(Stmt):
+    data_type: common.DataType
+    name: str
+    init: Expr
+
+    @root_validator
+    def check_location_type(cls, values):
+        if not (values["init"].location_type == values["location_type"]):
+            raise ValueError("Location type mismatch")
+        return values
+
+
+class AssignmentExpr(Expr):
+    left: Expr
+    right: Expr
+
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        if not (values["left"].location_type == values["right"].location_type):
+            raise ValueError("Location type mismatch")
+
+        if "location_type" not in values:
+            values["location_type"] = values["left"].location_type
+        else:
+            if not (values["left"].location_type == values["location_type"]):
+                raise ValueError("Location type mismatch")
 
         return values
 
@@ -97,7 +133,7 @@ class BlockStmt(Stmt):
             raise ValueError("BlockStmt is empty")
 
         if any(s.location_type != statements[0].location_type for s in statements):
-            raise ValueError("Location type mismatch")
+            raise ValueError("Location type mismatch: not all statements have the same")
 
         if "location_type" not in values:
             values["location_type"] = statements[0].location_type
@@ -122,6 +158,7 @@ class ExprStmt(Stmt):
 class UnstructuredField(Node):
     name: Str
     location_type: LocationType
+    sparse_location_type: Optional[LocationType]  # TODO chain?
     data_type: common.DataType
 
 

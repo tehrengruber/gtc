@@ -28,18 +28,6 @@ from . import common
 # = statements.proto =
 
 
-class Expr(Node):
-    pass
-
-
-class Stmt(Node):
-    pass
-
-
-class AST(Node):
-    root: Stmt
-
-
 @enum.unique
 class LocationType(enum.IntEnum):
     LocationTypeUnknown = 0
@@ -48,9 +36,21 @@ class LocationType(enum.IntEnum):
     Edge = 3
 
 
+class Expr(Node):
+    location_type: Optional[LocationType]
+
+
+class Stmt(Node):
+    location_type: Optional[LocationType]
+
+
+class AST(Node):
+    root: Stmt
+
+
 class UnstructuredDimension(Node):
     dense_location_type: LocationType
-    sparse_part: Optional[Union[LocationType]]
+    sparse_part: Optional[List[LocationType]]
 
 
 class FieldDimensions(Node):
@@ -58,7 +58,7 @@ class FieldDimensions(Node):
     # TODO mask_k: int
 
 
-class Field(Node):  # not to be confused with pydantic.Field
+class Field(Node):
     name: str
     is_temporary: bool
     field_dimensions: FieldDimensions
@@ -157,7 +157,12 @@ class TernaryOperator(Expr):
 # TODO class FunCallExpr
 # TODO class StencilFunCallExpr
 # TODO class StencilFunArgExpr
-# TODO class VarAccessExpr
+
+
+class VarAccessExpr(Expr):
+    name: str
+    # index: Expr # TODO
+    # is_external: bool # TODO
 
 
 class ZeroOffset(Node):
@@ -178,7 +183,7 @@ class FieldAccessExpr(Expr):
     # TODO AccessExprData and ID probably unused in SIR
 
 
-class LiteralExpr(Expr):
+class LiteralAccessExpr(Expr):
     value: str
     data_type: BuiltinType
     # TODO AccessExprData and ID probably unused in SIR
