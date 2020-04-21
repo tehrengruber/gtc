@@ -9,7 +9,7 @@ ARG ECKIT_VERSION=1.10.1
 RUN cd /tmp && \
     wget -q https://github.com/ecmwf/eckit/archive/${ECKIT_VERSION}.tar.gz && \
     tar xzf ${ECKIT_VERSION}.tar.gz && \
-    cd ${ECKIT_VERSION} && \
+    cd eckit-${ECKIT_VERSION} && \
     mkdir build && cd build && \
     cmake .. && \
     make -j$(nproc) install && \
