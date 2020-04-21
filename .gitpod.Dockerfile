@@ -9,7 +9,7 @@ ARG ECBUILD_VERSION=3.3.2
 RUN cd /tmp && \
     wget -q https://github.com/ecmwf/ecbuild/archive/${ECBUILD_VERSION}.tar.gz && \
     tar xzf ${ECBUILD_VERSION}.tar.gz && \
-    mv -r ecbuild-${ECBUILD_VERSION} $HOME && \
+    mv ecbuild-${ECBUILD_VERSION} $HOME && \
     rm -rf /tmp/*
 
 ARG ECKIT_VERSION=1.10.1
