@@ -11,7 +11,7 @@ RUN cd /tmp && \
     tar xzf ${ECBUILD_VERSION}.tar.gz && \
     mv ecbuild-${ECBUILD_VERSION} $HOME && \
     rm -rf /tmp/* && \
-    echo "PATH=\$\{PATH\}:\$HOME/ecbuild-${ECBUILD_VERSION}/bin" >> $HOME/.bashrc
+    echo "PATH=\$PATH:\$HOME/ecbuild-${ECBUILD_VERSION}/bin" >> $HOME/.bashrc
 
 ARG ECKIT_VERSION=1.10.1
 RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
