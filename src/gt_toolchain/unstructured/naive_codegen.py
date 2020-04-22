@@ -14,7 +14,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
     LOCATION_TYPE_TO_STR: ClassVar[Mapping[LocationType, Mapping[str, str]]] = MappingProxyType(
         {
             LocationType.Node: MappingProxyType({"singular": "vertex", "plural": "vertices"}),
-            LocationType.Edge: MappingProxyType({"singular": "edge", "plural": "edge"}),
+            LocationType.Edge: MappingProxyType({"singular": "edge", "plural": "edges"}),
             LocationType.Face: MappingProxyType({"singular": "cell", "plural": "cells"}),
         }
     )

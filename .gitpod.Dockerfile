@@ -25,7 +25,7 @@ RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
     rm -rf /tmp/*
 
 
-ARG ATLAS_VERSION=0.20.1
+ARG ATLAS_VERSION=0.19.0
 RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
     cd /tmp && \
     wget -q https://github.com/ecmwf/atlas/archive/${ATLAS_VERSION}.tar.gz && \
