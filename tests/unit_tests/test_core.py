@@ -58,26 +58,10 @@ class TestNodeMetaAttributes:
         assert my_node.id_attr == custom_id
         assert my_node.id_attr != other_node.id_attr
 
-    def test_kind(self, sample_node):
-        assert sample_node.kind_attr == type(sample_node).__name__
-
-    def test_custom_kind(self, source_location, location_node):
-        custom_kind = "LocationNode"
-        my_node = common.LocationNode(kind_attr=custom_kind, loc=source_location)
-
-        assert my_node.kind_attr == location_node.kind_attr == custom_kind
-
-        with pytest.raises(pydantic.ValidationError):
-            common.LocationNode(kind_attr="WrongKind", loc=source_location)
-
     def test_dialect(self, sample_node):
-        assert sample_node.dialect_attr == "common"
-
-    def test_custom_dialect(self, source_location, location_node):
-        custom_dialect = "MyDialect"
-        my_node = common.LocationNode(dialect_attr=custom_dialect, loc=source_location)
-
-        assert my_node.dialect_attr == custom_dialect != location_node.dialect_attr
+        assert sample_node.dialect is sample_node.__class__.dialect
+        assert issubclass(sample_node.dialect, eve.BaseDialect)
+        assert sample_node.dialect.name in eve.registered_dialects
 
 
 class TestNodeFeatures:
@@ -87,16 +71,10 @@ class TestNodeFeatures:
 
     def test_mutability(self, mutable_sample_node):
         mutable_sample_node.id_attr = None
-        mutable_sample_node.kind_attr = None
-        mutable_sample_node.dialect_attr = None
 
     def test_inmutability(self, sample_node):
         with pytest.raises(TypeError):
-            sample_node.kind_attr = None
-        with pytest.raises(TypeError):
-            sample_node.kind_attr = None
-        with pytest.raises(TypeError):
-            sample_node.dialect_attr = None
+            sample_node.id_attr = None
 
     def test_attributes(self, sample_node):
         attribute_names = set(name for name, _ in sample_node.attributes())

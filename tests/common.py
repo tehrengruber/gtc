@@ -22,7 +22,8 @@ from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set, Typ
 
 from pydantic import Field, validator  # noqa: F401
 
-from eve.core import (  # type: ignore
+from eve.core import (
+    BaseDialect,
     Bool,
     Bytes,
     Float,
@@ -174,15 +175,19 @@ class IntKind(enum.IntEnum):
     PLUS = 1
 
 
-class EmptyNode(FrozenNode):
+class TestDialect(BaseDialect):
+    name = "__test"
+
+
+class EmptyNode(FrozenNode, dialect=TestDialect):
     pass
 
 
-class LocationNode(FrozenNode):
+class LocationNode(FrozenNode, dialect=TestDialect):
     loc: SourceLocation
 
 
-class SimpleNode(FrozenNode):
+class SimpleNode(FrozenNode, dialect=TestDialect):
     bool_value: Bool
     int_value: Int
     float_value: Float
@@ -192,40 +197,40 @@ class SimpleNode(FrozenNode):
     str_kind: StrKind
 
 
-class SimpleNodeWithOptionals(FrozenNode):
+class SimpleNodeWithOptionals(FrozenNode, dialect=TestDialect):
     int_value: Optional[Int]
     float_value: Optional[Float]
     str_value: Optional[Str]
 
 
-class SimpleNodeWithHiddenMembers(FrozenNode):
+class SimpleNodeWithHiddenMembers(FrozenNode, dialect=TestDialect):
     hidden_attr_: Int
     int_value: Int
     hidden_value_: Int
 
 
-class SimpleNodeWithLoc(FrozenNode):
+class SimpleNodeWithLoc(FrozenNode, dialect=TestDialect):
     int_value: Int
     float_value: Float
     str_value: Str
     loc: Optional[SourceLocation]
 
 
-class SimpleNodeWithCollections(FrozenNode):
+class SimpleNodeWithCollections(FrozenNode, dialect=TestDialect):
     int_list: List[Int]
     str_set: Set[Str]
     str_to_int_dict: Dict[Str, Int]
     loc: Optional[SourceLocation]
 
 
-class SimpleNodeWithAbstractCollections(FrozenNode):
+class SimpleNodeWithAbstractCollections(FrozenNode, dialect=TestDialect):
     int_sequence: Sequence[Int]
     str_set: Set[Str]
     str_to_int_mapping: Mapping[Str, Int]
     loc: Optional[SourceLocation]
 
 
-class CompoundNode(FrozenNode):
+class CompoundNode(FrozenNode, dialect=TestDialect):
     location: LocationNode
     simple: SimpleNode
     simple_loc: SimpleNodeWithLoc
@@ -233,14 +238,14 @@ class CompoundNode(FrozenNode):
     other_simple_opt: Optional[SimpleNodeWithOptionals]
 
 
-class CompoundNodeWithCollections(FrozenNode):
+class CompoundNodeWithCollections(FrozenNode, dialect=TestDialect):
     simple_col: Optional[SimpleNodeWithCollections]
     simple_abscol: Optional[SimpleNodeWithAbstractCollections]
     compound_col: Sequence[CompoundNode]
     compound_all: Optional[Mapping[Str, CompoundNode]]
 
 
-class MutableSimpleNode(Node):
+class MutableSimpleNode(Node, dialect=TestDialect):
     bool_value: Bool
     int_value: Int
     float_value: Float
@@ -250,7 +255,7 @@ class MutableSimpleNode(Node):
     str_kind: StrKind
 
 
-class MutableCompoundNode(Node):
+class MutableCompoundNode(Node, dialect=TestDialect):
     location: LocationNode
     simple: SimpleNode
     simple_loc: SimpleNodeWithLoc

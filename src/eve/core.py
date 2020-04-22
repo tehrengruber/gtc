@@ -22,12 +22,17 @@ import copy
 import enum
 import itertools
 import operator
+from types import MappingProxyType
 from typing import (
     Any,
     Callable,
+    ClassVar,
     Collection,
+    Dict,
+    FrozenSet,
     Generator,
     Iterable,
+    Mapping,
     MutableSequence,
     MutableSet,
     Optional,
@@ -57,6 +62,9 @@ Str = StrictStr  # noqa
 #: Marker value used to avoid confusion with `None`
 #: (specially in contexts where `None` could be a valid value)
 NOTHING = object()
+
+_dialects: Dict[str, "BaseDialect"] = {}
+registered_dialects: Mapping[str, "BaseDialect"] = MappingProxyType(_dialects)
 
 
 class UIDGenerator:
@@ -154,6 +162,24 @@ class SourceLocation(BaseModel):
         return f"<{self.source}: Line {self.line}, Col {self.column}>"
 
 
+class BaseDialect:
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        global _dialects
+
+        super().__init_subclass__(**kwargs)
+        if "name" not in cls.__dict__:
+            raise TypeError("Dialect classes must define a 'name: str' attribute.")
+        if cls.name in _dialects:
+            raise ValueError("Dialect 'name' is not unique.")
+
+        cls.nodes = frozenset()
+        _dialects[cls.name] = cls
+
+    name: ClassVar[str] = "_base_"
+    nodes: ClassVar[FrozenSet[Type["BaseNode"]]] = frozenset()
+
+
 class BaseNode(BaseModel):
     """Base node class.
 
@@ -170,24 +196,31 @@ class BaseNode(BaseModel):
     "_attr" are considered meta-attributes of the node, not children.
     """
 
+    dialect: ClassVar[Type[BaseDialect]] = BaseDialect
     id_attr: Optional[Str] = None
-    kind_attr: Optional[Str] = None
-    dialect_attr: Optional[Str] = None
+
+    @classmethod
+    def __init_subclass__(cls, *, dialect=None, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        if dialect is None:
+            dialect = getattr(cls, "dialect", BaseDialect)
+            if not issubclass(dialect, BaseDialect):
+                raise TypeError(f"Invalid dialect class ({dialect}) defined in the node class")
+        elif issubclass(dialect, BaseDialect):
+            if dialect is not cls.__dict__.get("dialect", dialect):
+                raise TypeError(
+                    f"A conflictive dialect class definition exists in the node class ({cls.dialect})"
+                )
+        else:
+            raise TypeError(f"Invalid dialect class ({dialect})")
+
+        dialect.nodes = frozenset(dialect.nodes | {cls})
+        cls.dialect = dialect
 
     @validator("id_attr", pre=True, always=True)
     def _id_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
         return v or UIDGenerator.get_unique_id()
-
-    @validator("kind_attr", pre=True, always=True)
-    def _kind_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
-        if v and v != cls.__name__:
-            raise ValueError(f"kind_attr value '{v}' does not match cls.__name__ {cls.__name__}")
-
-        return v or cls.__name__
-
-    @validator("dialect_attr", pre=True, always=True)
-    def _dialect_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
-        return v or cls.__module__.split(".")[-1]
 
     def attributes(self) -> Generator[Tuple[str, Any], None, None]:
         for name, _ in self.__fields__.items():
