@@ -13,7 +13,7 @@ RUN cd /tmp && \
     rm -rf /tmp/* && \
     echo "PATH=\$PATH:\$HOME/ecbuild-${ECBUILD_VERSION}/bin" >> $HOME/.bashrc
 
-ARG ECKIT_VERSION=1.4.1
+ARG ECKIT_VERSION=1.10.1
 RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
     cd /tmp && \
     wget -q https://github.com/ecmwf/eckit/archive/${ECKIT_VERSION}.tar.gz && \
@@ -25,7 +25,7 @@ RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
     rm -rf /tmp/*
 
 
-ARG ATLAS_VERSION=0.19.0
+ARG ATLAS_VERSION=0.20.1
 RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
     cd /tmp && \
     wget -q https://github.com/ecmwf/atlas/archive/${ATLAS_VERSION}.tar.gz && \
