@@ -13,7 +13,7 @@ RUN cd /tmp && \
     rm -rf /tmp/* && \
     echo "PATH=\$PATH:\$HOME/ecbuild-${ECBUILD_VERSION}/bin" >> $HOME/.bashrc
 
-ARG ECKIT_VERSION=1.10.1
+ARG ECKIT_VERSION=1.4.1
 RUN export PATH=$PATH:$HOME/ecbuild-${ECBUILD_VERSION}/bin && \
     cd /tmp && \
     wget -q https://github.com/ecmwf/eckit/archive/${ECKIT_VERSION}.tar.gz && \
