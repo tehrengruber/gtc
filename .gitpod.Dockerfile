@@ -5,7 +5,7 @@ RUN cat aliases.txt >> $HOME/.bashrc
 
 USER root
 
-RUN pyenv install 3.8.2 && pyenv global 3.8.2
+RUN pyenv install 3.8.2; pyenv global 3.8.2
 
 ARG ECBUILD_VERSION=3.3.2
 RUN cd /tmp && \
