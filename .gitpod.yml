@@ -2,18 +2,23 @@ image:
     file: .gitpod.Dockerfile
 
 tasks:
-    - before: |
-          echo $PIP_USER > pip_user_before.log
-          echo $PYTHONUSERBASE > python_user_base_before.log
-          mkdir -p /workspace/.caches/pre-commit
-          ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
-          cd $GITPOD_REPO_ROOT
-      init: |
+    - init: |
           echo $PIP_USER > pip_user_init.log
           echo $PYTHONUSERBASE > python_user_base_init.log
           ./scripts/init_env.sh -i
-          pre-commit install --install-hooks
-          gp preview file://$GITPOD_REPO_ROOT/docs/_build/html/index.html
+          pip install boltons
+    # - before: |
+    #       echo $PIP_USER > pip_user_before.log
+    #       echo $PYTHONUSERBASE > python_user_base_before.log
+    #       mkdir -p /workspace/.caches/pre-commit
+    #       ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
+    #       cd $GITPOD_REPO_ROOT
+    #   init: |
+    #       echo $PIP_USER > pip_user_init.log
+    #       echo $PYTHONUSERBASE > python_user_base_init.log
+    #       ./scripts/init_env.sh -i
+    #       pre-commit install --install-hooks
+    #       gp preview file://$GITPOD_REPO_ROOT/docs/_build/html/index.html
 
 github:
     prebuilds:
