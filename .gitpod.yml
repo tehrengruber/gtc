@@ -3,12 +3,14 @@ image:
 
 tasks:
     - before: |
-          echo $PIP_USER > pip_user_gitpod_yml.log
-          echo $PYTHONUSERBASE > python_user_base_gitpod_yml.log
+          echo $PIP_USER > pip_user_before.log
+          echo $PYTHONUSERBASE > python_user_base_before.log
           mkdir -p /workspace/.caches/pre-commit
           ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
           cd $GITPOD_REPO_ROOT
       init: |
+          echo $PIP_USER > pip_user_init.log
+          echo $PYTHONUSERBASE > python_user_base_init.log
           ./scripts/init_env.sh -i
           pre-commit install --install-hooks
           gp preview file://$GITPOD_REPO_ROOT/docs/_build/html/index.html
