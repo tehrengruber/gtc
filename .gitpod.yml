@@ -7,10 +7,11 @@ tasks:
           ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
       init: |
           ./scripts/init_env.sh -i
+          ln -s $GITPOD_REPO_ROOT/.gitpod/eve.egg-link /workspace/.pip-modules/lib/python3.8/site-packages/eve.egg-link
           pre-commit install --install-hooks
           gp preview file://$GITPOD_REPO_ROOT/docs/_build/html/index.html
-      command: |
-          pip install -e $GITPOD_REPO_ROOT[cpp]
+    #   command: |
+    #       pip install -e $GITPOD_REPO_ROOT[cpp]
 # - before: |
 #       echo $PIP_USER > pip_user_before.log
 #       echo $PYTHONUSERBASE > python_user_base_before.log
