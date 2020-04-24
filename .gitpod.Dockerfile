@@ -43,5 +43,5 @@ USER gitpod
 
 RUN pyenv install 3.8.2; pyenv global 3.8.2
 
-RUN echo $PIP_USER > /workspace/pip_user.log
-RUN echo $PYTHONUSERBASE > /workspace/pythonuserbase.log
+RUN echo $PIP_USER > $HOME/pip_user.log
+RUN echo $PYTHONUSERBASE > $HOME/pythonuserbase.log
