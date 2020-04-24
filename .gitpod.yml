@@ -5,7 +5,7 @@ tasks:
     - before: |
           mkdir -p /workspace/.caches/pre-commit
           ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
-    - init: |
+      init: |
           ./scripts/init_env.sh -i
           pre-commit install --install-hooks
           gp preview file://$GITPOD_REPO_ROOT/docs/_build/html/index.html
