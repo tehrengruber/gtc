@@ -15,7 +15,7 @@
 #include "fvm_nabla.hpp"
 
 namespace {
-std::pair<double, double> min_max(atlas::Field const &field) {
+std::tuple<double, double, double> min_max(atlas::Field const &field) {
   assert(field.rank() == 2);
 
   double min = std::numeric_limits<double>::max();
@@ -24,18 +24,21 @@ std::pair<double, double> min_max(atlas::Field const &field) {
 
   auto shape = field.shape();
 
+  double avg = 0.;
   for (std::size_t jnode = 0; jnode < field.shape()[0]; ++jnode) {
     min = std::min(min, nabla(jnode, 0));
     max = std::max(max, nabla(jnode, 0));
+    avg += nabla(jnode, 0);
   }
-  return {min, max};
+  return {min, max, avg / (double)field.shape()[0]};
 }
 void print_min_max(atlas::Field const &field) {
-  auto [min, max] = min_max(field);
-  std::cout << field.name() << " min=" << min << ", max=" << max << std::endl;
+  auto [min, max, avg] = min_max(field);
+  std::cout << field.name() << " min=" << min << ", max=" << max
+            << ", avg=" << avg << std::endl;
 }
 
-std::pair<double, double> min_max_1d(atlas::Field const &field) {
+std::tuple<double, double, double> min_max_1d(atlas::Field const &field) {
   assert(field.rank() == 1);
 
   double min = std::numeric_limits<double>::max();
@@ -44,15 +47,18 @@ std::pair<double, double> min_max_1d(atlas::Field const &field) {
 
   auto shape = field.shape();
 
+  double avg = 0.;
   for (std::size_t jnode = 0; jnode < field.shape()[0]; ++jnode) {
     min = std::min(min, nabla(jnode));
     max = std::max(max, nabla(jnode));
+    avg += nabla(jnode);
   }
-  return {min, max};
+  return {min, max, avg / (double)field.shape()[0]};
 }
 void print_min_max_1d(atlas::Field const &field) {
-  auto [min, max] = min_max_1d(field);
-  std::cout << field.name() << " min=" << min << ", max=" << max << std::endl;
+  auto [min, max, avg] = min_max_1d(field);
+  std::cout << field.name() << " min=" << min << ", max=" << max
+            << ", avg=" << avg << std::endl;
 }
 } // namespace
 
@@ -89,8 +95,8 @@ public:
           generatorParams.set("triangulate", true);
           // generatorParams.set("patch_pole", true);
           // generatorParams.set("include_pole", false);
+          //   generatorParams.set("angle", 20);
           generatorParams.set("angle", -1.0);
-          // generatorParams.set("angle", -1.0);
           // generatorParams.set("ghost_at_end", true);
 
           atlas::StructuredMeshGenerator generator(generatorParams);
@@ -125,12 +131,9 @@ private:
     const auto vol_atlas =
         atlas::array::make_view<double, 1>(mesh_.nodes().field("dual_volumes"));
     auto vol = atlas::array::make_view<double, 2>(m_vol);
-    std::cout << "vol size = " << vol_atlas.size() << std::endl;
-    // for (int i = 0, size = vol_atlas.size(); i < size; ++i) {
-    //   std::cout << vol_atlas(i) << std::endl;
-    //   vol(i, 0) = vol_atlas(i) * (std::pow(deg2rad, 2) * std::pow(radius,
-    //   2));
-    // }
+    for (int i = 0, size = vol_atlas.size(); i < size; ++i) {
+      vol(i, 0) = vol_atlas(i) * (std::pow(deg2rad, 2) * std::pow(radius, 2));
+    }
   }
   void initialize_S() {
     // all fields supported by dawn are 2 (or 3 with sparse) dimensional:
@@ -252,7 +255,7 @@ public:
 
 int main() {
 
-  FVMDriver driver{"O2", 1};
+  FVMDriver driver{"O32", 1};
 
   // input
   atlas::Field m_pp =
@@ -304,6 +307,8 @@ int main() {
   gmesh.write(m_pnabla_MXX);
 
   std::cout << "after nabla: " << std::endl;
+  //   print_min_max(m_zavgS_MXX);
+  //   print_min_max(m_zavgS_MYY);
   print_min_max(m_pnabla_MXX);
-  print_min_max(m_zavgS_MXX);
+  print_min_max(m_pnabla_MYY);
 }

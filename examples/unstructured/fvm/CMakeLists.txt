@@ -7,6 +7,8 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 add_custom_command(OUTPUT fvm_nabla.hpp
                    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/fvm_nabla.py > ${CMAKE_CURRENT_BINARY_DIR}/fvm_nabla.hpp
+                   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/fvm_nabla.py
+                   COMMENT "Generating ${CMAKE_CURRENT_BINARY_DIR}/fvm_nabla.hpp"
 )
 
 add_executable(fvm_nabla fvm_nabla_atlas_driver.cpp fvm_nabla.hpp)

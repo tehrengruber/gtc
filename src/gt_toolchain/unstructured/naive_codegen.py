@@ -42,7 +42,8 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         FieldAccessExpr = mako_tpl.Template(
             """<%
     sparse_index = "m_sparse_dimension_idx, " if _this_node.is_sparse else ""
-%>${ name }(deref(LibTag{}, ${ iter_var }), ${ sparse_index } k)"""
+    field_acc_itervar = outer_iter_var if _this_node.is_sparse else iter_var
+%>${ name }(deref(LibTag{}, ${ field_acc_itervar }), ${ sparse_index } k)"""
         )
 
         AssignmentExpr = "{left} = {right}"
