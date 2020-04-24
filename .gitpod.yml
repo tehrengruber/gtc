@@ -2,8 +2,13 @@ image:
     file: .gitpod.Dockerfile
 
 tasks:
+    - before: |
+          mkdir -p /workspace/.caches/pre-commit
+          ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
     - init: |
-          pip install --upgrade -r ${GITPOD_REPO_ROOT}/requirements_dev.txt
+          ./scripts/init_env.sh -i
+          pre-commit install --install-hooks
+          gp preview file://$GITPOD_REPO_ROOT/docs/_build/html/index.html
       command: |
           pip install -e $GITPOD_REPO_ROOT[cpp]
 # - before: |
