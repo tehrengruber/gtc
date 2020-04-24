@@ -1,7 +1,10 @@
 #!/bin/bash
 
+
 EVE_PYTHON_CMD=${EVE_PYTHON_CMD:-python3}
 EVE_ROOT="$(dirname $(dirname $(readlink -e $0)))"
+
+echo "pip user = $PIP_USER"
 
 MAKE_VENV="true"
 

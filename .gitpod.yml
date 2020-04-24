@@ -3,8 +3,8 @@ image:
 
 tasks:
     - before: |
-          echo $PIP_USER
-          echo $PYTHONUSERBASE
+          echo $PIP_USER > pip_user_gitpod_yml.log
+          echo $PYTHONUSERBASE > python_user_base_gitpod_yml.log
           mkdir -p /workspace/.caches/pre-commit
           ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
           cd $GITPOD_REPO_ROOT
