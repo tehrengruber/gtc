@@ -3,10 +3,9 @@ image:
 
 tasks:
     - init: |
-          echo $PIP_USER > pip_user_init.log
-          echo $PYTHONUSERBASE > python_user_base_init.log
-          ./scripts/init_env.sh -i
-          pip install boltons
+          pip install --upgrade -r ${GITPOD_REPO_ROOT}/requirements_dev.txt
+      command: |
+          pip install -e $GITPOD_REPO_ROOT[cpp]
     # - before: |
     #       echo $PIP_USER > pip_user_before.log
     #       echo $PYTHONUSERBASE > python_user_base_before.log
