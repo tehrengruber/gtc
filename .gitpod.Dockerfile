@@ -38,8 +38,8 @@ USER root
 
 USER gitpod
 
-ENV PYTHONUSERBASE=/workspace/.pip-modules \
-    PIP_USER=yes
+# ENV PYTHONUSERBASE=/workspace/.pip-modules \
+#     PIP_USER=yes
 
 RUN pyenv install 3.8.2; pyenv global 3.8.2
 
