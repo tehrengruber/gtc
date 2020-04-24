@@ -37,3 +37,5 @@ USER gitpod
 
 COPY .gitpod/aliases.txt .
 RUN cat aliases.txt >> $HOME/.bashrc
+
+RUN pyenv install 3.8.2; pyenv global 3.8.2
