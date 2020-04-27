@@ -14,7 +14,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
     LOCATION_TYPE_TO_STR: ClassVar[Mapping[LocationType, Mapping[str, str]]] = MappingProxyType(
         {
             LocationType.Node: MappingProxyType({"singular": "vertex", "plural": "vertices"}),
-            LocationType.Edge: MappingProxyType({"singular": "edge", "plural": "edge"}),
+            LocationType.Edge: MappingProxyType({"singular": "edge", "plural": "edges"}),
             LocationType.Face: MappingProxyType({"singular": "cell", "plural": "cells"}),
         }
     )
@@ -31,8 +31,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
 
     class Templates:
         UnstructuredField = mako_tpl.Template(
-            """\
-<%
+            """<%
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"]
     data_type = _this_generator.DATA_TYPE_TO_STR[_this_node.data_type]
     sparseloc = "sparse_" if _this_node.sparse_location_type else ""
@@ -41,11 +40,10 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         )
 
         FieldAccessExpr = mako_tpl.Template(
-            """
-<%
+            """<%
     sparse_index = "m_sparse_dimension_idx, " if _this_node.is_sparse else ""
-%>
-  ${ name }(deref(LibTag{}, ${ iter_var }), ${ sparse_index } k)"""
+    field_acc_itervar = outer_iter_var if _this_node.is_sparse else iter_var
+%>${ name }(deref(LibTag{}, ${ field_acc_itervar }), ${ sparse_index } k)"""
         )
 
         AssignmentExpr = "{left} = {right}"
@@ -61,8 +59,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         )  # TODO datatype
 
         ForK = mako_tpl.Template(
-            """
-<%
+            """<%
     if _this_node.loop_order == _this_module.common.LoopOrder.FORWARD:
         k_init = '0'
         k_cond = 'k < k_size'
@@ -71,29 +68,24 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         k_init = 'k_size -1'
         k_cond = 'k >= 0'
         k_step = '--k'
-%>
-for (int k = ${k_init}; ${k_cond}; ${k_step}) {
+%>for (int k = ${k_init}; ${k_cond}; ${k_step}) {
     int m_sparse_dimension_idx;
     ${ "".join(horizontal_loops) }\n}"""
         )
 
         HorizontalLoop = mako_tpl.Template(
-            """\
-<%
+            """<%
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['plural'].title()
-%>
-  for(auto const & t: get${ loc_type }(LibTag{}, mesh)) ${ ast }"""
+%>for(auto const & t: get${ loc_type }(LibTag{}, mesh)) ${ ast }"""
         )
 
         BlockStmt = mako_tpl.Template("{${ ''.join(statements) }\n}")
 
         ReduceOverNeighbourExpr = mako_tpl.Template(
-            """\
-<%
+            """<%
     right_loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.right_location_type]["singular"].title()
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"].title()
-%>
-            (m_sparse_dimension_idx=0,reduce${ right_loc_type }To${ loc_type }(LibTag{}, mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
+%>(m_sparse_dimension_idx=0,reduce${ right_loc_type }To${ loc_type }(LibTag{}, mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
 lhs ${ operation }= ${ right };
 m_sparse_dimension_idx++;
 return lhs;
@@ -114,8 +106,7 @@ ${ "".join(k_loops) }
         )
 
         Computation = mako_tpl.Template(
-            """
-<%
+            """<%
     stencil_calls = '\\n'.join("{name}();".format(name=s.name) for s in _this_node.stencils)
     ctor_field_params = ', '.join(
         'dawn::{sparse_loc}{loc_type}_field_t<LibTag, {data_type}>& {name}'.format(
@@ -129,8 +120,7 @@ ${ "".join(k_loops) }
     ctor_field_initializers = ', '.join(
         '{name}({name})'.format(name=p.name) for p in _this_node.params
     )
-%>
-#define DAWN_GENERATED 1
+%>#define DAWN_GENERATED 1
 #define DAWN_BACKEND_T CXXNAIVEICO
 #include <driver-includes/unstructured_interface.hpp>
 namespace dawn_generated {
