@@ -19,6 +19,7 @@
 # RUN: python -u %s | filecheck %s
 # ---
 
+from eve import codegen
 from gt_toolchain.unstructured import common, naive
 from gt_toolchain.unstructured.naive_codegen import NaiveCodeGenerator
 
@@ -40,14 +41,16 @@ def make_test(node, test_name="", **kwargs):
         "{node_name}{test_name}\n{generated_code}".format(
             node_name=node.__class__.__name__,
             test_name="." + test_name if len(test_name) > 0 else "",
-            generated_code=NaiveCodeGenerator().visit(node, **kwargs),
+            generated_code=codegen.format_source(
+                "cpp", NaiveCodeGenerator().visit(node, **kwargs), style="LLVM"
+            ),
         )
     )
 
 
 # CHECK: UnstructuredField
 # CHECK-NEXT:
-# CHECK-NEXT: dawn::edge_field_t<LibTag, double>& in;
+# CHECK-NEXT: dawn::edge_field_t<LibTag, double> &in;
 make_test(
     naive.UnstructuredField(
         name="in", location_type=naive.LocationType.Edge, data_type=common.DataType.FLOAT64
@@ -70,11 +73,13 @@ make_test(
 )
 
 # CHECK: ReduceOverNeighbourExpr.dense_access
-# CHECK-NEXT: (m_sparse_dimension_idx=0,reduceEdgeToVertex(LibTag{}, mesh, iter, EXPR, [&](auto& lhs, auto const& redIdx) {
-# CHECK-NEXT: lhs += field({{.*}}redIdx{{.*}} k);
-# CHECK-NEXT: m_sparse_dimension_idx++;
-# CHECK-NEXT: return lhs;
-# CHECK-NEXT: }))
+# CHECK-NEXT: (m_sparse_dimension_idx = 0,
+# CHECK-NEXT:  reduceEdgeToVertex(LibTag{}, mesh, iter, EXPR,
+# CHECK-NEXT:                     [&](auto &lhs, auto const &redIdx) {
+# CHECK-NEXT:                       lhs += field({{.*}}redIdx{{.*}} k);
+# CHECK-NEXT:                       m_sparse_dimension_idx++;
+# CHECK-NEXT:                       return lhs;
+# CHECK-NEXT:                     }))
 make_test(
     naive.ReduceOverNeighbourExpr(
         operation=common.BinaryOperator.ADD,
@@ -89,11 +94,14 @@ make_test(
 )
 
 # CHECK: ReduceOverNeighbourExpr.sparse_access
-# CHECK-NEXT: (m_sparse_dimension_idx=0,reduceEdgeToVertex(LibTag{}, mesh, iter, EXPR, [&](auto& lhs, auto const& redIdx) {
-# CHECK-NEXT: lhs += field({{.*}}iter{{.*}}m_sparse_dimension_idx{{.*}},{{.*}}k);
-# CHECK-NEXT: m_sparse_dimension_idx++;
-# CHECK-NEXT: return lhs;
-# CHECK-NEXT: }))
+# CHECK-NEXT: (m_sparse_dimension_idx = 0,
+# CHECK-NEXT:  reduceEdgeToVertex(LibTag{}, mesh, iter, EXPR,
+# CHECK-NEXT:                     [&](auto &lhs, auto const &redIdx) {
+# CHECK-NEXT:                       lhs += field({{.*}}iter{{.*}}
+# CHECK-NEXT:                           m_sparse_dimension_idx{{.*}},{{.*}}k);
+# CHECK-NEXT:                       m_sparse_dimension_idx++;
+# CHECK-NEXT:                       return lhs;
+# CHECK-NEXT:                     }))
 make_test(
     naive.ReduceOverNeighbourExpr(
         operation=common.BinaryOperator.ADD,
