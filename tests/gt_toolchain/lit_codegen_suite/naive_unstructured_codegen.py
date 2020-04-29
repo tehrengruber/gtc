@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# # --- LLVM-lit test definition
+# --- LLVM-lit test definition
 #
 # RUN: python -u %s | filecheck %s
 # ---
@@ -38,9 +38,8 @@ from gt_toolchain.unstructured.naive_codegen import NaiveCodeGenerator
 
 def make_test(node, test_name="", **kwargs):
     print(
-        "{node_name}{test_name}\n{generated_code}".format(
-            node_name=node.__class__.__name__,
-            test_name="." + test_name if len(test_name) > 0 else "",
+        "{test_name}\n{generated_code}".format(
+            test_name=".".join(filter(None, [node.__class__.__name__, test_name])),
             generated_code=codegen.format_source(
                 "cpp", NaiveCodeGenerator().visit(node, **kwargs), style="LLVM"
             ),

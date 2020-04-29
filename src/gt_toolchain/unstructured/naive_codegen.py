@@ -30,7 +30,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
     )
 
     class Templates:
-        Node = "{_this_instance.__class__.__name__.upper()}"
+        Node = mako_tpl.Template("${_this_node.__class__.__name__.upper()}")  # only for testing
 
         UnstructuredField = mako_tpl.Template(
             """<%
