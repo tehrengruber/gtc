@@ -30,6 +30,8 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
     )
 
     class Templates:
+        Node = mako_tpl.Template("${_this_node.__class__.__name__.upper()}")  # only for testing
+
         UnstructuredField = mako_tpl.Template(
             """<%
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"]
