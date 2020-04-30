@@ -57,8 +57,8 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         ExprStmt = "\n{expr};"
 
         VarDeclStmt = mako_tpl.Template(
-            "\n${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] } ${ name } = ${ init };"
-        )  # TODO datatype
+            "\n${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] } ${ name };"
+        )
 
         ForK = mako_tpl.Template(
             """<%
@@ -72,6 +72,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         k_step = '--k'
 %>for (int k = ${k_init}; ${k_cond}; ${k_step}) {
     int m_sparse_dimension_idx;
+    ${ "".join(declarations) }\n
     ${ "".join(horizontal_loops) }\n}"""
         )
 

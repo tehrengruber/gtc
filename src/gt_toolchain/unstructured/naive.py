@@ -80,13 +80,6 @@ class BinaryOp(Expr):
 class VarDeclStmt(Stmt):
     data_type: common.DataType
     name: str
-    init: Expr
-
-    @root_validator
-    def check_location_type(cls, values):
-        if not (values["init"].location_type == values["location_type"]):
-            raise ValueError("Location type mismatch")
-        return values
 
 
 class AssignmentExpr(Expr):
@@ -177,6 +170,7 @@ class HorizontalLoop(Node):
 
 class ForK(Node):
     horizontal_loops: List[HorizontalLoop]
+    declarations: List[VarDeclStmt]
     loop_order: common.LoopOrder
 
 
