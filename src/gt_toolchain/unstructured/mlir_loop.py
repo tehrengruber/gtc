@@ -18,11 +18,9 @@
 from typing import List
 
 from devtools import debug
+from pydantic import root_validator
 
 from eve import Node, Str
-
-
-# from pydantic import root_validator
 
 
 # Not part of Loop
@@ -70,6 +68,16 @@ class ForOp(Node):
     step: IndexExpr
     initArgs: List[Node]
     region: SizedRegion1
+
+    @root_validator(pre=True)
+    def check_yield(cls, values):
+        if len(values["initArgs"]) > 0:
+            if isinstance(values["region"].body[-1], YieldOp):
+                if len(values["initArgs"]) != len(values["region"].body[-1].results):
+                    raise ValueError("YieldOp number of results doesn't match number of initArgs")
+            else:
+                raise ValueError("Body of ForOp needs to end with YieldOp")
+        return values
 
 
 # let arguments = (ins I1:$condition);
