@@ -4,7 +4,6 @@ import os
 import subprocess
 
 import cppimport.import_hook
-import fvm_nabla_wrapper
 import numpy as np
 from atlas4py import (
     Config,
@@ -24,28 +23,11 @@ with open(output_file, "w+") as output:
         ["python", "fvm_nabla.py"], stdout=output, cwd=os.path.dirname(os.path.realpath(__file__)),
     )
 
+import fvm_nabla_wrapper  # noqa: E402 isort:skip
 
 cppimport.force_rebuild(True)
 
-# VOL(min/max):  57510668192.214096    851856184496.32886
-#  SXX(min/max):  -103437.60479272791    340115.33913622628
-#  SYY(min/max):  -2001577.7946404363    2001577.7946404363
-#  PP(min/max):  0.0000000000000000    1965.4980340735883
-#  nablaXX(min/max):  -3.5455427772566003E-003  3.5455427772565435E-003
-#  nablaYY(min/max):  -3.3540113705465301E-003  3.3540113705465301E-003
-# zavgSXX(min/max):  -199755464.25741270    388241977.58389181
-#  zavgSYY(min/max):  -1000788897.3202186    1000788897.3202186
-
-
 grid = StructuredGrid("O32")
-print(grid.periodic)
-# grid = StructuredGrid(x_spacing=LinearSpacing(-1, 1, 20), y_spacing=LinearSpacing(-1, 1, 21))
-# print(grid)
-
-#           atlas::MeshGenerator::Parameters generatorParams;
-#           generatorParams.set("triangulate", true);
-#           generatorParams.set("angle", -1.0);
-#           atlas::StructuredMeshGenerator generator(generatorParams);
 config = Config()
 config["triangulate"] = True
 config["angle"] = 20.0
@@ -69,14 +51,9 @@ m_vol = fs_nodes.create_field(name="vol", levels=1, dtype=np.float64)
 edges_per_node = 7
 m_sign = fs_nodes.create_field(name="m_sign", levels=1, dtype=np.float64, variables=edges_per_node)
 
-#         fs_edges_(mesh_, atlas::option::levels(nb_levels) | atlas::option::halo(1)),
-#         fs_nodes_(mesh_, atlas::option::levels(nb_levels) | atlas::option::halo(1)), //
-
 # ============ initialize_S()
 # all fields supported by dawn are 2 (or 3 with sparse) dimensional:
 # (unstructured, lev, sparse) S has dimensions (unstructured, [MMX/MMY])
-# const auto S =
-#     atlas::array::make_view<double, 2>(mesh_.edges().field("dual_normals"));
 S = np.array(mesh.edges.field("dual_normals"), copy=False)
 S_MXX = np.array(m_S_MXX, copy=False)
 S_MYY = np.array(m_S_MYY, copy=False)
@@ -92,19 +69,6 @@ deg2rad = 2.0 * rpi / 360.0
 for i in range(0, fs_edges.size - 1):
     S_MXX[i, klevel] = S[i, MXX] * radius * deg2rad
     S_MYY[i, klevel] = S[i, MYY] * radius * deg2rad
-
-
-# TODO remove (just double-check that there are the same values)
-# def min_max_avg(field):
-#     view = np.array(field, copy=False)
-#     min_val = float("inf")
-#     max_val = float("-inf")
-#     avg_val = 0
-#     for i in range(0, field.shape[0] - 1):
-#         min_val = min(min_val, view[i])
-#         max_val = max(max_val, view[i])
-#         avg_val += view[i]
-#     print("field: min={}, max={}, avg={}".format(min_val, max_val, avg_val / field.shape[0]))
 
 
 def min_max_avg(field):
