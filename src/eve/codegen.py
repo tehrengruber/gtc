@@ -43,6 +43,7 @@ import black
 import jinja2
 from mako import template as mako_tpl
 
+from . import utils
 from .core import BaseNode, NodeVisitor, StrEnum, ValidNodeType
 
 
@@ -111,75 +112,42 @@ def format_source(language: str, source: str, *, skip_errors=True, **kwargs) -> 
             )
 
 
-ValidNameDefType = Union[str, Sequence[str]]
-
-
-def make_canonical_cased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return (" ".join(words)).lower()
-
-
-def make_concatcased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return "".join(words)
-
-
-def make_camelCased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return words[0] + "".join(word.title() for word in words[1:])
-
-
-def make_CamelCased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return "".join(word.title() for word in words)
-
-
-def make_SNAKE_CASED(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return "_".join(word.upper() for word in words)
-
-
-def make_snake_cased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return "_".join(words)
-
-
 class Identifier:
     """Text string representing a symbol name in a programming language."""
 
     # Based on code from :https://blog.kangz.net/posts/2016/08/31/code-generation-the-easier-way/
 
-    def __init__(self, name: ValidNameDefType):
-        if isinstance(name, collections.abc.Sequence):
-            if not all(isinstance(item, str) for item in name):
+    def __init__(self, words: utils.WordsSequenceType):
+        if isinstance(words, collections.abc.Sequence):
+            if not all(isinstance(item, str) for item in words):
                 raise TypeError(
-                    f"Identifier definition ('{name}') type is not 'Union[str, Sequence[str]]'"
+                    f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
                 )
-            self.words = name
-        elif isinstance(name, str):
-            self.words = [name]
+            self.words = words
+        elif isinstance(words, str):
+            self.words = [words]
         else:
             raise TypeError(
-                f"Identifier definition ('{name}') type is not 'Union[str, Sequence[str]]'"
+                f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
             )
 
     def as_canonical_cased(self):
-        return self.make_canonical_cased(self.words)
+        return utils.join_canonical_cased(self.words)
 
     def as_concatcased(self):
-        return self.make_concatcased(self.words)
+        return utils.join_concatcased(self.words)
 
     def as_camelCased(self):
-        return self.make_camelCased(self.words)
+        return utils.join_camelCased(self.words)
 
     def as_CamelCased(self):
-        return self.make_CamelCased(self.words)
+        return utils.join_CamelCased(self.words)
 
     def as_SNAKE_CASE(self):
-        return self.make_SNAKE_CASED(self.words)
+        return utils.join_SNAKE_CASED(self.words)
 
     def as_snake_cased(self):
-        return self.make_snake_cased(self.words)
+        return utils.join_snake_cased(self.words)
 
 
 TextSequenceType = Union[Sequence[str], "TextBlock"]

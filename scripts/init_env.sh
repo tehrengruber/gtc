@@ -73,6 +73,10 @@ ${EVE_PYTHON_CMD} -m pip install -r ${EVE_ROOT}/requirements_dev.txt
 ${EVE_PYTHON_CMD} -m pip install -e ${EVE_ROOT}[cpp]
 echo -e "\nDone!"
 
+if [ "$MAKE_VENV" = "true" ]; then
+    deactivate
+fi
+
 echo -e "\nCreating local debug folder ('_local') ..."
 mkdir -p ${EVE_ROOT}/_local
 echo -e "\nDone!"

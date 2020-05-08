@@ -19,7 +19,6 @@
 
 import collections.abc
 import copy
-import enum
 import itertools
 import operator
 from types import MappingProxyType
@@ -29,35 +28,22 @@ from typing import (
     ClassVar,
     Collection,
     Dict,
-    FrozenSet,
     Generator,
     Iterable,
     Mapping,
     MutableSequence,
     MutableSet,
     Optional,
+    Set,
     Tuple,
     Type,
     Union,
 )
 
-from pydantic import (
-    BaseModel,
-    PositiveInt,
-    StrictBool,
-    StrictFloat,
-    StrictInt,
-    StrictStr,
-    validator,
-)
-from pydantic.typing import AnyCallable
+from pydantic import BaseModel, PositiveInt, validator
 
+from .types import Bool, Bytes, Float, Int, Str
 
-Bool = StrictBool  # noqa
-Bytes = bytes  # noqa
-Float = StrictFloat  # noqa
-Int = StrictInt  # noqa
-Str = StrictStr  # noqa
 
 #: Marker value used to avoid confusion with `None`
 #: (specially in contexts where `None` could be a valid value)
@@ -85,61 +71,6 @@ class UIDGenerator:
         cls.__unique_counter = itertools.count(start)
 
 
-#: Typing hint for `__get_validators__()` methods (defined but not exported in `pydantic.typing`)
-CallableGenerator = Generator[AnyCallable, None, None]
-
-
-class Enum(enum.Enum):
-    """Basic :class:`enum.Enum` subclass with strict type validation."""
-
-    @classmethod
-    def __get_validators__(cls) -> CallableGenerator:
-        yield cls._strict_type_validator
-        if hasattr(super(), "__get_validators__"):
-            yield from super().__get_validators__()
-
-    @classmethod
-    def _strict_type_validator(cls, v: Any) -> enum.Enum:
-        if not isinstance(v, cls):
-            raise TypeError(f"Invalid value type [expected: {cls}, received: {v.__class__}]")
-        return v
-
-
-class IntEnum(enum.IntEnum):
-    """Basic :class:`enum.IntEnum` subclass with strict type validation."""
-
-    @classmethod
-    def __get_validators__(cls) -> CallableGenerator:
-        yield cls._strict_type_validator
-        if hasattr(super(), "__get_validators__"):
-            yield from super().__get_validators__()
-
-    @classmethod
-    def _strict_type_validator(cls, v: Any) -> enum.IntEnum:
-        if not isinstance(v, cls):
-            raise TypeError(f"Invalid value type [expected: {cls}, received: {v.__class__}]")
-        return v
-
-
-class StrEnum(str, enum.Enum):
-    """Basic :class:`enum.Enum` subclass with strict type validation and supporting string operations."""
-
-    @classmethod
-    def __get_validators__(cls) -> CallableGenerator:
-        yield cls._strict_type_validator
-        if hasattr(super(), "__get_validators__"):
-            yield from super().__get_validators__()
-
-    @classmethod
-    def _strict_type_validator(cls, v: Any) -> "StrEnum":
-        if not isinstance(v, cls):
-            raise TypeError(f"Invalid value type [expected: {cls}, received: {v.__class__}]")
-        return v
-
-    def __str__(self) -> str:
-        return self.value
-
-
 class BaseModelConfig:
     extra = "forbid"
 
@@ -149,7 +80,7 @@ class FrozenModelConfig(BaseModelConfig):
 
 
 class SourceLocation(BaseModel):
-    """Source code location (line, column)."""
+    """Source code location (line, column, source)."""
 
     line: PositiveInt
     column: PositiveInt
@@ -169,15 +100,107 @@ class BaseDialect:
 
         super().__init_subclass__(**kwargs)
         if "name" not in cls.__dict__:
-            raise TypeError("Dialect classes must define a 'name: str' attribute.")
+            raise TypeError("Dialect classes must define a unique 'name: str' attribute.")
         if cls.name in _dialects:
-            raise ValueError("Dialect 'name' is not unique.")
+            raise ValueError(f"Dialect name ('{cls.name}') is not unique.")
 
-        cls.nodes = frozenset()
+        cls.nodes = set()
+        cls.vtypes = set()
         _dialects[cls.name] = cls
 
-    name: ClassVar[str] = "_base_"
-    nodes: ClassVar[FrozenSet[Type["BaseNode"]]] = frozenset()
+    @staticmethod
+    def _validate_dialect_reference(new_class, dialect):
+        if dialect is None:
+            dialect = getattr(new_class, "dialect", BaseDialect)
+            if not issubclass(dialect, BaseDialect):
+                raise TypeError(f"Reference to an invalid dialect class ({dialect})")
+        elif issubclass(dialect, BaseDialect):
+            if dialect is not new_class.__dict__.get("dialect", dialect):
+                raise TypeError(
+                    f"A conflictive 'dialect' class definition exists in {new_class} ({new_class.dialect})"
+                )
+        else:
+            raise TypeError(f"Invalid dialect class ({dialect})")
+
+    name: ClassVar[str]
+    nodes: ClassVar[Set[Type["BaseNode"]]] = set()
+    vtypes: ClassVar[Set[Type["VType"]]] = set()
+
+
+class BuiltinDialect(BaseDialect):
+    name: ClassVar[str] = ""
+
+
+class VType(BaseModel):
+    """Representation of an abstract data type."""
+
+    @classmethod
+    def __init_subclass__(cls, *, dialect=None, **kwargs):
+        super().__init_subclass__(**kwargs)
+        dialect = BaseDialect._validate_dialect_reference(cls, dialect)
+        if "name" not in cls.__dict__:
+            raise TypeError("VType classes must define a unique 'name: str' attribute.")
+        if cls.name in dialect.vtypes:
+            raise ValueError(f"VType name ('{cls.name}') is not unique.")
+        dialect.vtypes.add(cls)
+        cls.dialect = dialect
+
+    name: ClassVar[str]
+
+
+class BuiltinVType(VType, dialect=BaseDialect):
+    pass
+
+
+class NoneVType(BuiltinVType):
+    name: ClassVar[str] = "none"
+
+
+class BooleanVType(BuiltinVType):
+    name: ClassVar[str] = "boolean"
+
+
+class IndexVType(BuiltinVType):
+    name: ClassVar[str] = "index"
+
+
+class IntegerVType(BuiltinVType):
+    name: ClassVar[str] = "name"
+
+
+# complex, float, integer, boolean,
+# index, memref
+# tuple, struct, tensor
+# singleton
+
+# python
+# complex > real > integral > bool
+
+
+# dtypes
+
+# b	boolean
+# i	signed integer
+# u	unsigned integer
+# f	floating-point
+# c	complex floating-point
+# m	timedelta
+# M	datetime
+# O	object
+# S	(byte-)string
+# U	Unicode
+# V	void
+
+# standard-type ::=     complex-type
+#                     | float-type
+#                     | function-type
+#                     | index-type
+#                     | integer-type
+#                     | memref-type
+#                     | none-type
+#                     | tensor-type
+#                     | tuple-type
+#                     | vector-type
 
 
 class BaseNode(BaseModel):
@@ -197,29 +220,20 @@ class BaseNode(BaseModel):
     """
 
     dialect: ClassVar[Type[BaseDialect]] = BaseDialect
+    name: ClassVar[str] = ""
     id_attr: Optional[Str] = None
 
     @classmethod
     def __init_subclass__(cls, *, dialect=None, **kwargs):
         super().__init_subclass__(**kwargs)
-
-        if dialect is None:
-            dialect = getattr(cls, "dialect", BaseDialect)
-            if not issubclass(dialect, BaseDialect):
-                raise TypeError(f"Invalid dialect class ({dialect}) defined in the node class")
-        elif issubclass(dialect, BaseDialect):
-            if dialect is not cls.__dict__.get("dialect", dialect):
-                raise TypeError(
-                    f"A conflictive dialect class definition exists in the node class ({cls.dialect})"
-                )
-        else:
-            raise TypeError(f"Invalid dialect class ({dialect})")
-
-        dialect.nodes = frozenset(dialect.nodes | {cls})
+        dialect = BaseDialect._validate_dialect_reference(cls, dialect)
+        dialect.nodes.add(cls)
         cls.dialect = dialect
 
     @validator("id_attr", pre=True, always=True)
-    def _id_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
+    def _id_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:
+        if not isinstance(v, str):
+            raise TypeError(f"id_attr is not an 'str' instance ({type(v)})")
         return v or UIDGenerator.get_unique_id()
 
     def attributes(self) -> Generator[Tuple[str, Any], None, None]:
@@ -252,6 +266,12 @@ ValidLeafNodeType = Union[
 ]
 
 ValidNodeType = Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]
+
+
+class BaseVisitor:
+    @classmethod
+    def __init_subclass__():
+        pass
 
 
 class NodeVisitor:
