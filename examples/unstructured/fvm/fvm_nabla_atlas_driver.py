@@ -27,6 +27,11 @@ import fvm_nabla_wrapper  # noqa: E402 isort:skip
 
 cppimport.force_rebuild(True)
 
+
+def assert_close(expected, actual):
+    assert math.isclose(expected, actual), "expected={}, actual={}".format(expected, actual)
+
+
 grid = StructuredGrid("O32")
 config = Config()
 config["triangulate"] = True
@@ -80,10 +85,12 @@ def min_max_avg(field):
     )
 
 
-#  SXX(min/max):  -103437.60479272791    340115.33913622628
-#  SYY(min/max):  -2001577.7946404363    2001577.7946404363
-min_max_avg(m_S_MXX)
-min_max_avg(m_S_MYY)
+# SXX(min/max):  -103437.60479272791    340115.33913622628
+assert math.isclose(min(S_MXX), -103437.60479272791)
+assert math.isclose(max(S_MXX), 340115.33913622628)
+# SYY(min/max):  -2001577.7946404363    2001577.7946404363
+assert math.isclose(min(S_MYY), -2001577.7946404363)
+assert math.isclose(max(S_MYY), 2001577.7946404363)
 # =========end initialize_S()
 # ============ initialize_sign()
 node2edge_sign = np.array(m_sign, copy=False)
@@ -109,13 +116,16 @@ for jnode in range(0, fs_nodes.size - 1):
 # =========end initialize_sign()
 # ============ initialize_vol()
 vol_atlas = np.array(mesh.nodes.field("dual_volumes"), copy=False)
-# dual_volumes min=2.32551, max=68.8916
-min_max_avg(mesh.nodes.field("dual_volumes"))
+# dual_volumes 4.6510228700066421    68.891611253882218    12.347560975609632
+assert_close(4.6510228700066421, min(vol_atlas))
+assert_close(68.891611253882218, max(vol_atlas))
+
 vol = np.array(m_vol, copy=False)
 for i in range(0, vol_atlas.size):
     vol[i, klevel] = vol_atlas[i] * pow(deg2rad, 2) * pow(radius, 2)
 # VOL(min/max):  57510668192.214096    851856184496.32886
-min_max_avg(m_vol)
+assert_close(57510668192.214096, min(vol))
+assert_close(851856184496.32886, max(vol))
 # =========vol initialize_vol()
 
 # ============ fillInputData()
@@ -166,8 +176,9 @@ for jnode in range(0, fs_nodes.size - 1):
             1.0 + math.cos(rpi * zdist / zrad)
         ) * math.pow(math.cos(rpi * zdist / zeta), 2)
 
-min_max_avg(m_pp)  # TODO max is too high
-min_max_avg(m_pp)
+pp = rzs
+assert_close(0.0000000000000000, min(pp))
+assert_close(1965.4980340735883, max(pp))
 
 m_zavgS_MXX = fs_edges.create_field(name="m_zavgS_MXX", levels=1, dtype=np.float64)
 m_zavgS_MYY = fs_edges.create_field(name="m_zavgS_MYY", levels=1, dtype=np.float64)
@@ -188,11 +199,17 @@ fvm_nabla_wrapper.run_computation(
     m_sign,
 )
 
-# zavgSXX(min/max):  -199755464.25741270    388241977.58389181
-# zavgSYY(min/max):  -1000788897.3202186    1000788897.3202186
+assert_close(-199755464.25741270, min(np.array(m_zavgS_MXX, copy=False)))
+assert_close(388241977.58389181, max(np.array(m_zavgS_MXX, copy=False)))
+assert_close(-1000788897.3202186, min(np.array(m_zavgS_MYY, copy=False)))
+assert_close(1000788897.3202186, max(np.array(m_zavgS_MYY, copy=False)))
 min_max_avg(m_zavgS_MXX)
 min_max_avg(m_zavgS_MYY)
 #  nablaXX(min/max):  -3.5455427772566003E-003  3.5455427772565435E-003
+assert_close(-3.5455427772566003e-003, min(np.array(m_pnabla_MXX, copy=False)))
+assert_close(3.5455427772565435e-003, max(np.array(m_pnabla_MXX, copy=False)))
 #  nablaYY(min/max):  -3.3540113705465301E-003  3.3540113705465301E-003
+assert_close(-3.3540113705465301e-003, min(np.array(m_pnabla_MYY, copy=False)))
+assert_close(3.3540113705465301e-003, max(np.array(m_pnabla_MYY, copy=False)))
 min_max_avg(m_pnabla_MXX)
 min_max_avg(m_pnabla_MYY)
