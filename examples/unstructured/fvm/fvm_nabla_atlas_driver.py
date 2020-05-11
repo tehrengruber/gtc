@@ -37,8 +37,6 @@ config = Config()
 config["triangulate"] = True
 config["angle"] = 20.0
 # config["angle"] = -1.0
-# TODO I am a bit confused: 20.0 and -1.0 produce different results,
-# sometimes one sometimes the other seems to be the correct value to reproduce Christian's results
 mesh = StructuredMeshGenerator(config).generate(grid)  # Generator parameters
 
 fs_edges = functionspace.EdgeColumns(mesh, halo=1)  # TODO nb_levels
@@ -71,7 +69,7 @@ rpi = 2.0 * math.asin(1.0)
 radius = 6371.22e03
 deg2rad = 2.0 * rpi / 360.0
 
-for i in range(0, fs_edges.size - 1):
+for i in range(0, fs_edges.size):
     S_MXX[i, klevel] = S[i, MXX] * radius * deg2rad
     S_MYY[i, klevel] = S[i, MYY] * radius * deg2rad
 
@@ -101,10 +99,10 @@ def is_pole_edge(e):
     return Topology.check(edge_flags[e], Topology.POLE)
 
 
-for jnode in range(0, fs_nodes.size - 1):
+for jnode in range(0, fs_nodes.size):
     node_edge_con = mesh.nodes.edge_connectivity
     edge_node_con = mesh.edges.node_connectivity
-    for jedge in range(0, node_edge_con.cols(jnode) - 1):
+    for jedge in range(0, node_edge_con.cols(jnode)):
         iedge = node_edge_con[jnode, jedge]
         ip1 = edge_node_con[iedge, 0]
         if jnode == ip1:
@@ -158,13 +156,13 @@ rzs = np.array(m_pp, copy=False)
 
 rcoords_deg = np.array(mesh.nodes.field("lonlat"))
 
-for jnode in range(0, fs_nodes.size - 1):
-    for i in range(0, 1):
+for jnode in range(0, fs_nodes.size):
+    for i in range(0, 2):
         rcoords[jnode, klevel, i] = rcoords_deg[jnode, i] * deg2rad
         rlonlatcr[jnode, klevel, i] = rcoords[jnode, klevel, i]  # This is not my pattern!
     rcosa[jnode, klevel] = math.cos(rlonlatcr[jnode, klevel, MYY])
     rsina[jnode, klevel] = math.sin(rlonlatcr[jnode, klevel, MYY])
-for jnode in range(0, fs_nodes.size - 1):
+for jnode in range(0, fs_nodes.size):
     zlon = rlonlatcr[jnode, klevel, MXX]
     zdist = math.sin(zlatc) * rsina[jnode, klevel] + math.cos(zlatc) * rcosa[
         jnode, klevel
@@ -199,17 +197,18 @@ fvm_nabla_wrapper.run_computation(
     m_sign,
 )
 
+# min_max_avg(m_zavgS_MXX)
+# min_max_avg(m_zavgS_MYY)
 assert_close(-199755464.25741270, min(np.array(m_zavgS_MXX, copy=False)))
 assert_close(388241977.58389181, max(np.array(m_zavgS_MXX, copy=False)))
 assert_close(-1000788897.3202186, min(np.array(m_zavgS_MYY, copy=False)))
 assert_close(1000788897.3202186, max(np.array(m_zavgS_MYY, copy=False)))
-min_max_avg(m_zavgS_MXX)
-min_max_avg(m_zavgS_MYY)
+
+# min_max_avg(m_pnabla_MXX)
+# min_max_avg(m_pnabla_MYY)
 #  nablaXX(min/max):  -3.5455427772566003E-003  3.5455427772565435E-003
 assert_close(-3.5455427772566003e-003, min(np.array(m_pnabla_MXX, copy=False)))
 assert_close(3.5455427772565435e-003, max(np.array(m_pnabla_MXX, copy=False)))
 #  nablaYY(min/max):  -3.3540113705465301E-003  3.3540113705465301E-003
 assert_close(-3.3540113705465301e-003, min(np.array(m_pnabla_MYY, copy=False)))
 assert_close(3.3540113705465301e-003, max(np.array(m_pnabla_MYY, copy=False)))
-min_max_avg(m_pnabla_MXX)
-min_max_avg(m_pnabla_MYY)
