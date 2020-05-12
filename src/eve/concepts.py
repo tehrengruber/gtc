@@ -21,7 +21,8 @@ import collections.abc
 import copy
 import itertools
 import operator
-from types import MappingProxyType
+import typing
+import zlib
 from typing import (
     Any,
     Callable,
@@ -30,17 +31,20 @@ from typing import (
     Dict,
     Generator,
     Iterable,
-    Mapping,
+    List,
     MutableSequence,
     MutableSet,
     Optional,
-    Set,
+    Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
 )
 
-from pydantic import BaseModel, PositiveInt, validator
+import pydantic
+import pydantic.utils
+from pydantic import BaseModel, PositiveInt, root_validator, validator
 
 from .types import Bool, Bytes, Float, Int, Str
 
@@ -49,26 +53,121 @@ from .types import Bool, Bytes, Float, Int, Str
 #: (specially in contexts where `None` could be a valid value)
 NOTHING = object()
 
-_dialects: Dict[str, "BaseDialect"] = {}
-registered_dialects: Mapping[str, "BaseDialect"] = MappingProxyType(_dialects)
+
+#: Public register of dialects
+registered_dialects: Dict[str, Type["Dialect"]] = {}
+
+
+def _register_dialect(dialect_class: Type["Dialect"]) -> Type["Dialect"]:
+    global registered_dialects
+
+    if not issubclass(dialect_class, Dialect):
+        raise TypeError(f"Invalid dialect class {dialect_class}.")
+    if "name" not in dialect_class.__dict__:
+        raise TypeError("Dialect classes must define a unique 'name: str' attribute.")
+    if (
+        dialect_class.name in registered_dialects
+        and dialect_class is not registered_dialects[dialect_class.name]
+    ):
+        raise ValueError(f"Dialect name ('{dialect_class.name}') is not unique.")
+
+    if dialect_class.name not in registered_dialects:
+        registered_dialects[dialect_class.name] = dialect_class
+        dialect_class.nodes = {}
+        dialect_class.vtypes = {}
+
+    return dialect_class
+
+
+def _validate_dialect_reference(
+    dialect_member_class: Type[Any], expected_dialect: Optional[Type["Dialect"]] = None
+) -> Type["Dialect"]:
+    dialect: Type["Dialect"] = dialect_member_class.__dict__.get("dialect", expected_dialect)
+    if expected_dialect is None:
+        if "dialect" not in dialect_member_class.__dict__:
+            raise TypeError(f"{dialect_member_class} does not contain a dialect reference.")
+        if not issubclass(dialect, Dialect):
+            raise TypeError(f"Reference to an invalid dialect class ({dialect})")
+    elif issubclass(expected_dialect, Dialect):
+        if dialect is not expected_dialect:
+            raise TypeError(
+                f"A conflictive 'dialect' class definition exists in {dialect_member_class} ({dialect})"
+            )
+    else:
+        raise TypeError(f"Invalid expected dialect class ({expected_dialect})")
+
+    return dialect
+
+
+NodeClassRefType = Union[str, Type["Dialect"], Type["Node"]]
+
+
+def _collect_nodes(
+    spec: Union[NodeClassRefType, Iterable[NodeClassRefType]]
+) -> Tuple[Tuple[str, ...], Tuple[Type["Node"], ...], int]:
+
+    if spec in (Ellipsis, Node):
+        return tuple(), tuple(), zlib.adler32("".encode())
+    elif isinstance(spec, (str, type)):
+        spec = [spec]
+
+    # Collect qualified node names
+    collected_names = []
+    for item in spec:
+        if isinstance(item, str):
+            components = item.strip().split(".")
+            if (
+                len(components) == 2
+                and components[0] in registered_dialects
+                and components[1] in registered_dialects[components[0]].nodes
+            ):
+                collected_names.append(item)
+            else:
+                raise ValueError(f"Invalid node name: '{item}'.")
+        elif isinstance(item, type):
+            if issubclass(item, Dialect):
+                collected_names.extend(member.unique_code() for member in item.nodes.values())
+            elif issubclass(item, Node):
+                collected_names.append(item.unique_code())
+            else:
+                raise TypeError(f"Invalid Node class: {item}.")
+        else:
+            raise TypeError(f"Invalid Node class: {item}.")
+
+    # Sort and hash the collected names
+    collected_names = tuple(sorted(set(collected_names)))
+    collected_hash = zlib.adler32(",".join(collected_names).encode())
+
+    # Collect node types
+    collected_types = []
+    for name in collected_names:
+        dialect, node = name.split(".")
+        collected_types.append(registered_dialects[dialect].nodes[node])
+
+    collected_types = tuple(collected_types)
+
+    return collected_names, collected_types, collected_hash
 
 
 class UIDGenerator:
-    #: Prefix for unique ids
-    prefix = ""
+    """Simple unique id generator using a counter."""
 
     #: Constantly increasing counter for generation of unique ids
-    __unique_counter = itertools.count(1)
+    __counter = itertools.count(1)
 
     @classmethod
-    def get_unique_id(cls) -> str:
-        """Generate a new globally unique `int` for the current session."""
-        return f"{cls.prefix}_{next(cls.__unique_counter)}"
+    def get_unique_id(cls, *, prefix: Optional[str] = None) -> str:
+        """Generate a new globally unique id (for the current session)."""
+        count = next(cls.__counter)
+        if prefix:
+            return f"{prefix}_{count}"
+        else:
+            return f"{count}"
 
     @classmethod
     def reset(cls, start: int = 1) -> None:
         """Reset generator."""
-        cls.__unique_counter = itertools.count(start)
+        cls.__counter = itertools.count(start)
 
 
 class BaseModelConfig:
@@ -82,134 +181,101 @@ class FrozenModelConfig(BaseModelConfig):
 class SourceLocation(BaseModel):
     """Source code location (line, column, source)."""
 
+    class Config(FrozenModelConfig):
+        pass
+
     line: PositiveInt
     column: PositiveInt
     source: Str
 
-    class Config(FrozenModelConfig):
-        pass
+    def __init__(self, line: int, column: int, source: str):
+        super().__init__(line=line, column=column, source=source)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"<{self.source}: Line {self.line}, Col {self.column}>"
 
 
-class BaseDialect:
-    @classmethod
-    def __init_subclass__(cls, **kwargs):
-        global _dialects
+NodeOrVTypeType = Union[Type["Node"], Type["VType"]]
 
-        super().__init_subclass__(**kwargs)
-        if "name" not in cls.__dict__:
-            raise TypeError("Dialect classes must define a unique 'name: str' attribute.")
-        if cls.name in _dialects:
-            raise ValueError(f"Dialect name ('{cls.name}') is not unique.")
 
-        cls.nodes = set()
-        cls.vtypes = set()
-        _dialects[cls.name] = cls
+class Dialect:
+    """Base dialect class."""
 
-    @staticmethod
-    def _validate_dialect_reference(new_class, dialect):
-        if dialect is None:
-            dialect = getattr(new_class, "dialect", BaseDialect)
-            if not issubclass(dialect, BaseDialect):
-                raise TypeError(f"Reference to an invalid dialect class ({dialect})")
-        elif issubclass(dialect, BaseDialect):
-            if dialect is not new_class.__dict__.get("dialect", dialect):
-                raise TypeError(
-                    f"A conflictive 'dialect' class definition exists in {new_class} ({new_class.dialect})"
-                )
-        else:
-            raise TypeError(f"Invalid dialect class ({dialect})")
-
+    # Placeholders for class members in concrete Dialect subclasses
+    #: Unique name of the dialect
     name: ClassVar[str]
-    nodes: ClassVar[Set[Type["BaseNode"]]] = set()
-    vtypes: ClassVar[Set[Type["VType"]]] = set()
 
+    #: Registered dialect nodes
+    nodes: ClassVar[Dict[str, Type["Node"]]]
 
-class BuiltinDialect(BaseDialect):
-    name: ClassVar[str] = ""
+    #: Registered dialect types
+    vtypes: ClassVar[Dict[str, Type["VType"]]]
+
+    @classmethod
+    def __init_subclass__(cls) -> None:
+        _register_dialect(cls)
+
+    @classmethod
+    def register(cls, new_member_class: NodeOrVTypeType) -> NodeOrVTypeType:
+        """Register a new member (Node, VType) of the dialect."""
+
+        if issubclass(new_member_class, Node):
+            member_type = "node"
+        elif issubclass(new_member_class, VType):
+            member_type = "vtype"
+        else:
+            raise TypeError(
+                f"New member class ('{new_member_class}') is not a Node or VType subclass."
+            )
+
+        registered_members = getattr(cls, f"{member_type}s")
+
+        if new_member_class._code_:
+            member_name = new_member_class._code_.strip()
+        else:
+            member_name = new_member_class.__name__
+        if member_name.startswith("__") and member_name.endswith("__"):
+            raise ValueError(f"Special node class ({new_member_class}) can not be registered.")
+        if (
+            member_name in registered_members
+            and registered_members[member_name] is not new_member_class
+        ):
+            raise ValueError(
+                f"{member_type.capitalize()} name '{member_name}' has been already "
+                f"registered by {registered_members[member_name]}."
+            )
+
+        registered_members[member_name] = new_member_class
+        new_member_class._dialect_ = _validate_dialect_reference(new_member_class, cls)
+
+        return new_member_class
 
 
 class VType(BaseModel):
-    """Representation of an abstract data type."""
+    """Representation of an abstract value data type."""
+
+    class Config(FrozenModelConfig):
+        pass
+
+    # Placeholders for class members in concrete subclasses
+    #: Unique vtype name
+    _code_: ClassVar[str]
+
+    #: Reference to dialect (added automatically at registration)
+    _dialect_: ClassVar[Type[Dialect]]
 
     @classmethod
-    def __init_subclass__(cls, *, dialect=None, **kwargs):
-        super().__init_subclass__(**kwargs)
-        dialect = BaseDialect._validate_dialect_reference(cls, dialect)
-        if "name" not in cls.__dict__:
-            raise TypeError("VType classes must define a unique 'name: str' attribute.")
-        if cls.name in dialect.vtypes:
-            raise ValueError(f"VType name ('{cls.name}') is not unique.")
-        dialect.vtypes.add(cls)
-        cls.dialect = dialect
-
-    name: ClassVar[str]
+    def unique_code(cls) -> str:
+        return f"{cls._dialect_.name}.{cls._code_}"
 
 
-class BuiltinVType(VType, dialect=BaseDialect):
-    pass
-
-
-class NoneVType(BuiltinVType):
-    name: ClassVar[str] = "none"
-
-
-class BooleanVType(BuiltinVType):
-    name: ClassVar[str] = "boolean"
-
-
-class IndexVType(BuiltinVType):
-    name: ClassVar[str] = "index"
-
-
-class IntegerVType(BuiltinVType):
-    name: ClassVar[str] = "name"
-
-
-# complex, float, integer, boolean,
-# index, memref
-# tuple, struct, tensor
-# singleton
-
-# python
-# complex > real > integral > bool
-
-
-# dtypes
-
-# b	boolean
-# i	signed integer
-# u	unsigned integer
-# f	floating-point
-# c	complex floating-point
-# m	timedelta
-# M	datetime
-# O	object
-# S	(byte-)string
-# U	Unicode
-# V	void
-
-# standard-type ::=     complex-type
-#                     | float-type
-#                     | function-type
-#                     | index-type
-#                     | integer-type
-#                     | memref-type
-#                     | none-type
-#                     | tensor-type
-#                     | tuple-type
-#                     | vector-type
-
-
-class BaseNode(BaseModel):
+class Node(BaseModel):
     """Base node class.
 
     Field values should be either:
 
         * builtin types: `bool`, `bytes`, `int`, `float`, `str`
-        * other :class:`BaseNode` subclasses
+        * other :class:`Node` subclasses
         * other :class:`pydantic.BaseModel` subclasses
         * supported collections (:class:`List`, :class:`Dict`, :class:`Set`)
           of any of the previous items
@@ -219,59 +285,268 @@ class BaseNode(BaseModel):
     "_attr" are considered meta-attributes of the node, not children.
     """
 
-    dialect: ClassVar[Type[BaseDialect]] = BaseDialect
-    name: ClassVar[str] = ""
+    class Config(BaseModelConfig):
+        pass
+
+    # Placeholders for class members in concrete subclasses
+    #: Unique nodename (None means that it is an abstract node)
+    _code_: ClassVar[Optional[str]] = None
+
+    #: Reference to dialect (added automatically at registration)
+    _dialect_: ClassVar[Type[Dialect]]
+
+    # Node fields
+    #: Unique node id (meta-attribute)
     id_attr: Optional[Str] = None
 
     @classmethod
-    def __init_subclass__(cls, *, dialect=None, **kwargs):
-        super().__init_subclass__(**kwargs)
-        dialect = BaseDialect._validate_dialect_reference(cls, dialect)
-        dialect.nodes.add(cls)
-        cls.dialect = dialect
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        if "_code_" in cls.__dict__ and not isinstance(cls._code_, str):
+            raise TypeError(
+                f"Node class {cls} defines an invalid '_code_' (str) class attribute: {cls._code_}"
+            )
+
+        if "_dialect_" in cls.__dict__ and not isinstance(cls.__dict__["_dialect_"], Dialect):
+            raise TypeError(
+                f"Invalid dialect definition for class {cls}: {cls.__dict__['_dialect_']}."
+            )
+
+    def __init__(self, **kwargs: Any):
+        assert self._code_
+        super().__init__(**kwargs)
 
     @validator("id_attr", pre=True, always=True)
-    def _id_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:
+    def _id_attr_validator(cls: Type["Node"], v: Optional[str]) -> str:  # type: ignore
+        if v is None:
+            v = UIDGenerator.get_unique_id(prefix=cls._code_)
         if not isinstance(v, str):
             raise TypeError(f"id_attr is not an 'str' instance ({type(v)})")
-        return v or UIDGenerator.get_unique_id()
+        return v
+
+    @classmethod
+    def unique_code(cls) -> str:
+        return f"{cls._dialect_.name}.{cls._code_}"
 
     def attributes(self) -> Generator[Tuple[str, Any], None, None]:
         for name, _ in self.__fields__.items():
             if name.endswith("_attr"):
-                yield (name, getattr(self, name))
+                yield name, getattr(self, name)
 
     def children(self) -> Generator[Tuple[str, Any], None, None]:
         for name, _ in self.__fields__.items():
             if not (name.endswith("_attr") or name.endswith("_")):
-                yield (name, getattr(self, name))
+                yield name, getattr(self, name)
 
+
+class _NodeFromClass:
+    def __getitem__(self, spec: Union[NodeClassRefType, Iterable[NodeClassRefType]]) -> TypeVar:  # type: ignore
+        _, classes, hashed_id = _collect_nodes(spec)
+        type_var_name = f"Node_{hashed_id}".replace("-", "_")
+        return TypeVar(type_var_name, *classes)  # type: ignore
+
+
+#: Syntax marker to create a TypeVar with restricted node types
+NodeFrom = _NodeFromClass()
+
+
+class ValueNode(Node):
+
+    result: VType
+
+
+FlowSuccessorType = Tuple[str, List[ValueNode]]
+
+
+class TerminatorNode(Node):
+
+    successors: List[FlowSuccessorType]
+
+
+class Block(BaseModel, collections.abc.MutableSequence):
     class Config(BaseModelConfig):
-        pass
+        orm_mode = True
+
+    #: Accepted node types (it should be modified in custom subclasses)
+    _restricted_nodes_: ClassVar[Tuple[Type[Node], ...]] = tuple()
+
+    # Block fields
+    #: List of nodes contained in the block
+    label: str = ""
+    inputs: List[ValueNode] = []
+    nodes: List[Node] = []
+
+    def __init__(self, label: str = "", **kwargs: Any):
+        super().__init__(label=label, **kwargs)
+
+    @root_validator(pre=True)
+    def _nodes_from_object_validator(  # type: ignore
+        cls: Type["Block"], data: Union[Dict[str, Any], pydantic.utils.GetterDict],
+    ) -> Union[Dict[str, Any], pydantic.utils.GetterDict]:
+        # This pre-root validator (combined with the orm_mode setting in Config) provides
+        # a workaround to initialize fields of block subclasses inside other nodes using
+        # superclass Block objects
+        if isinstance(data, pydantic.utils.GetterDict) and isinstance(data._obj, Block):
+            data = {"label": data._obj.label, "inputs": data._obj.inputs, "nodes": data._obj.nodes}
+
+        return data
+
+    @validator("nodes")
+    def _node_list_validator(cls: Type["Block"], v: List[Any]) -> List[Node]:  # type: ignore
+        if not isinstance(v, collections.abc.Sequence):
+            raise TypeError(f"Invalid list of Node objects '{v}'")
+        return cls._validate_nodes(v)
+
+    @classmethod
+    def _validate_nodes(cls, nodes: List[Node]) -> List[Node]:
+        for node in nodes:
+            if cls._restricted_nodes_ and not isinstance(node, cls._restricted_nodes_):
+                raise TypeError(
+                    f"'{node}'' has an invalid type ({type(node)}) for this block."
+                    "Valid types are: {cls._restricted_nodes_}."
+                )
+
+        if not isinstance(nodes[-1], TerminatorNode):
+            raise TypeError(f"Last node in the block ({nodes[-1]}) is not a terminator.")
+
+        return nodes
+
+    @typing.overload
+    def __getitem__(self, idx: int) -> Node:
+        ...
+
+    @typing.overload
+    def __getitem__(self, s: slice) -> List[Node]:
+        ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[Node, List[Node]]:
+        return self.nodes.__getitem__(index)
+
+    @typing.overload
+    def __setitem__(self, idx: int, value: Node) -> None:
+        ...
+
+    @typing.overload
+    def __setitem__(self, s: slice, value: Iterable[Node]) -> None:
+        ...
+
+    def __setitem__(self, index: Union[int, slice], value: Union[Node, Iterable[Node]]) -> None:
+        if isinstance(value, Node):
+            self._validate_nodes([value])
+        else:
+            self._validate_nodes(list(value))
+        self.nodes.__setitem__(index, value)  # type:ignore
+
+    def __delitem__(self, index: Union[int, slice]) -> None:
+        return self.nodes.__delitem__(index)
+
+    def __len__(self) -> int:
+        return self.nodes.__len__()
+
+    def insert(self, index: int, value: Node) -> None:
+        self._validate_nodes([value])
+        return self.nodes.insert(index, value)
 
 
-class Node(BaseNode):
+class _BlockOfClass:
+
+    __cached_subclasses: ClassVar[Dict[int, Type["Block"]]] = {}
+
+    def __getitem__(self, spec: Union[NodeClassRefType, Sequence[NodeClassRefType]]) -> Type[Block]:
+        spec = [spec] if isinstance(spec, (str, type)) else list(spec)
+        class_name: Optional[str] = None
+
+        if spec:
+            for _i, item in enumerate(spec):
+                if isinstance(item, str):
+                    item = item.strip()
+                    if item.startswith("__classname__:"):
+                        class_name = item.split(":")[1]
+                        continue
+
+            if _i < len(spec):
+                del spec[_i]
+
+        restricted_names, restricted_classes, hashed_id = _collect_nodes(spec)
+
+        # Find or create a (cached) custom Block subclass
+        if hashed_id not in self.__cached_subclasses:
+            class_name = class_name or f"Block_{hashed_id:x}".replace("-", "_")
+            # Create a new pydantic model dynamically
+            self.__cached_subclasses[hashed_id] = pydantic.create_model(  # type: ignore
+                class_name,
+                _restricted_nodes_=(ClassVar[Tuple[Type[Node]]], restricted_classes),
+                nodes=(List[Union[restricted_classes]], []),  # type: ignore
+                __base__=Block,
+            )
+
+        return self.__cached_subclasses[hashed_id]
+
+
+#: Syntax marker to create constrained Block subclasses
+BlockOf = _BlockOfClass()
+
+
+# class Region(BaseModel, collections.abc.MutableMapping):
+#     class Config(BaseModelConfig):
+#         orm_mode = True
+
+#     # CFGRegion fields
+#     #: Dict of blocks with labels
+#     blocks: Dict[str, Block] = {}
+
+#     def __init__(self, blocks: Optional[Dict[str, Block]] = None, *args, **kwargs) -> None:
+#         if blocks is None:
+#             blocks = {}
+#         super().__init__(blocks=blocks, *args, **kwargs)
+
+#     @root_validator(pre=True)
+#     def _blocks_from_object_validator(
+#         cls: Type[Block], data: Union[Dict[str, Any], pydantic.utils.GetterDict],
+#     ) -> Union[Dict[str, Any], pydantic.utils.GetterDict]:
+#         # This pre-root validator (combined with the orm_mode setting in Config) provides
+#         # a workaround to initialize CFGRegion fields inside other nodes using plain dicts
+#         if isinstance(data, pydantic.utils.GetterDict) and isinstance(
+#             data._obj, collections.abc.Mapping
+#         ):
+#             data = {"blocks": data._obj}
+
+#         return data
+
+#     def __getitem__(self, index):
+#         return self.blocks.__getitem__(index)
+
+#     def __setitem__(self, index, value):
+#         return self.blocks.__setitem__(index, value)
+
+#     def __delitem__(self, index):
+#         return self.blocks.__delitem__(index)
+
+#     def __len__(self):
+#         return self.blocks.__len__()
+
+#     def __iter__(self):
+#         return self.blocks.__iter__()
+
+
+class Module:
     pass
+    # symtable
+    # dialects
 
 
-class FrozenNode(Node):
-    """Base inmutable node class."""
-
-    class Config(FrozenModelConfig):
-        pass
+class Program:
+    pass
+    # modules: List[Module]
+    # symtable
+    # dialects
 
 
 ValidLeafNodeType = Union[
-    bool, bytes, int, float, str, Bool, Bytes, Int, Float, Str, BaseNode, BaseModel, None
+    bool, bytes, int, float, str, Bool, Bytes, Int, Float, Str, Node, BaseModel, None
 ]
 
 ValidNodeType = Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]
-
-
-class BaseVisitor:
-    @classmethod
-    def __init_subclass__():
-        pass
 
 
 class NodeVisitor:
@@ -300,21 +575,21 @@ class NodeVisitor:
 
     def visit(self, node: ValidNodeType, **kwargs) -> Any:
         visitor = self.generic_visit
-        if isinstance(node, BaseNode):
+        if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
                 method_name = "visit_" + node_class.__name__
                 if hasattr(self, method_name):
                     visitor = getattr(self, method_name)
                     break
 
-                if node_class is BaseNode:
+                if node_class is Node:
                     break
 
         return visitor(node, **kwargs)
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
         items: Iterable[Tuple[Any, Any]] = []
-        if isinstance(node, BaseNode):
+        if isinstance(node, Node):
             items = node.children()
         elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
@@ -357,7 +632,7 @@ class NodeTranslator(NodeVisitor):
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             tmp_items: Collection[ValidNodeType] = []
-            if isinstance(node, BaseNode):
+            if isinstance(node, Node):
                 tmp_items = {key: self.visit(value, **kwargs) for key, value in node}
                 result = node.__class__(  # type: ignore
                     **{key: value for key, value in node.attributes()},
@@ -405,7 +680,7 @@ class NodeModifier(NodeVisitor):
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
         result: Any = node
-        if isinstance(node, (BaseNode, collections.abc.Collection)) and not isinstance(
+        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             items: Iterable[Tuple[Any, Any]] = []

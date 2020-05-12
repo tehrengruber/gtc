@@ -38,14 +38,26 @@ Str = StrictStr  # noqa: F401
 CallableGenerator = Generator[AnyCallable, None, None]
 
 
+# T = TypeVar("T")
+# V = TypeVar("V")
+
+# class classproperty:
+#     def __init__(self, getter: Callable[[Type[T]], V]):
+#         self.getter = getter
+
+#     def __get__(self, instance: Optional[T], owner: Type[T]) -> V:
+#         if instance is None:
+#             return self.getter(owner)
+#         else:
+#             raise AttributeError()
+
+
 class Enum(enum.Enum):
     """Basic :class:`enum.Enum` subclass with strict type validation."""
 
     @classmethod
     def __get_validators__(cls) -> CallableGenerator:
         yield cls._strict_type_validator
-        if hasattr(super(), "__get_validators__"):
-            yield from super().__get_validators__()
 
     @classmethod
     def _strict_type_validator(cls, v: Any) -> enum.Enum:
@@ -60,8 +72,6 @@ class IntEnum(enum.IntEnum):
     @classmethod
     def __get_validators__(cls) -> CallableGenerator:
         yield cls._strict_type_validator
-        if hasattr(super(), "__get_validators__"):
-            yield from super().__get_validators__()
 
     @classmethod
     def _strict_type_validator(cls, v: Any) -> enum.IntEnum:
@@ -76,8 +86,6 @@ class StrEnum(str, enum.Enum):
     @classmethod
     def __get_validators__(cls) -> CallableGenerator:
         yield cls._strict_type_validator
-        if hasattr(super(), "__get_validators__"):
-            yield from super().__get_validators__()
 
     @classmethod
     def _strict_type_validator(cls, v: Any) -> "StrEnum":
@@ -86,4 +94,5 @@ class StrEnum(str, enum.Enum):
         return v
 
     def __str__(self) -> str:
+        assert isinstance(self.value, str)
         return self.value

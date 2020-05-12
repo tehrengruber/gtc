@@ -44,7 +44,8 @@ import jinja2
 from mako import template as mako_tpl
 
 from . import utils
-from .core import BaseNode, NodeVisitor, StrEnum, ValidNodeType
+from .concepts import Node, NodeVisitor, ValidNodeType
+from .types import StrEnum
 
 
 try:
@@ -117,7 +118,7 @@ class Identifier:
 
     # Based on code from :https://blog.kangz.net/posts/2016/08/31/code-generation-the-easier-way/
 
-    def __init__(self, words: utils.WordsSequenceType):
+    def __init__(self, words: utils.WordSequenceType):
         if isinstance(words, collections.abc.Sequence):
             if not all(isinstance(item, str) for item in words):
                 raise TypeError(
@@ -401,7 +402,7 @@ class TemplatedGenerator(NodeVisitor):
         """Public method to build a class instance and visit an IR node.
 
         The order followed to choose a `dump()` function for instances of
-        :class:`eve.BaseNode` is the following:
+        :class:`eve.Node` is the following:
 
             1. A `self.visit_NODE_TYPE_NAME()` method where `NODE_TYPE_NAME`
                matches `NODE_CLASS.__name__`, and `NODE_CLASS` is the
@@ -425,7 +426,7 @@ class TemplatedGenerator(NodeVisitor):
             * `_this_module`: the generator's module instance .
             * `**kwargs`: the keyword arguments received by the visiting method.
 
-        For primitive types (not :class:`eve.BaseNode` subclasses),
+        For primitive types (not :class:`eve.Node` subclasses),
         the :meth:`self.generic_dump()` method will be used.
 
         Args:
@@ -456,7 +457,7 @@ class TemplatedGenerator(NodeVisitor):
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> Union[str, Collection[str]]:
         result = ""
-        if isinstance(node, BaseNode):
+        if isinstance(node, Node):
             template, _ = self.get_template(node)
             if template:
                 result = self.render_template(
@@ -481,11 +482,11 @@ class TemplatedGenerator(NodeVisitor):
         """Get a template for a node instance (see :meth:`apply`)."""
         template: Optional[TextTemplate] = None
         template_key: Optional[str] = None
-        if isinstance(node, BaseNode):
+        if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
                 template_key = node_class.__name__
                 template = self._templates.get(template_key, None)
-                if template is not None or node_class is BaseNode:
+                if template is not None or node_class is Node:
                     break
 
         return template, None if template is None else template_key

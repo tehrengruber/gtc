@@ -17,7 +17,9 @@
 """General utility functions."""
 
 
-from typing import Sequence, Union
+import itertools
+import string
+from typing import Any, Callable, Dict, Optional, Sequence, Type, TypeVar, Union
 
 from boltons.strutils import (  # noqa: F401
     a10n,
@@ -30,7 +32,6 @@ from boltons.strutils import (  # noqa: F401
     escape_shell_args,
     find_hashtags,
     format_int_list,
-    indent,
     is_ascii,
     is_uuid,
     iter_splitlines,
@@ -47,34 +48,34 @@ from boltons.strutils import (  # noqa: F401
 )
 
 
-WordsSequenceType = Union[str, Sequence[str]]
+WordSequenceType = Union[str, Sequence[str]]
 
 
-def join_canonical_cased(words: WordsSequenceType):
+def join_canonical_cased(words: WordSequenceType):
     words = [words] if isinstance(words, str) else words
     return (" ".join(words)).lower()
 
 
-def join_concatcased(words: WordsSequenceType):
+def join_concatcased(words: WordSequenceType):
     words = [words] if isinstance(words, str) else words
     return "".join(words)
 
 
-def join_camelCased(words: WordsSequenceType):
+def join_camelCased(words: WordSequenceType):
     words = [words] if isinstance(words, str) else words
     return words[0] + "".join(word.title() for word in words[1:])
 
 
-def join_CamelCased(words: WordsSequenceType):
+def join_CamelCased(words: WordSequenceType):
     words = [words] if isinstance(words, str) else words
     return "".join(word.title() for word in words)
 
 
-def join_SNAKE_CASED(words: WordsSequenceType):
+def join_SNAKE_CASED(words: WordSequenceType):
     words = [words] if isinstance(words, str) else words
     return "_".join(word for word in words).upper()
 
 
-def join_snake_cased(words: WordsSequenceType):
+def join_snake_cased(words: WordSequenceType):
     words = [words] if isinstance(words, str) else words
     return "_".join(words)
