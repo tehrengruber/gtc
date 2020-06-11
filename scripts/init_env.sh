@@ -1,7 +1,7 @@
 #!/bin/bash
 
 EVE_PYTHON_CMD=${EVE_PYTHON_CMD:-python3}
-EVE_ROOT="$(dirname $(dirname $(readlink -e $0)))"
+EVE_ROOT=$(dirname $(dirname "$(readlink -e $0)"))
 
 MAKE_VENV="true"
 

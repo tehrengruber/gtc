@@ -13,6 +13,7 @@ isort>=4.3.21
 jupyter>=1.0
 jupyterlab>=2.1
 mypy>=0.761
+numpy>=1.17
 pip-tools>=5.1
 pre-commit>=2.2
 pytest>=5.4

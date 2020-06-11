@@ -3,7 +3,7 @@
 EVE_PYTHON_CMD=${EVE_PYTHON_CMD:-python3}
 EVE_VENV_NAME=${EVE_VENV_NAME:-".eve.venv"}
 
-EVE_ROOT="$(dirname $(dirname $(readlink -e $BASH_SOURCE)))"
+EVE_ROOT=$(dirname $(dirname "$(readlink -e $BASH_SOURCE)"))
 EVE_VENV_PATH=${EVE_ROOT}/${EVE_VENV_NAME}
 
 if [ "$0" = ${BASH_SOURCE} ]; then
