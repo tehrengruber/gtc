@@ -13,6 +13,7 @@ tasks:
           cp ~/.pyenv/versions/${PYENV_PYTHON_VERSION}/lib/python${PYENV_PYTHON_VERSION:0:3}/site-packages/*.egg-link /workspace/.pip-modules/lib/python${PYENV_PYTHON_VERSION:0:3}/site-packages/
           cd $GITPOD_REPO_ROOT
           pre-commit install --install-hooks
+          pip install cppimport numpy # temporarily for the fvm nabla driver
           gp preview file://$GITPOD_REPO_ROOT/docs/_build/html/index.html
 
 github:
