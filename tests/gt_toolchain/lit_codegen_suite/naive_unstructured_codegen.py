@@ -73,8 +73,7 @@ make_test(
 
 # CHECK: ReduceOverNeighbourExpr.dense_access
 # CHECK-NEXT: (m_sparse_dimension_idx = 0,
-# CHECK-NEXT:  reduceEdgeToVertex(LibTag{}, mesh, iter, EXPR,
-# CHECK-NEXT:                     [&](auto &lhs, auto const &redIdx) {
+# CHECK-NEXT: reduceEdgeToVertex(mesh, iter, EXPR, [&](auto &lhs, auto const &redIdx) {
 # CHECK-NEXT:                       lhs += field({{.*}}redIdx{{.*}} k);
 # CHECK-NEXT:                       m_sparse_dimension_idx++;
 # CHECK-NEXT:                       return lhs;
@@ -94,10 +93,8 @@ make_test(
 
 # CHECK: ReduceOverNeighbourExpr.sparse_access
 # CHECK-NEXT: (m_sparse_dimension_idx = 0,
-# CHECK-NEXT:  reduceEdgeToVertex(LibTag{}, mesh, iter, EXPR,
-# CHECK-NEXT:                     [&](auto &lhs, auto const &redIdx) {
-# CHECK-NEXT:                       lhs += field({{.*}}iter{{.*}}
-# CHECK-NEXT:                           m_sparse_dimension_idx{{.*}},{{.*}}k);
+# CHECK-NEXT:  reduceEdgeToVertex(mesh, iter, EXPR, [&](auto &lhs, auto const &redIdx) {
+# CHECK-NEXT:                       lhs += field({{.*}}iter{{.*}} m_sparse_dimension_idx{{.*}},{{.*}}k);
 # CHECK-NEXT:                       m_sparse_dimension_idx++;
 # CHECK-NEXT:                       return lhs;
 # CHECK-NEXT:                     }))

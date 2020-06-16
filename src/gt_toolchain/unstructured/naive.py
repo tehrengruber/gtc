@@ -172,7 +172,7 @@ class ForK(Node):
 class Stencil(Node):
     name: Str
     k_loops: List[ForK]
-    declarations: List[TemporaryFieldDeclStmt]
+    declarations: Optional[List[TemporaryFieldDeclStmt]]
 
 
 class Computation(Node):
