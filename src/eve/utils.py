@@ -17,10 +17,14 @@
 """General utility functions."""
 
 
+import collections.abc
 import itertools
 import string
+import typing
 from typing import Any, Callable, Dict, Optional, Sequence, Type, TypeVar, Union
 
+import xxhash
+from boltons.iterutils import flatten, flatten_iter
 from boltons.strutils import (  # noqa: F401
     a10n,
     args2cmd,
@@ -51,31 +55,51 @@ from boltons.strutils import (  # noqa: F401
 WordSequenceType = Union[str, Sequence[str]]
 
 
-def join_canonical_cased(words: WordSequenceType):
+def join_canonical_cased(words: WordSequenceType) -> str:
     words = [words] if isinstance(words, str) else words
     return (" ".join(words)).lower()
 
 
-def join_concatcased(words: WordSequenceType):
+def join_concatcased(words: WordSequenceType) -> str:
     words = [words] if isinstance(words, str) else words
     return "".join(words)
 
 
-def join_camelCased(words: WordSequenceType):
+def join_camelCased(words: WordSequenceType) -> str:
     words = [words] if isinstance(words, str) else words
     return words[0] + "".join(word.title() for word in words[1:])
 
 
-def join_CamelCased(words: WordSequenceType):
+def join_CamelCased(words: WordSequenceType) -> str:
     words = [words] if isinstance(words, str) else words
     return "".join(word.title() for word in words)
 
 
-def join_SNAKE_CASED(words: WordSequenceType):
+def join_SNAKE_CASED(words: WordSequenceType) -> str:
     words = [words] if isinstance(words, str) else words
     return "_".join(word for word in words).upper()
 
 
-def join_snake_cased(words: WordSequenceType):
+def join_snake_cased(words: WordSequenceType) -> str:
     words = [words] if isinstance(words, str) else words
     return "_".join(words)
+
+
+def shash(*args: Any, hash_algorithm: Optional[Any] = None, str_encoding: str = "utf-8") -> str:
+    if hash_algorithm is None:
+        hash_algorithm = xxhash.xxh64()
+
+    for item in args:
+        if not isinstance(item, bytes):
+            if not isinstance(item, str):
+                if isinstance(item, collections.abc.Iterable):
+                    item = flatten(item)
+                elif isinstance(item, collections.abc.Mapping):
+                    item = flatten(item.items())
+                item = repr(item)
+
+            item = item.encode(str_encoding)
+
+        hash_algorithm.update(item)
+
+    return typing.cast(str, hash_algorithm.hexdigest())

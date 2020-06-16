@@ -22,7 +22,6 @@ import copy
 import itertools
 import operator
 import typing
-import zlib
 from typing import (
     Any,
     Callable,
@@ -45,7 +44,9 @@ from typing import (
 import pydantic
 import pydantic.utils
 from pydantic import BaseModel, PositiveInt, root_validator, validator
+from typing_extensions import TypedDict
 
+from . import utils
 from .types import Bool, Bytes, Float, Int, Str
 
 
@@ -56,6 +57,144 @@ NOTHING = object()
 
 #: Public register of dialects
 registered_dialects: Dict[str, Type["Dialect"]] = {}
+
+EVE_FIELD_ANNOTATIONS_MARKER = "__eve"
+
+
+def has_inputs(node_class: Type["Node"]) -> bool:
+    return any(node_class.is_input_field(field_name) for field_name in node_class.__fields__)
+
+
+def has_regions(node_class: Type["Node"]) -> bool:
+    return any(node_class.is_region_field(field_name) for field_name in node_class.__fields__)
+
+
+def has_outputs(node_class: Type["Node"]) -> bool:
+    return any(node_class.is_output_field(field_name) for field_name in node_class.__fields__)
+
+
+def has_successors(node_class: Type["Node"]) -> bool:
+    return any(node_class.is_successor_field(field_name) for field_name in node_class.__fields__)
+
+
+def InputField(
+    default: Any = ...,
+    *,
+    vtype: Optional[Union[Type["VType"], Tuple[Type["VType"]]]] = None,
+    **kwargs: Any,
+) -> pydantic.fields.FieldInfo:
+    kwargs[EVE_FIELD_ANNOTATIONS_MARKER] = _make_annotations(role="in", vtype=vtype)
+    return typing.cast(pydantic.fields.FieldInfo, pydantic.Field(default, **kwargs))
+
+
+def OutputField(
+    default: Any = ...,
+    *,
+    vtype: Optional[Union[Type["VType"], Tuple[Type["VType"]]]] = None,
+    **kwargs: Any,
+) -> pydantic.fields.FieldInfo:
+    kwargs[EVE_FIELD_ANNOTATIONS_MARKER] = _make_annotations(role="out", vtype=vtype)
+    return typing.cast(pydantic.fields.FieldInfo, pydantic.Field(default, **kwargs))
+
+
+#: Valid definitions
+#:  role: "in", "out"
+#:  vtype: ...
+EveAnnotations = TypedDict(
+    "EveAnnotations", {"role": str, "vtype": Tuple[Type["VType"]]}, total=False
+)
+
+
+def _make_annotations(
+    role: Optional[str] = None, vtype: Optional[Union[Type["VType"], Tuple[Type["VType"]]]] = None
+) -> EveAnnotations:
+    result: EveAnnotations = {}
+    if role is not None:
+        result["role"] = role
+    elif not isinstance(role, str):
+        raise TypeError(f"role parameter contains an invalid 'str' ({role})")
+
+    if vtype is not None:
+        if not isinstance(vtype, tuple):
+            vtype = (vtype,)
+        assert isinstance(vtype, tuple)
+        for v in vtype:
+            if not (isinstance(v, type) and issubclass(v, VType)):
+                raise TypeError(f"vtype parameter contains an invalid VType class ({v})")
+        result["vtype"] = vtype
+
+    return result
+
+
+def _get_annotations(
+    definition: Union[Type[BaseModel], pydantic.fields.ModelField], field_name: Optional[str] = None
+) -> EveAnnotations:
+    if isinstance(definition, type):
+        if field_name is not None:
+            return typing.cast(
+                EveAnnotations,
+                definition.__fields__[field_name].field_info.extra.get(
+                    EVE_FIELD_ANNOTATIONS_MARKER, {}
+                ),
+            )
+        else:
+            raise ValueError(f"Invalid field_name: '{field_name}'")
+    elif isinstance(definition, pydantic.fields.ModelField):
+        return typing.cast(
+            EveAnnotations, definition.field_info.extra.get(EVE_FIELD_ANNOTATIONS_MARKER, {})
+        )
+    else:
+        raise TypeError(f"Invalid BaseModel or ModelField type: '{definition}'")
+
+
+NodeClassesSpec = Union[str, Type["Dialect"], Type["Node"]]
+
+
+def _collect_nodes(
+    spec: Union[NodeClassesSpec, Iterable[NodeClassesSpec]]
+) -> Tuple[Tuple[str, ...], Tuple[Type["Node"], ...], str]:
+
+    if spec in (Ellipsis, Node):
+        return tuple(), tuple(), utils.shash("")
+    elif isinstance(spec, (str, type)):
+        spec = [spec]
+
+    # Collect qualified node names
+    collected_names = []
+    for item in spec:
+        if isinstance(item, str):
+            components = item.strip().split(".")
+            if (
+                len(components) == 2
+                and components[0] in registered_dialects
+                and components[1] in registered_dialects[components[0]].nodes
+            ):
+                collected_names.append(item)
+            else:
+                raise ValueError(f"Invalid node name: '{item}'.")
+        elif isinstance(item, type):
+            if issubclass(item, Dialect):
+                collected_names.extend(member.name_key() for member in item.nodes.values())
+            elif issubclass(item, Node):
+                collected_names.append(item.name_key())
+            else:
+                raise TypeError(f"Invalid Node class: {item}.")
+        else:
+            raise TypeError(f"Invalid Node class: {item}.")
+
+    # Sort and hash the collected names
+    collected_names = tuple(sorted(set(collected_names)))
+    collected_hash = utils.shash(*collected_names)
+
+    # Collect node types
+    collected_types = []
+    for name in collected_names:
+        dialect, node = name.split(".")
+        collected_types.append(registered_dialects[dialect].nodes[node])
+
+    collected_types = tuple(collected_types)
+
+    return collected_names, collected_types, collected_hash
 
 
 def _register_dialect(dialect_class: Type["Dialect"]) -> Type["Dialect"]:
@@ -99,56 +238,6 @@ def _validate_dialect_reference(
     return dialect
 
 
-NodeClassRefType = Union[str, Type["Dialect"], Type["Node"]]
-
-
-def _collect_nodes(
-    spec: Union[NodeClassRefType, Iterable[NodeClassRefType]]
-) -> Tuple[Tuple[str, ...], Tuple[Type["Node"], ...], int]:
-
-    if spec in (Ellipsis, Node):
-        return tuple(), tuple(), zlib.adler32("".encode())
-    elif isinstance(spec, (str, type)):
-        spec = [spec]
-
-    # Collect qualified node names
-    collected_names = []
-    for item in spec:
-        if isinstance(item, str):
-            components = item.strip().split(".")
-            if (
-                len(components) == 2
-                and components[0] in registered_dialects
-                and components[1] in registered_dialects[components[0]].nodes
-            ):
-                collected_names.append(item)
-            else:
-                raise ValueError(f"Invalid node name: '{item}'.")
-        elif isinstance(item, type):
-            if issubclass(item, Dialect):
-                collected_names.extend(member.unique_code() for member in item.nodes.values())
-            elif issubclass(item, Node):
-                collected_names.append(item.unique_code())
-            else:
-                raise TypeError(f"Invalid Node class: {item}.")
-        else:
-            raise TypeError(f"Invalid Node class: {item}.")
-
-    # Sort and hash the collected names
-    collected_names = tuple(sorted(set(collected_names)))
-    collected_hash = zlib.adler32(",".join(collected_names).encode())
-
-    # Collect node types
-    collected_types = []
-    for name in collected_names:
-        dialect, node = name.split(".")
-        collected_types.append(registered_dialects[dialect].nodes[node])
-
-    collected_types = tuple(collected_types)
-
-    return collected_names, collected_types, collected_hash
-
-
 class UIDGenerator:
     """Simple unique id generator using a counter."""
 
@@ -181,12 +270,12 @@ class FrozenModelConfig(BaseModelConfig):
 class SourceLocation(BaseModel):
     """Source code location (line, column, source)."""
 
-    class Config(FrozenModelConfig):
-        pass
-
     line: PositiveInt
     column: PositiveInt
     source: Str
+
+    class Config(FrozenModelConfig):
+        pass
 
     def __init__(self, line: int, column: int, source: str):
         super().__init__(line=line, column=column, source=source)
@@ -195,7 +284,33 @@ class SourceLocation(BaseModel):
         return f"<{self.source}: Line {self.line}, Col {self.column}>"
 
 
-NodeOrVTypeType = Union[Type["Node"], Type["VType"]]
+class CFTarget(BaseModel):
+    """Control flow target class."""
+
+    RETURN_TARGET: ClassVar[str] = "<RET>"
+
+    # CFTarget
+    #: Target block label
+    block: str
+
+    #: List of values passed to target block
+    args: List["Node"]
+
+    class Config(BaseModelConfig):
+        pass
+
+    @classmethod
+    def make_return(cls, args: Optional[List["Node"]] = None) -> "CFTarget":
+        return cls(block=cls.RETURN_TARGET, args=args if args else [])
+
+    def __init__(self, block: str, args: List["Node"]):
+        super().__init__(block=block, args=args)
+
+    def is_return(self) -> bool:
+        return self.block == self.RETURN_TARGET
+
+
+SuccessorsList = List[CFTarget]
 
 
 class Dialect:
@@ -216,7 +331,7 @@ class Dialect:
         _register_dialect(cls)
 
     @classmethod
-    def register(cls, new_member_class: NodeOrVTypeType) -> NodeOrVTypeType:
+    def register(cls, new_member_class: Type["DialectMember"]) -> Type["DialectMember"]:
         """Register a new member (Node, VType) of the dialect."""
 
         if issubclass(new_member_class, Node):
@@ -225,17 +340,18 @@ class Dialect:
             member_type = "vtype"
         else:
             raise TypeError(
-                f"New member class ('{new_member_class}') is not a Node or VType subclass."
+                f"New member class ('{new_member_class}') is not a DialectMember subclass."
             )
 
         registered_members = getattr(cls, f"{member_type}s")
 
-        if new_member_class._code_:
-            member_name = new_member_class._code_.strip()
-        else:
+        member_name = new_member_class.__dict__.get("_name_", None)
+        if not member_name:
             member_name = new_member_class.__name__
+
         if member_name.startswith("__") and member_name.endswith("__"):
             raise ValueError(f"Special node class ({new_member_class}) can not be registered.")
+
         if (
             member_name in registered_members
             and registered_members[member_name] is not new_member_class
@@ -251,25 +367,43 @@ class Dialect:
         return new_member_class
 
 
-class VType(BaseModel):
+class DialectMember(BaseModel):
+    # Placeholders for class members in concrete subclasses
+    #: Custon name (if None, the name of the class will be used instead)
+    _name_: ClassVar[Optional[str]] = None
+
+    #: Reference to dialect (added automatically at registration)
+    _dialect_: ClassVar[Optional[Type[Dialect]]] = None
+
+    @classmethod
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        if cls._name_ is not None and not isinstance(cls._name_, str):
+            raise TypeError(
+                f"DialectMember class {cls} defines an invalid '_name_' (str) class attribute: {cls._name_}"
+            )
+
+        if cls._dialect_ is not None and not isinstance(cls._dialect_, Dialect):
+            raise TypeError(
+                f"Invalid dialect definition for class {cls}: {cls.__dict__['_dialect_']}."
+            )
+
+    @classmethod
+    def name_key(cls) -> str:
+        name = cls._name_ or cls.__name__
+        if cls._dialect_:
+            name = f"{cls._dialect_.name}.{name}"
+        return name
+
+
+class VType(DialectMember):
     """Representation of an abstract value data type."""
 
     class Config(FrozenModelConfig):
         pass
 
-    # Placeholders for class members in concrete subclasses
-    #: Unique vtype name
-    _code_: ClassVar[str]
 
-    #: Reference to dialect (added automatically at registration)
-    _dialect_: ClassVar[Type[Dialect]]
-
-    @classmethod
-    def unique_code(cls) -> str:
-        return f"{cls._dialect_.name}.{cls._code_}"
-
-
-class Node(BaseModel):
+class Node(DialectMember):
     """Base node class.
 
     Field values should be either:
@@ -282,65 +416,104 @@ class Node(BaseModel):
 
     Field names ending with "_"  are considered hidden fields and
     will not appear in the node iterators. Field names ending with
-    "_attr" are considered meta-attributes of the node, not children.
+    "__" are considered meta-attributes of the node, not children.
     """
 
     class Config(BaseModelConfig):
         pass
 
-    # Placeholders for class members in concrete subclasses
-    #: Unique nodename (None means that it is an abstract node)
-    _code_: ClassVar[Optional[str]] = None
-
-    #: Reference to dialect (added automatically at registration)
-    _dialect_: ClassVar[Type[Dialect]]
-
     # Node fields
     #: Unique node id (meta-attribute)
-    id_attr: Optional[Str] = None
+    id__: Optional[Str] = None
 
     @classmethod
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
-        if "_code_" in cls.__dict__ and not isinstance(cls._code_, str):
-            raise TypeError(
-                f"Node class {cls} defines an invalid '_code_' (str) class attribute: {cls._code_}"
-            )
 
-        if "_dialect_" in cls.__dict__ and not isinstance(cls.__dict__["_dialect_"], Dialect):
+        # Checka that the node field definitions are semantically sound
+        successors_names: List[str] = []
+        for name, model_field in cls.__fields__.items():
+            vtype_definition = _get_annotations(model_field).get("vtype", None)
+            if vtype_definition is not None and not issubclass(model_field.outer_type_, Node):
+                raise TypeError(
+                    f"Node class {cls.__name__} defines vtype constraints for field '{name}'"
+                    f" which is not a Node ({model_field})"
+                )
+            if not name.endswith("__") and model_field.outer_type_ == List[CFTarget]:
+                successors_names.append(name)
+
+        if len(successors_names) > 1:
             raise TypeError(
-                f"Invalid dialect definition for class {cls}: {cls.__dict__['_dialect_']}."
+                f"Node class {cls.__name__} defines multiple successors lists: {successors_names}"
             )
 
     def __init__(self, **kwargs: Any):
-        assert self._code_
         super().__init__(**kwargs)
 
-    @validator("id_attr", pre=True, always=True)
+    @validator("id__", pre=True, always=True)
     def _id_attr_validator(cls: Type["Node"], v: Optional[str]) -> str:  # type: ignore
         if v is None:
-            v = UIDGenerator.get_unique_id(prefix=cls._code_)
+            v = UIDGenerator.get_unique_id(prefix=cls._name_)
         if not isinstance(v, str):
-            raise TypeError(f"id_attr is not an 'str' instance ({type(v)})")
+            raise TypeError(f"id__ is not an 'str' instance ({type(v)})")
         return v
 
+    def iter_attributes(self) -> Generator[Tuple[str, Any], None, None]:
+        for name, _ in self.__fields__.items():
+            if name.endswith("__"):
+                yield name, getattr(self, name)
+
+    def iter_children(self) -> Generator[Tuple[str, Any], None, None]:
+        for name, _ in self.__fields__.items():
+            if not name.endswith("__"):
+                yield name, getattr(self, name)
+
+    def iter_inputs(self) -> Generator[Tuple[str, Any], None, None]:
+        for name in self.__fields__:
+            if self.is_input_field(name) and not name.endswith("__"):
+                yield name, getattr(self, name)
+
+    def iter_regions(self) -> Generator[Tuple[str, Any], None, None]:
+        for name in self.__fields__:
+            if self.is_region_field(name) and not name.endswith("__"):
+                yield name, getattr(self, name)
+
+    def iter_outputs(self) -> Generator[Tuple[str, Any], None, None]:
+        for name in self.__fields__:
+            if self.is_output_field(name) and not name.endswith("__"):
+                yield name, getattr(self, name)
+
+    def iter_successors(self) -> Generator[Tuple[str, Any], None, None]:
+        for name in self.__fields__:
+            if self.is_successor_field(name) and not name.endswith("__"):
+                for successor in getattr(self, name):
+                    yield successor
+
+                break
+
     @classmethod
-    def unique_code(cls) -> str:
-        return f"{cls._dialect_.name}.{cls._code_}"
+    def is_input_field(cls, field_name: str) -> bool:
+        assert field_name in cls.__fields__
+        return bool(_get_annotations(cls, field_name).get("role", None) == "in")
 
-    def attributes(self) -> Generator[Tuple[str, Any], None, None]:
-        for name, _ in self.__fields__.items():
-            if name.endswith("_attr"):
-                yield name, getattr(self, name)
+    @classmethod
+    def is_region_field(cls, field_name: str) -> bool:
+        assert field_name in cls.__fields__
+        return issubclass(cls.__fields__[field_name].type_, Region)
 
-    def children(self) -> Generator[Tuple[str, Any], None, None]:
-        for name, _ in self.__fields__.items():
-            if not (name.endswith("_attr") or name.endswith("_")):
-                yield name, getattr(self, name)
+    @classmethod
+    def is_output_field(cls, field_name: str) -> bool:
+        assert field_name in cls.__fields__
+        return bool(_get_annotations(cls, field_name).get("role", None) == "out")
+
+    @classmethod
+    def is_successor_field(cls, field_name: str) -> bool:
+        assert field_name in cls.__fields__
+        return bool(cls.__fields__[field_name].outer_type_ == List[CFTarget])
 
 
 class _NodeFromClass:
-    def __getitem__(self, spec: Union[NodeClassRefType, Iterable[NodeClassRefType]]) -> TypeVar:  # type: ignore
+    def __getitem__(self, spec: Union[NodeClassesSpec, Iterable[NodeClassesSpec]]) -> TypeVar:  # type: ignore
         _, classes, hashed_id = _collect_nodes(spec)
         type_var_name = f"Node_{hashed_id}".replace("-", "_")
         return TypeVar(type_var_name, *classes)  # type: ignore
@@ -348,19 +521,6 @@ class _NodeFromClass:
 
 #: Syntax marker to create a TypeVar with restricted node types
 NodeFrom = _NodeFromClass()
-
-
-class ValueNode(Node):
-
-    result: VType
-
-
-FlowSuccessorType = Tuple[str, List[ValueNode]]
-
-
-class TerminatorNode(Node):
-
-    successors: List[FlowSuccessorType]
 
 
 class Block(BaseModel, collections.abc.MutableSequence):
@@ -371,9 +531,13 @@ class Block(BaseModel, collections.abc.MutableSequence):
     _restricted_nodes_: ClassVar[Tuple[Type[Node], ...]] = tuple()
 
     # Block fields
-    #: List of nodes contained in the block
+    #: Block label
     label: str = ""
-    inputs: List[ValueNode] = []
+
+    #: List of input arguments
+    inputs: List[Node] = []
+
+    #: List of nodes contained in the block
     nodes: List[Node] = []
 
     def __init__(self, label: str = "", **kwargs: Any):
@@ -406,7 +570,7 @@ class Block(BaseModel, collections.abc.MutableSequence):
                     "Valid types are: {cls._restricted_nodes_}."
                 )
 
-        if not isinstance(nodes[-1], TerminatorNode):
+        if nodes and not has_successors(nodes[-1].__class__):
             raise TypeError(f"Last node in the block ({nodes[-1]}) is not a terminator.")
 
         return nodes
@@ -452,7 +616,7 @@ class _BlockOfClass:
 
     __cached_subclasses: ClassVar[Dict[int, Type["Block"]]] = {}
 
-    def __getitem__(self, spec: Union[NodeClassRefType, Sequence[NodeClassRefType]]) -> Type[Block]:
+    def __getitem__(self, spec: Union[NodeClassesSpec, Sequence[NodeClassesSpec]]) -> Type[Block]:
         spec = [spec] if isinstance(spec, (str, type)) else list(spec)
         class_name: Optional[str] = None
 
@@ -487,46 +651,46 @@ class _BlockOfClass:
 BlockOf = _BlockOfClass()
 
 
-# class Region(BaseModel, collections.abc.MutableMapping):
-#     class Config(BaseModelConfig):
-#         orm_mode = True
+class Region(BaseModel, collections.abc.MutableMapping):
+    class Config(BaseModelConfig):
+        orm_mode = True
 
-#     # CFGRegion fields
-#     #: Dict of blocks with labels
-#     blocks: Dict[str, Block] = {}
+    # CFGRegion fields
+    #: Dict of blocks with labels
+    blocks: Dict[str, Block] = {}
 
-#     def __init__(self, blocks: Optional[Dict[str, Block]] = None, *args, **kwargs) -> None:
-#         if blocks is None:
-#             blocks = {}
-#         super().__init__(blocks=blocks, *args, **kwargs)
+    def __init__(self, blocks: Optional[Dict[str, Block]] = None, *args, **kwargs) -> None:
+        if blocks is None:
+            blocks = {}
+        super().__init__(blocks=blocks, *args, **kwargs)
 
-#     @root_validator(pre=True)
-#     def _blocks_from_object_validator(
-#         cls: Type[Block], data: Union[Dict[str, Any], pydantic.utils.GetterDict],
-#     ) -> Union[Dict[str, Any], pydantic.utils.GetterDict]:
-#         # This pre-root validator (combined with the orm_mode setting in Config) provides
-#         # a workaround to initialize CFGRegion fields inside other nodes using plain dicts
-#         if isinstance(data, pydantic.utils.GetterDict) and isinstance(
-#             data._obj, collections.abc.Mapping
-#         ):
-#             data = {"blocks": data._obj}
+    @root_validator(pre=True)
+    def _blocks_from_object_validator(
+        cls: Type[Block], data: Union[Dict[str, Any], pydantic.utils.GetterDict],
+    ) -> Union[Dict[str, Any], pydantic.utils.GetterDict]:
+        # This pre-root validator (combined with the orm_mode setting in Config) provides
+        # a workaround to initialize CFGRegion fields inside other nodes using plain dicts
+        if isinstance(data, pydantic.utils.GetterDict) and isinstance(
+            data._obj, collections.abc.Mapping
+        ):
+            data = {"blocks": data._obj}
 
-#         return data
+        return data
 
-#     def __getitem__(self, index):
-#         return self.blocks.__getitem__(index)
+    def __getitem__(self, index):
+        return self.blocks.__getitem__(index)
 
-#     def __setitem__(self, index, value):
-#         return self.blocks.__setitem__(index, value)
+    def __setitem__(self, index, value):
+        return self.blocks.__setitem__(index, value)
 
-#     def __delitem__(self, index):
-#         return self.blocks.__delitem__(index)
+    def __delitem__(self, index):
+        return self.blocks.__delitem__(index)
 
-#     def __len__(self):
-#         return self.blocks.__len__()
+    def __len__(self):
+        return self.blocks.__len__()
 
-#     def __iter__(self):
-#         return self.blocks.__iter__()
+    def __iter__(self):
+        return self.blocks.__iter__()
 
 
 class Module:

@@ -27,6 +27,7 @@ NODE_MAKERS = []
 INVALID_NODE_MAKERS = []
 
 
+# Automatic creation of pytest fixtures from maker functions in .common module
 for key, value in common.__dict__.items():
     if key.startswith("make_"):
         name = key[5:]
@@ -47,6 +48,16 @@ def {name}({name}_maker):
                 INVALID_NODE_MAKERS.append(value)
             else:
                 NODE_MAKERS.append(value)
+
+
+@pytest.fixture
+def sample_dialect():
+    return common.TestDialect
+
+
+@pytest.fixture
+def sample_vtype():
+    return common.SimpleVType
 
 
 @pytest.fixture(params=NODE_MAKERS)

@@ -22,7 +22,7 @@ from typing import ClassVar, Collection, Dict, List, Mapping, Optional, Sequence
 
 from pydantic import Field, validator  # noqa: F401
 
-from eve.concepts import Dialect, Node, SourceLocation
+from eve.concepts import Dialect, Node, SourceLocation, ValueNode, VType
 from eve.types import Bool, Bytes, Enum, Float, Int, IntEnum, Str, StrEnum
 
 
@@ -170,21 +170,26 @@ class TestDialect(Dialect):
 
 
 @TestDialect.register
+class SimpleVType(VType):
+    _name_: ClassVar[Optional[str]] = "simple"
+
+
+@TestDialect.register
 class EmptyNode(Node):
-    _code_: ClassVar[Optional[str]] = "empty"
+    _name_: ClassVar[Optional[str]] = "empty"
     pass
 
 
 @TestDialect.register
 class LocationNode(Node):
-    _code_: ClassVar[Optional[str]] = "location"
+    _name_: ClassVar[Optional[str]] = "location"
 
     loc: SourceLocation
 
 
 @TestDialect.register
 class SimpleNode(Node):
-    _code_ = "simple"
+    _name_ = "simple"
 
     bool_value: Bool
     int_value: Int
@@ -197,7 +202,7 @@ class SimpleNode(Node):
 
 @TestDialect.register
 class SimpleNodeWithOptionals(Node):
-    _code_ = "simple_opt"
+    _name_ = "simple_opt"
 
     int_value: Optional[Int]
     float_value: Optional[Float]
@@ -206,7 +211,7 @@ class SimpleNodeWithOptionals(Node):
 
 @TestDialect.register
 class SimpleNodeWithHiddenMembers(Node):
-    _code_ = "simpe_hidden"
+    _name_ = "simpe_hidden"
 
     hidden_attr_: Int
     int_value: Int
@@ -215,7 +220,7 @@ class SimpleNodeWithHiddenMembers(Node):
 
 @TestDialect.register
 class SimpleNodeWithLoc(Node):
-    _code_ = "simple_loc"
+    _name_ = "simple_loc"
 
     int_value: Int
     float_value: Float
@@ -225,7 +230,7 @@ class SimpleNodeWithLoc(Node):
 
 @TestDialect.register
 class SimpleNodeWithCollections(Node):
-    _code_ = "simple_collections"
+    _name_ = "simple_collections"
 
     int_list: List[Int]
     str_set: Set[Str]
@@ -235,7 +240,7 @@ class SimpleNodeWithCollections(Node):
 
 @TestDialect.register
 class SimpleNodeWithAbstractCollections(Node):
-    _code_ = "simple_abs_collections"
+    _name_ = "simple_abs_collections"
 
     int_sequence: Sequence[Int]
     str_set: Set[Str]
@@ -245,13 +250,20 @@ class SimpleNodeWithAbstractCollections(Node):
 
 @TestDialect.register
 class CompoundNode(Node):
-    _code_ = "compound"
+    _name_ = "compound"
 
     location: LocationNode
     simple: SimpleNode
     simple_loc: SimpleNodeWithLoc
     simple_opt: SimpleNodeWithOptionals
     other_simple_opt: Optional[SimpleNodeWithOptionals]
+
+
+@TestDialect.register
+class SimpleValueNode(ValueNode):
+    _name_ = "result"
+
+    location: SourceLocation
 
 
 # -- Maker functions --
@@ -358,8 +370,13 @@ def make_compound_node(randomize: bool = True) -> CompoundNode:
     )
 
 
+def make_simple_value_node(randomize: bool = True) -> LocationNode:
+    return SimpleValueNode(location=make_source_location(randomize), result=SimpleVType())
+
+
+# -- Makers of invalid nodes --
 def make_invalid_location_node(randomize: bool = True) -> LocationNode:
-    return LocationNode(loc=SourceLocation(line=0, column=-1))
+    return LocationNode(loc=SourceLocation(line=0, column=-1, source="<str>"))
 
 
 def make_invalid_at_int_simple_node(randomize: bool = True) -> SimpleNode:
@@ -446,7 +463,7 @@ def make_invalid_at_bytes_simple_node(randomize: bool = True) -> SimpleNode:
     )
 
 
-def invalid_at_enum_simple_node_maker(randomize: bool = True) -> SimpleNode:
+def make_invalid_at_enum_simple_node(randomize: bool = True) -> SimpleNode:
     factories = RandomFactories if randomize else Factories
     bool_value = factories.make_bool()
     int_value = factories.make_int()
