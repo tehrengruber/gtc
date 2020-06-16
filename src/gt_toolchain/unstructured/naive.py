@@ -55,10 +55,6 @@ class LiteralExpr(Expr):
     data_type: common.DataType
 
 
-class VarAccessExpr(Expr):
-    name: str
-
-
 class BinaryOp(Expr):
     op: common.BinaryOperator
     left: Expr
@@ -77,7 +73,7 @@ class BinaryOp(Expr):
         return values
 
 
-class VarDeclStmt(Stmt):
+class TemporaryFieldDeclStmt(Stmt):
     data_type: common.DataType
     name: str
 
@@ -170,13 +166,13 @@ class HorizontalLoop(Node):
 
 class ForK(Node):
     horizontal_loops: List[HorizontalLoop]
-    declarations: List[VarDeclStmt]
     loop_order: common.LoopOrder
 
 
 class Stencil(Node):
     name: Str
     k_loops: List[ForK]
+    declarations: List[TemporaryFieldDeclStmt]
 
 
 class Computation(Node):

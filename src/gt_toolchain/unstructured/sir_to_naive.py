@@ -79,20 +79,18 @@ class SirToNaive(NodeTranslator):
             self.sir_stencil_params[f.name] = f
             params.append(self.visit(f))
 
-        k_loops = self.visit(node.ast)
+        [declarations, k_loops] = self.visit(node.ast)
         return naive.Computation(
-            params=params, stencils=[naive.Stencil(name=node.name, k_loops=k_loops)]
+            params=params,
+            stencils=[naive.Stencil(name=node.name, k_loops=k_loops, declarations=declarations)],
         )
 
     def visit_VerticalRegion(self, node: Node, **kwargs):
         # TODO don't ignore interval
         [declarations, horizontal_loops] = self.visit(node.ast)
         return [
-            naive.ForK(
-                loop_order=node.loop_order,
-                declarations=declarations,
-                horizontal_loops=horizontal_loops,
-            )
+            declarations,
+            [naive.ForK(loop_order=node.loop_order, horizontal_loops=horizontal_loops,)],
         ]
 
     def visit_VerticalRegionDeclStmt(self, node: Node, **kwargs):
@@ -123,7 +121,9 @@ class SirToNaive(NodeTranslator):
         else:
             raise ValueError("no location type")
 
-        return naive.VarAccessExpr(name=node.name, location_type=loctype)
+        return naive.FieldAccessExpr(
+            name=node.name, offset=(False, 0), location_type=loctype, is_sparse=False,
+        )
 
     def visit_BlockStmt(self, node: Node, **kwargs):
         if self.isControlFlow:
@@ -140,8 +140,11 @@ class SirToNaive(NodeTranslator):
                     declarations.append(vardecl)
                     transformed_stmt = naive.ExprStmt(
                         expr=naive.AssignmentExpr(
-                            left=naive.VarAccessExpr(
-                                name=vardecl.name, location_type=initexpr.location_type
+                            left=naive.FieldAccessExpr(
+                                name=vardecl.name,
+                                offset=(False, 0),
+                                location_type=initexpr.location_type,
+                                is_sparse=False,
                             ),
                             right=initexpr,
                         )
@@ -177,7 +180,7 @@ class SirToNaive(NodeTranslator):
 
         init = self.visit(node.init_list[0])
         return [
-            naive.VarDeclStmt(
+            naive.TemporaryFieldDeclStmt(
                 data_type=node.data_type.data_type.type_id, name=node.name, location_type=loctype,
             ),
             init,

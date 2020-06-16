@@ -60,6 +60,11 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
             "\n${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] } ${ name };"
         )
 
+        TemporaryFieldDeclStmt = mako_tpl.Template(
+            """using dawn::allocateEdgeField;
+            auto ${ name } = allocate${ _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['singular'].capitalize() }Field<${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] }>(mesh);"""
+        )
+
         ForK = mako_tpl.Template(
             """<%
     if _this_node.loop_order == _this_module.common.LoopOrder.FORWARD:
@@ -72,7 +77,6 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         k_step = '--k'
 %>for (int k = ${k_init}; ${k_cond}; ${k_step}) {
     int m_sparse_dimension_idx;
-    ${ "".join(declarations) }\n
     ${ "".join(horizontal_loops) }\n}"""
         )
 
@@ -88,7 +92,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
             """<%
     right_loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.right_location_type]["singular"].title()
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"].title()
-%>(m_sparse_dimension_idx=0,reduce${ right_loc_type }To${ loc_type }(LibTag{}, mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
+%>(m_sparse_dimension_idx=0,reduce${ right_loc_type }To${ loc_type }(mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
 lhs ${ operation }= ${ right };
 m_sparse_dimension_idx++;
 return lhs;
@@ -103,6 +107,9 @@ return lhs;
             """
 void ${name}() {
 using dawn::deref;
+
+${ "\\n".join(declarations) }
+
 ${ "".join(k_loops) }
 }
 """
@@ -131,14 +138,14 @@ namespace cxxnaiveico {
 template <typename LibTag>
 class generated {
 private:
-  dawn::mesh_t<LibTag> const& mesh;
+  dawn::mesh_t<LibTag>& mesh;
   int const k_size;
 
 ${ ''.join(params) }
 ${ ''.join(stencils) }
 
 public:
-generated(dawn::mesh_t<LibTag> const& mesh, int k_size, ${ ctor_field_params }): mesh(mesh), k_size(k_size), ${ ctor_field_initializers } {}
+generated(dawn::mesh_t<LibTag>& mesh, int k_size, ${ ctor_field_params }): mesh(mesh), k_size(k_size), ${ ctor_field_initializers } {}
 
 void run() {
     ${ stencil_calls }
