@@ -1,4 +1,20 @@
 # -*- coding: utf-8 -*-
+#
+# Eve Toolchain - GT4Py Project - GridTools Framework
+#
+# Copyright (c) 2020, CSCS - Swiss National Supercomputing Center, ETH Zurich
+# All rights reserved.
+#
+# This file is part of the GT4Py project and the GridTools framework.
+# GT4Py is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or any later
+# version. See the LICENSE.txt file at the top-level directory of this
+# distribution for a copy of the license or check <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+
 from types import MappingProxyType
 from typing import ClassVar, Mapping
 
@@ -57,8 +73,13 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         ExprStmt = "\n{expr};"
 
         VarDeclStmt = mako_tpl.Template(
-            "\n${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] } ${ name } = ${ init };"
-        )  # TODO datatype
+            "\n${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] } ${ name };"
+        )
+
+        TemporaryFieldDeclStmt = mako_tpl.Template(
+            """using dawn::allocateEdgeField;
+            auto ${ name } = allocate${ _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['singular'].capitalize() }Field<${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] }>(mesh);"""
+        )
 
         ForK = mako_tpl.Template(
             """<%
@@ -87,7 +108,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
             """<%
     right_loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.right_location_type]["singular"].title()
     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"].title()
-%>(m_sparse_dimension_idx=0,reduce${ right_loc_type }To${ loc_type }(LibTag{}, mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
+%>(m_sparse_dimension_idx=0,reduce${ right_loc_type }To${ loc_type }(mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
 lhs ${ operation }= ${ right };
 m_sparse_dimension_idx++;
 return lhs;
@@ -102,6 +123,9 @@ return lhs;
             """
 void ${name}() {
 using dawn::deref;
+
+${ "\\n".join(declarations) }
+
 ${ "".join(k_loops) }
 }
 """
@@ -130,14 +154,14 @@ namespace cxxnaiveico {
 template <typename LibTag>
 class generated {
 private:
-  dawn::mesh_t<LibTag> const& mesh;
+  dawn::mesh_t<LibTag>& mesh;
   int const k_size;
 
 ${ ''.join(params) }
 ${ ''.join(stencils) }
 
 public:
-generated(dawn::mesh_t<LibTag> const& mesh, int k_size, ${ ctor_field_params }): mesh(mesh), k_size(k_size), ${ ctor_field_initializers } {}
+generated(dawn::mesh_t<LibTag>& mesh, int k_size, ${ ctor_field_params }): mesh(mesh), k_size(k_size), ${ ctor_field_initializers } {}
 
 void run() {
     ${ stencil_calls }
