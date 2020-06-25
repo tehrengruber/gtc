@@ -91,15 +91,19 @@ class SirToNaive(NodeTranslator):
             self.sir_stencil_params[f.name] = f
             params.append(self.visit(f))
 
-        k_loops = self.visit(node.ast)
+        [declarations, k_loops] = self.visit(node.ast)
         return naive.Computation(
-            params=params, stencils=[naive.Stencil(name=node.name, k_loops=k_loops)]
+            params=params,
+            stencils=[naive.Stencil(name=node.name, k_loops=k_loops, declarations=declarations)],
         )
 
     def visit_VerticalRegion(self, node: Node, **kwargs):
         # TODO don't ignore interval
-        horizontal_loops = self.visit(node.ast)
-        return [naive.ForK(loop_order=node.loop_order, horizontal_loops=horizontal_loops)]
+        [declarations, horizontal_loops] = self.visit(node.ast)
+        return [
+            declarations,
+            [naive.ForK(loop_order=node.loop_order, horizontal_loops=horizontal_loops,)],
+        ]
 
     def visit_VerticalRegionDeclStmt(self, node: Node, **kwargs):
         return self.visit(node.vertical_region)
@@ -129,7 +133,9 @@ class SirToNaive(NodeTranslator):
         else:
             raise ValueError("no location type")
 
-        return naive.VarAccessExpr(name=node.name, location_type=loctype)
+        return naive.FieldAccessExpr(
+            name=node.name, offset=(False, 0), location_type=loctype, is_sparse=False,
+        )
 
     def visit_BlockStmt(self, node: Node, **kwargs):
         if self.isControlFlow:
@@ -138,24 +144,30 @@ class SirToNaive(NodeTranslator):
                 return self.visit(s)
         else:
             horizontal_loops = []
-            statements = []
-            cur_loc_type = None
-            # TODO this is a hack and violating the new parallel model!
+            declarations = []
             for s in node.statements:
-                transformed = self.visit(s)
-                if transformed.location_type != cur_loc_type:
-                    if statements:  # we already have some statements -> make horizontal loop
-                        horizontal_loops.append(
-                            naive.HorizontalLoop(ast=naive.BlockStmt(statements=statements))
+                if isinstance(s, sir.VarDeclStmt):
+                    # TODO this doesn't work: if we move the declaration out of the horizontal loop, we need to promote it to a field
+                    [vardecl, initexpr] = self.visit(s)
+                    declarations.append(vardecl)
+                    transformed_stmt = naive.ExprStmt(
+                        expr=naive.AssignmentExpr(
+                            left=naive.FieldAccessExpr(
+                                name=vardecl.name,
+                                offset=(False, 0),
+                                location_type=initexpr.location_type,
+                                is_sparse=False,
+                            ),
+                            right=initexpr,
                         )
-                        statements = []
-                    cur_loc_type = transformed.location_type
-                statements.append(transformed)
-            if statements:
+                    )
+                else:
+                    transformed_stmt = self.visit(s)
+
                 horizontal_loops.append(
-                    naive.HorizontalLoop(ast=naive.BlockStmt(statements=statements))
+                    naive.HorizontalLoop(ast=naive.BlockStmt(statements=[transformed_stmt]))
                 )
-            return horizontal_loops
+            return [declarations, horizontal_loops]
 
     def visit_BinaryOperator(self, node: Node, **kwargs):
         return naive.BinaryOp(
@@ -179,12 +191,12 @@ class SirToNaive(NodeTranslator):
             raise ValueError("no location type")
 
         init = self.visit(node.init_list[0])
-        return naive.VarDeclStmt(
-            data_type=node.data_type.data_type.type_id,
-            name=node.name,
-            init=init,
-            location_type=loctype,
-        )
+        return [
+            naive.TemporaryFieldDeclStmt(
+                data_type=node.data_type.data_type.type_id, name=node.name, location_type=loctype,
+            ),
+            init,
+        ]
 
     def visit_LiteralAccessExpr(self, node: Node, **kwargs):
         loctype = ""

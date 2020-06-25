@@ -1,5 +1,5 @@
 //===--------------------------------------------------------------------------------*-
-//C++ -*-===//
+// C++ -*-===//
 //                          _
 //                         | |
 //                       __| | __ ___      ___ ___
@@ -51,4 +51,9 @@ template <typename Tag, typename LocationType>
 auto deref(Tag, LocationType const &l) -> LocationType const & {
   return l;
 }
+
+template <typename T, typename Mesh> auto allocateEdgeField(Mesh &);
+template <typename T, typename Mesh> auto allocateCellField(Mesh &);
+template <typename T, typename Mesh> auto allocateVertexField(Mesh &);
+
 } // namespace dawn

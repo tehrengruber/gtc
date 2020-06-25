@@ -55,10 +55,6 @@ class LiteralExpr(Expr):
     data_type: common.DataType
 
 
-class VarAccessExpr(Expr):
-    name: str
-
-
 class BinaryOp(Expr):
     op: common.BinaryOperator
     left: Expr
@@ -77,16 +73,9 @@ class BinaryOp(Expr):
         return values
 
 
-class VarDeclStmt(Stmt):
+class TemporaryFieldDeclStmt(Stmt):
     data_type: common.DataType
     name: str
-    init: Expr
-
-    @root_validator
-    def check_location_type(cls, values):
-        if not (values["init"].location_type == values["location_type"]):
-            raise ValueError("Location type mismatch")
-        return values
 
 
 class AssignmentExpr(Expr):
@@ -183,6 +172,7 @@ class ForK(Node):
 class Stencil(Node):
     name: Str
     k_loops: List[ForK]
+    declarations: Optional[List[TemporaryFieldDeclStmt]]
 
 
 class Computation(Node):

@@ -16,10 +16,14 @@
 #ifndef DAWN_INTERFACE_ATLAS_INTERFACE_H_
 #define DAWN_INTERFACE_ATLAS_INTERFACE_H_
 
+#include "atlas/functionspace/EdgeColumns.h"
+#include "atlas/functionspace/NodeColumns.h"
 #include "atlas/mesh.h"
 #include <algorithm>
+#include <atlas/mesh/Mesh.h>
 #include <cassert>
 #include <iterator>
+#include <optional>
 
 namespace utility {
 namespace impl_ {
@@ -66,16 +70,26 @@ namespace atlasInterface {
 
 struct atlasTag {};
 
+struct Mesh {
+  atlas::Mesh &mesh;
+};
+
+Mesh meshType(atlasTag);
+
 template <typename T> class Field {
 public:
-  T const &operator()(int f, int k) const { return atlas_field_(f, k); }
-  T &operator()(int f, int k) { return atlas_field_(f, k); }
+  T const &operator()(int f, int k) const { return view_(f, k); }
+  T &operator()(int f, int k) { return view_(f, k); }
 
-  Field(atlas::array::ArrayView<T, 2> const &atlas_field)
-      : atlas_field_(atlas_field) {}
+  Field(atlas::array::ArrayView<T, 2> const &view) : view_(view) {}
+
+  Field(atlas::Field &&field)
+      : field_{std::move(field)}, view_{
+                                      atlas::array::make_view<T, 2>(*field_)} {}
 
 private:
-  atlas::array::ArrayView<T, 2> atlas_field_;
+  std::optional<atlas::Field> field_;
+  atlas::array::ArrayView<T, 2> view_;
 };
 
 template <typename T> Field<T> cellFieldType(atlasTag);
@@ -102,16 +116,32 @@ template <typename T> SparseDimension<T> sparseCellFieldType(atlasTag);
 template <typename T> SparseDimension<T> sparseEdgeFieldType(atlasTag);
 template <typename T> SparseDimension<T> sparseVertexFieldType(atlasTag);
 
-atlas::Mesh meshType(atlasTag);
+template <typename T> Field<T> allocateEdgeField(Mesh &mesh) {
+  atlas::functionspace::EdgeColumns fs_edges_(
+      mesh.mesh,
+      atlas::option::levels(1) |
+          atlas::option::halo(1)); // TODO levels and halo need be changed
+  return {fs_edges_.createField<T>()};
+}
+template <typename T> Field<T> allocateVertexField(Mesh &mesh) {
+  atlas::functionspace::NodeColumns fs_nodes_(
+      mesh.mesh,
+      atlas::option::levels(1) |
+          atlas::option::halo(1)); // TODO levels and halo need be changed
+  return {fs_nodes_.createField<T>()};
+}
+template <typename T> Field<T> allocateCellField(Mesh &mesh) {
+  static_assert(sizeof(T) < 0, "not implemented");
+}
 
-auto getCells(atlasTag, atlas::Mesh const &m) {
-  return utility::irange(0, m.cells().size());
+auto getCells(atlasTag, Mesh const &m) {
+  return utility::irange(0, m.mesh.cells().size());
 }
-auto getEdges(atlasTag, atlas::Mesh const &m) {
-  return utility::irange(0, m.edges().size());
+auto getEdges(atlasTag, Mesh const &m) {
+  return utility::irange(0, m.mesh.edges().size());
 }
-auto getVertices(atlasTag, atlas::Mesh const &m) {
-  return utility::irange(0, m.nodes().size());
+auto getVertices(atlasTag, Mesh const &m) {
+  return utility::irange(0, m.mesh.nodes().size());
 }
 
 std::vector<int>
@@ -206,84 +236,84 @@ std::vector<int> const nodeNeighboursOfNode(atlas::Mesh const &m,
 //===------------------------------------------------------------------------------------------===//
 
 template <typename Init, typename Op, typename WeightT>
-auto reduceCellToCell(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                      Op &&op, std::vector<WeightT> &&weights) {
+auto reduceCellToCell(Mesh const &m, int idx, Init init, Op &&op,
+                      std::vector<WeightT> &&weights) {
   static_assert(std::is_arithmetic<WeightT>::value,
                 "weights need to be of arithmetic type!\n");
   int i = 0;
-  for (auto &&objIdx : cellNeighboursOfCell(m, idx))
+  for (auto &&objIdx : cellNeighboursOfCell(m.mesh, idx))
     op(init, objIdx, weights[i++]);
   return init;
 }
 template <typename Init, typename Op, typename WeightT>
-auto reduceEdgeToCell(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                      Op &&op, std::vector<WeightT> &&weights) {
+auto reduceEdgeToCell(Mesh const &m, int idx, Init init, Op &&op,
+                      std::vector<WeightT> &&weights) {
   static_assert(std::is_arithmetic<WeightT>::value,
                 "weights need to be of arithmetic type!\n");
   int i = 0;
-  for (auto &&objIdx : edgeNeighboursOfCell(m, idx))
+  for (auto &&objIdx : edgeNeighboursOfCell(m.mesh, idx))
     op(init, objIdx, weights[i++]);
   return init;
 }
 template <typename Init, typename Op, typename WeightT>
-auto reduceVertexToCell(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                        Op &&op, std::vector<WeightT> &&weights) {
+auto reduceVertexToCell(Mesh const &m, int idx, Init init, Op &&op,
+                        std::vector<WeightT> &&weights) {
   static_assert(std::is_arithmetic<WeightT>::value,
                 "weights need to be of arithmetic type!\n");
   int i = 0;
-  for (auto &&objIdx : nodeNeighboursOfCell(m, idx))
-    op(init, objIdx, weights[i++]);
-  return init;
-}
-
-template <typename Init, typename Op, typename WeightT>
-auto reduceCellToEdge(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                      Op &&op, std::vector<WeightT> &&weights) {
-  static_assert(std::is_arithmetic<WeightT>::value,
-                "weights need to be of arithmetic type!\n");
-  int i = 0;
-  for (auto &&objIdx : cellNeighboursOfEdge(m, idx))
-    op(init, objIdx, weights[i++]);
-  return init;
-}
-template <typename Init, typename Op, typename WeightT>
-auto reduceVertexToEdge(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                        Op &&op, std::vector<WeightT> &&weights) {
-  static_assert(std::is_arithmetic<WeightT>::value,
-                "weights need to be of arithmetic type!\n");
-  int i = 0;
-  for (auto &&objIdx : nodeNeighboursOfEdge(m, idx))
+  for (auto &&objIdx : nodeNeighboursOfCell(m.mesh, idx))
     op(init, objIdx, weights[i++]);
   return init;
 }
 
 template <typename Init, typename Op, typename WeightT>
-auto reduceCellToVertex(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                        Op &&op, std::vector<WeightT> &&weights) {
+auto reduceCellToEdge(Mesh const &m, int idx, Init init, Op &&op,
+                      std::vector<WeightT> &&weights) {
   static_assert(std::is_arithmetic<WeightT>::value,
                 "weights need to be of arithmetic type!\n");
   int i = 0;
-  for (auto &&objIdx : cellNeighboursOfNode(m, idx))
+  for (auto &&objIdx : cellNeighboursOfEdge(m.mesh, idx))
     op(init, objIdx, weights[i++]);
   return init;
 }
 template <typename Init, typename Op, typename WeightT>
-auto reduceEdgeToVertex(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                        Op &&op, std::vector<WeightT> &&weights) {
+auto reduceVertexToEdge(Mesh const &m, int idx, Init init, Op &&op,
+                        std::vector<WeightT> &&weights) {
   static_assert(std::is_arithmetic<WeightT>::value,
                 "weights need to be of arithmetic type!\n");
   int i = 0;
-  for (auto &&objIdx : edgeNeighboursOfNode(m, idx))
+  for (auto &&objIdx : nodeNeighboursOfEdge(m.mesh, idx))
+    op(init, objIdx, weights[i++]);
+  return init;
+}
+
+template <typename Init, typename Op, typename WeightT>
+auto reduceCellToVertex(Mesh const &m, int idx, Init init, Op &&op,
+                        std::vector<WeightT> &&weights) {
+  static_assert(std::is_arithmetic<WeightT>::value,
+                "weights need to be of arithmetic type!\n");
+  int i = 0;
+  for (auto &&objIdx : cellNeighboursOfNode(m.mesh, idx))
     op(init, objIdx, weights[i++]);
   return init;
 }
 template <typename Init, typename Op, typename WeightT>
-auto reduceVertexToVertex(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                          Op &&op, std::vector<WeightT> &&weights) {
+auto reduceEdgeToVertex(Mesh const &m, int idx, Init init, Op &&op,
+                        std::vector<WeightT> &&weights) {
   static_assert(std::is_arithmetic<WeightT>::value,
                 "weights need to be of arithmetic type!\n");
   int i = 0;
-  for (auto &&objIdx : nodeNeighboursOfNode(m, idx))
+  for (auto &&objIdx : edgeNeighboursOfNode(m.mesh, idx))
+    op(init, objIdx, weights[i++]);
+  return init;
+}
+template <typename Init, typename Op, typename WeightT>
+auto reduceVertexToVertex(Mesh const &m, int idx, Init init, Op &&op,
+                          std::vector<WeightT> &&weights) {
+  static_assert(std::is_arithmetic<WeightT>::value,
+                "weights need to be of arithmetic type!\n");
+  int i = 0;
+  for (auto &&objIdx : nodeNeighboursOfNode(m.mesh, idx))
     op(init, objIdx, weights[i++]);
   return init;
 }
@@ -293,60 +323,52 @@ auto reduceVertexToVertex(atlasTag, atlas::Mesh const &m, int idx, Init init,
 //===------------------------------------------------------------------------------------------===//
 
 template <typename Init, typename Op>
-auto reduceCellToCell(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                      Op &&op) {
-  for (auto &&objIdx : cellNeighboursOfCell(m, idx))
+auto reduceCellToCell(Mesh const &m, int idx, Init init, Op &&op) {
+  for (auto &&objIdx : cellNeighboursOfCell(m.mesh, idx))
     op(init, objIdx);
   return init;
 }
 template <typename Init, typename Op>
-auto reduceEdgeToCell(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                      Op &&op) {
-  for (auto &&objIdx : edgeNeighboursOfCell(m, idx))
+auto reduceEdgeToCell(Mesh const &m, int idx, Init init, Op &&op) {
+  for (auto &&objIdx : edgeNeighboursOfCell(m.mesh, idx))
     op(init, objIdx);
   return init;
 }
 template <typename Init, typename Op>
-auto reduceVertexToCell(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                        Op &&op) {
-  for (auto &&objIdx : nodeNeighboursOfCell(m, idx))
-    op(init, objIdx);
-  return init;
-}
-
-template <typename Init, typename Op>
-auto reduceCellToEdge(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                      Op &&op) {
-  for (auto &&objIdx : cellNeighboursOfEdge(m, idx))
-    op(init, objIdx);
-  return init;
-}
-template <typename Init, typename Op>
-auto reduceVertexToEdge(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                        Op &&op) {
-  for (auto &&objIdx : nodeNeighboursOfEdge(m, idx))
+auto reduceVertexToCell(Mesh const &m, int idx, Init init, Op &&op) {
+  for (auto &&objIdx : nodeNeighboursOfCell(m.mesh, idx))
     op(init, objIdx);
   return init;
 }
 
 template <typename Init, typename Op>
-auto reduceCellToVertex(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                        Op &&op) {
-  for (auto &&objIdx : cellNeighboursOfNode(m, idx))
+auto reduceCellToEdge(Mesh const &m, int idx, Init init, Op &&op) {
+  for (auto &&objIdx : cellNeighboursOfEdge(m.mesh, idx))
     op(init, objIdx);
   return init;
 }
 template <typename Init, typename Op>
-auto reduceEdgeToVertex(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                        Op &&op) {
-  for (auto &&objIdx : edgeNeighboursOfNode(m, idx))
+auto reduceVertexToEdge(Mesh const &m, int idx, Init init, Op &&op) {
+  for (auto &&objIdx : nodeNeighboursOfEdge(m.mesh, idx))
+    op(init, objIdx);
+  return init;
+}
+
+template <typename Init, typename Op>
+auto reduceCellToVertex(Mesh const &m, int idx, Init init, Op &&op) {
+  for (auto &&objIdx : cellNeighboursOfNode(m.mesh, idx))
     op(init, objIdx);
   return init;
 }
 template <typename Init, typename Op>
-auto reduceVertexToVertex(atlasTag, atlas::Mesh const &m, int idx, Init init,
-                          Op &&op) {
-  for (auto &&objIdx : nodeNeighboursOfNode(m, idx))
+auto reduceEdgeToVertex(Mesh const &m, int idx, Init init, Op &&op) {
+  for (auto &&objIdx : edgeNeighboursOfNode(m.mesh, idx))
+    op(init, objIdx);
+  return init;
+}
+template <typename Init, typename Op>
+auto reduceVertexToVertex(Mesh const &m, int idx, Init init, Op &&op) {
+  for (auto &&objIdx : nodeNeighboursOfNode(m.mesh, idx))
     op(init, objIdx);
   return init;
 }
