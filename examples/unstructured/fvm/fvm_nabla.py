@@ -130,20 +130,20 @@ zavg_red = sir.ReductionOverNeighborExpr(
     op="+",
     rhs=sir.FieldAccessExpr(name="pp", vertical_offset=0, horizontal_offset=sir.ZeroOffset()),
     init=sir.LiteralAccessExpr(
-        value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+        value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
     ),
     chain=[sir.LocationType.Edge, sir.LocationType.Vertex],
 )
 zavg_mul = sir.BinaryOperator(
     op="*",
     left=sir.LiteralAccessExpr(
-        value="0.5", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+        value="0.5", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
     ),
     right=zavg_red,
 )
 zavg_decl = sir.VarDeclStmt(
     data_type=sir.Type(
-        data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+        data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
         is_const=False,
         is_volatile=False,
     ),
@@ -220,7 +220,7 @@ assign_pnabla_MXX = sir.ExprStmt(
                 ),
             ),
             init=sir.LiteralAccessExpr(
-                value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+                value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
             ),
             chain=[sir.LocationType.Vertex, sir.LocationType.Edge],
         ),
@@ -255,7 +255,7 @@ assign_pnabla_MYY = sir.ExprStmt(
                 ),
             ),
             init=sir.LiteralAccessExpr(
-                value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+                value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
             ),
             chain=[sir.LocationType.Vertex, sir.LocationType.Edge],
         ),
