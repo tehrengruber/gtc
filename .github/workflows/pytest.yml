@@ -1,36 +1,31 @@
 name: pytest
 
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    push:
+        branches: [master]
+    pull_request:
+        branches: [master]
 
 jobs:
-  build:
+    build:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                python-version: [3.8]
 
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.8]
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install eve and dependencies
-      run: |
-        ./scripts/init_env.sh -i
-    - name: Install atlas4py # not in eve dependencies to make it easy to work with branches
-      run: |
-        git clone https://github.com/GridTools/atlas4py.git
-        pip install -e atlas4py
-    - name: Run checks
-      run: |
-        pre-commit run --all
-    - name: Test with pytest
-      run: |
-        pip install pytest
-        pytest
+        steps:
+            - uses: actions/checkout@v2
+            - name: Set up Python ${{ matrix.python-version }}
+              uses: actions/setup-python@v1
+              with:
+                  python-version: ${{ matrix.python-version }}
+            - name: Install eve and dependencies
+              run: |
+                  ./scripts/init_env.sh -i
+            - name: Run checks
+              run: |
+                  pre-commit run --all
+            - name: Test with pytest
+              run: |
+                  pip install pytest
+                  pytest
