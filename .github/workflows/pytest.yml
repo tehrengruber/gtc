@@ -23,6 +23,10 @@ jobs:
     - name: Install eve and dependencies
       run: |
         ./scripts/init_env.sh -i
+    - name: Install atlas4py # not in eve dependencies to make it easy to work with branches
+      run: |
+        git clone https://github.com/GridTools/atlas4py.git
+        pip install -e atlas4py
     - name: Run checks
       run: |
         pre-commit run --all
