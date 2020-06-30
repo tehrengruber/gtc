@@ -5,7 +5,7 @@ USER root
 RUN apt-get update -qq && \
     apt-get install -qq -y \
     libboost-all-dev \
-    ccache \
+    ccache && \
     rm -rf /var/lib/apt/lists/*
 
 ARG ECBUILD_VERSION=3.3.2
