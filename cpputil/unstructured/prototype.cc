@@ -1,6 +1,7 @@
 #include <gridtools/common/hymap.hpp>
 #include <gridtools/common/tuple_util.hpp>
 #include <gridtools/next/mesh.hpp>
+#include <gridtools/next/unstructured_helper.hpp>
 #include <gridtools/sid/composite.hpp>
 #include <gridtools/sid/concept.hpp>
 #include <gridtools/sid/synthetic.hpp>
@@ -25,6 +26,12 @@ template <std::size_t MaxNeighbors, class LocationType> struct myCon {
 template <std::size_t MaxNeighbors, class LocationType>
 auto connectivity_get_max_neighbors(myCon<MaxNeighbors, LocationType> const &) {
   return std::integral_constant<std::size_t, MaxNeighbors>{};
+}
+
+template <std::size_t MaxNeighbors, class LocationType>
+std::size_t
+connectivity_get_primary_size(myCon<MaxNeighbors, LocationType> const &conn) {
+  return conn.neighborTable.size();
 }
 
 template <std::size_t MaxNeighbors, class LocationType>
@@ -63,11 +70,11 @@ auto indirect_access(SID &&field, NeighPtrT const &neighptr) {
 
 template <class Mesh, class In, class Out>
 void sum_vertex_to_cell(Mesh const &mesh, In &&in, Out &&out) {
-  auto n_cells = gridtools::at_key<cell>(gridtools::sid::get_upper_bounds(
-      out)); // TODO needs to come from the mesh!
-
-  auto cell_to_vertex = gridtools::next::mesh::get_neighbor_table(
+  auto n_cells = gridtools::next::connectivity::get_primary_size(
       gridtools::at_key<cell2vertex>(mesh));
+
+  auto cell_to_vertex = gridtools::next::connectivity::get_neighbor_table(
+      gridtools::next::mesh::get_connectivity<cell2vertex>(mesh));
 
   static_assert(
       gridtools::sid::concept_impl_::is_sid<decltype(cell_to_vertex)>{});
@@ -84,7 +91,7 @@ void sum_vertex_to_cell(Mesh const &mesh, In &&in, Out &&out) {
     int sum = 0;
     auto neigh_ptr = gridtools::at_key<connectivity_tag>(ptr);
     for (std::size_t neigh_vertex = 0;
-         neigh_vertex < gridtools::next::mesh::get_max_neighbors(
+         neigh_vertex < gridtools::next::connectivity::get_max_neighbors(
                             gridtools::at_key<cell2vertex>(mesh));
          ++neigh_vertex) {
       auto absolute_neigh_index = *neigh_ptr;
