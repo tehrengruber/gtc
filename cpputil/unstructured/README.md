@@ -14,18 +14,19 @@ _Mesh_ is a `gridtools::hymap` with
 
 _NeighborChain_ is
 
-- a _tuple-like_ (see GridTools) object with _LocationTypes_, e.g. `std::tuple<Edge, Node>` (edge to node). \[Potentially, we could model more complex neighbor chains with this approach, e.g. Node->Cell->Edge\]
+<!-- - a _tuple-like_ (see GridTools) object with _LocationTypes_, e.g. `std::tuple<edge, vertex>` (edge to vertex). \[Potentially, we could model more complex neighbor chains with this approach, e.g. vertex->cell->edge\] -->
+- a `std::tuple` with _LocationTypes_, e.g. `std::tuple<edge, vertex>` (edge to vertex). \[Potentially, we could model more complex neighbor chains with this approach, e.g. vertex->cell->edge\] -->
 
-_LocationTypes_ are
+_LocationTypes_ are the following tags
 
-- `struct Node;`
-- `struct Edge;`
-- `struct Cell;`
+- `struct vertex;`
+- `struct edge;`
+- `struct cell;`
 
 _Connectivity_
 
-- `getNeighborTable(Connectivity)` returns a two dimensional SID with dimensions `primary` and `neighbor` (TODO better names)
-- `getMaxNeighbors(Connectivity)` returns an `std::integral_constant<std::size_t, N>` with `N` representing the maximal number of neighbors.
+- `get_neighbor_table(Connectivity)` returns a two dimensional SID with dimensions _LocationType_ and `neighbor` (TODO better name)
+- `get_max_neighbors(Connectivity)` returns an `std::integral_constant<std::size_t, N>` with `N` representing the maximal number of neighbors.
 
 _Callable_ has
 
