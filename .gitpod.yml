@@ -6,6 +6,9 @@ tasks:
           mkdir -p /workspace/.caches/pre-commit
           ln -s /workspace/.caches/pre-commit  ~/.cache/pre-commit
       init: |
+          cd $GITPOD_REPO_ROOT/cpputil/unstructured
+          mkdir -p build && cd build && cmake ..
+          ln -s $(pwd)/compile_commands.json $GITPOD_REPO_ROOT/cpputil/unstructured
           ./scripts/init_env.sh -i
           cd /workspace && git clone https://github.com/GridTools/atlas4py.git && pip install -e atlas4py
           PYENV_PYTHON_VERSION=$(python --version | cut -d ' ' -f 2)
