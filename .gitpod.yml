@@ -9,6 +9,7 @@ tasks:
           cd $GITPOD_REPO_ROOT/cpputil/unstructured
           mkdir -p build && cd build && cmake ..
           ln -s $(pwd)/compile_commands.json $GITPOD_REPO_ROOT/cpputil/unstructured
+          cd $GITPOD_REPO_ROOT
           ./scripts/init_env.sh -i
           cd /workspace && git clone https://github.com/GridTools/atlas4py.git && pip install -e atlas4py
           PYENV_PYTHON_VERSION=$(python --version | cut -d ' ' -f 2)
