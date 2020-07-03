@@ -1,1 +1,3 @@
 .clangd/
+.cmakels/
+*.log

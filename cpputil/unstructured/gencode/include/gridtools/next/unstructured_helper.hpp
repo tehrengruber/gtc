@@ -1,3 +1,5 @@
+#pragma once
+
 #include <gridtools/common/hymap.hpp>
 
 namespace gridtools {

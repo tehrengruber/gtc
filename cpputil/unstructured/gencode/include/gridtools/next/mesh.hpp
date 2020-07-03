@@ -1,5 +1,8 @@
+#pragma once
+
 #include <cstddef>
 #include <gridtools/common/hymap.hpp>
+
 struct vertex;
 struct edge;
 struct cell;
