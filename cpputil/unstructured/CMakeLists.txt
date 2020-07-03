@@ -12,3 +12,10 @@ FetchContent_MakeAvailable(GridTools)
 add_executable(prototype prototype.cc)
 target_link_libraries(prototype GridTools::gridtools)
 target_include_directories(prototype PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gencode/include)
+
+
+find_package(Atlas)
+
+add_executable(atlas_mesh_adapter atlas_mesh_adapter.cc)
+target_link_libraries(atlas_mesh_adapter atlas GridTools::gridtools)
+target_include_directories(atlas_mesh_adapter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gencode/include)

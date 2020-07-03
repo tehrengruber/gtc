@@ -9,7 +9,7 @@ _Allocation_ of a computation object is provided by free function with the follo
 
 _Mesh_
 
-- `mesh::get_connectivity<NeighborChain>(Mesh)` returns an object modeling the _Connectivity_ concept
+- `mesh::connectivity<NeighborChain>(Mesh)` returns an object modeling the _Connectivity_ concept
 <!-- - `mesh::get_size<LocationType>(Mesh)` returns the number of elements of this LocationType (as `std::size_t`) \[Consider compile time sizes as well.\] -->
 - \[Note: Mesh has a default implementation using hymap in unstructured_helper.hpp\]
 
@@ -26,9 +26,10 @@ _LocationTypes_ are the following tag types
 
 _Connectivity_
 
-- `connectivity::get_neighbor_table(Connectivity)` returns a two dimensional SID with dimensions _LocationType_ and `neighbor` (TODO better name)
-- `connectivity::get_max_neighbors(Connectivity)` returns a `std::integral_constant<std::size_t, N>` with `N` representing the maximal number of neighbors.
-- `connectivity::get_primary_size(Connectivity)` returns the number of elements of the primary location (as `std::size_t`).  \[Consider compile time sizes as well.\]
+- `connectivity::neighbor_table(Connectivity)` returns a two dimensional SID with dimensions _LocationType_ and `neighbor` (TODO better name)
+- `connectivity::max_neighbors(Connectivity)` returns a `std::integral_constant<std::size_t, N>` with `N` representing the maximal number of neighbors.
+- `connectivity::primary_size(Connectivity)` returns the number of elements of the primary location (as `std::size_t`).  \[Consider compile time sizes as well.\]
+- `connectivity::skip_value(Connectivity)` returns the element signaling a non-existent value in a rectangular neighbor table
 - Connectivity needs to be copyable to device and elements need accessible from device (e.g. the neighbor table)
 
 _Callable_ has
