@@ -5,7 +5,6 @@
 #include "atlas/meshgenerator.h"
 #include <atlas/grid/StructuredGrid.h>
 #include <atlas/mesh.h>
-#include <mesh/Connectivity.h>
 #include <type_traits>
 
 #include <gridtools/next/atlas_adapter.hpp>
