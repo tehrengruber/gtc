@@ -1,6 +1,7 @@
 #include <gridtools/common/hymap.hpp>
 #include <gridtools/common/tuple_util.hpp>
 #include <gridtools/next/mesh.hpp>
+#include <gridtools/next/unstructured.hpp>
 #include <gridtools/next/unstructured_helper.hpp>
 #include <gridtools/sid/composite.hpp>
 #include <gridtools/sid/concept.hpp>

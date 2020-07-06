@@ -9,8 +9,10 @@
 #include <gridtools/storage/builder.hpp>
 #include <gridtools/storage/sid.hpp>
 
-#include <gridtools/next/mesh.hpp>
 #include <gridtools/storage/cpu_ifirst.hpp>
+
+#include "mesh.hpp"
+#include "unstructured.hpp"
 
 namespace gridtools::next::atlas_wrappers {
 

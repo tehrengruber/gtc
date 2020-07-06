@@ -3,12 +3,6 @@
 #include <cstddef>
 #include <gridtools/common/hymap.hpp>
 
-struct vertex;
-struct edge;
-struct cell;
-
-struct neighbor;
-
 namespace gridtools {
 namespace next {
 

@@ -10,7 +10,7 @@
 #include <gridtools/next/atlas_adapter.hpp>
 #include <gridtools/next/mesh.hpp>
 
-#include "tests/util/atlas_util.hpp"
+#include "tests/include/util/atlas_util.hpp"
 
 int main() {
   auto mesh = atlas_util::make_mesh();

@@ -32,12 +32,12 @@ _Connectivity_
 - `connectivity::skip_value(Connectivity)` returns the element signaling a non-existent value in a rectangular neighbor table
 - Connectivity needs to be copyable to device and elements need accessible from device (e.g. the neighbor table)
 
-_Callable_ has
+_Computation_ has
 
-- one argument for each input or output variable modelling SID
+- one argument for each input or output variable modelling _uSID_
+
+_unstructured SID (uSID)_ is a SID with the following dimensions:
 - the unstructured dimension is identified with key _LocationType_
 - a possible sparse dimension is identified with a _NeighborChain_ (TODO try implementation)
-
-### TODOs
-
-- Need to describe how to skip a value if #neighbors < max_neighbors (some magic number probably)
+- the vertical dimension is identified with `namespace dim {struct k;}` (TODO better ideas?)
+- TODO what to do with extra dimensions?

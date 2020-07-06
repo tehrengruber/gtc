@@ -30,11 +30,6 @@ add_executable(atlas_field_converter atlas_field_converter.cc)
 target_link_libraries(atlas_field_converter atlas GridTools::gridtools)
 target_include_directories(atlas_field_converter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gencode/include)
 
-add_executable(atlas_array_view_adapter atlas_array_view_adapter.cc)
-target_link_libraries(atlas_array_view_adapter atlas GridTools::gridtools)
-target_include_directories(atlas_array_view_adapter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gencode/include)
-
-
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)
