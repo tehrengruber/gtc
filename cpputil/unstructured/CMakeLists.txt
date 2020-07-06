@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.14.5)
 project(unstructured_interface LANGUAGES CXX)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/private")
+
 set(CMAKE_CXX_STANDARD 20)
 
 include(FetchContent)
@@ -18,6 +20,8 @@ target_include_directories(prototype PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gencode
 find_package(eckit REQUIRED)
 find_package(Atlas REQUIRED)
 
+add_subdirectory(gencode)
+
 add_executable(atlas_mesh_adapter atlas_mesh_adapter.cc)
 target_link_libraries(atlas_mesh_adapter atlas GridTools::gridtools)
 target_include_directories(atlas_mesh_adapter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gencode/include)
@@ -30,4 +34,8 @@ add_executable(atlas_array_view_adapter atlas_array_view_adapter.cc)
 target_link_libraries(atlas_array_view_adapter atlas GridTools::gridtools)
 target_include_directories(atlas_array_view_adapter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gencode/include)
 
-add_subdirectory(tests)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

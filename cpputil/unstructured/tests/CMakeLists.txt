@@ -1,4 +1,5 @@
-include(CTest)
-if(BUILD_TESTING)
-    add_subdirectory(regression)
-endif()
+include(FetchGoogleTest)
+fetch_googletest()
+
+add_subdirectory(regression)
+add_subdirectory(unit_tests)

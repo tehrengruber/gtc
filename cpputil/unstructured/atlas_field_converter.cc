@@ -17,23 +17,17 @@
 #include <gridtools/next/mesh.hpp>
 #include <gridtools/sid/synthetic.hpp>
 
+#include "tests/util/atlas_util.hpp"
+
 namespace dim {
 struct k;
 } // namespace dim
 
-auto make_mesh() {
-  atlas::StructuredGrid structuredGrid = atlas::Grid("O2");
-  atlas::MeshGenerator::Parameters generatorParams;
-  generatorParams.set("triangulate", true);
-  generatorParams.set("angle", -1.0);
-
-  atlas::StructuredMeshGenerator generator(generatorParams);
-
-  return generator.generate(structuredGrid);
-}
-
 // field to sid converter
 template <class LocationType, class DataType> auto as(atlas::Field &field) {
+  assert(field.rank() == 2 && "only rank 2 can be converted to "
+                              "uSID");
+
   if constexpr (std::is_same<LocationType, edge>{}) {
     assert(field.functionspace().type().compare("Edges") == 0 &&
            "wrong location type");
@@ -44,7 +38,6 @@ template <class LocationType, class DataType> auto as(atlas::Field &field) {
     assert(field.functionspace().type().compare("Nodes") == 0 &&
            "wrong location type");
   }
-  std::cout << "type = " << field.functionspace().type() << std::endl;
   using strides_t =
       typename gridtools::hymap::keys<LocationType,
                                       dim::k>::template values<int, int>;
@@ -59,7 +52,7 @@ template <class LocationType, class DataType> auto as(atlas::Field &field) {
 }
 
 int main() {
-  auto mesh = make_mesh();
+  auto mesh = atlas_util::make_mesh();
   atlas::mesh::actions::build_edges(mesh);
 
   int nb_levels = 5;

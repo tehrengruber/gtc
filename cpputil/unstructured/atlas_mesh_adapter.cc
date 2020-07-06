@@ -10,19 +10,10 @@
 #include <gridtools/next/atlas_adapter.hpp>
 #include <gridtools/next/mesh.hpp>
 
-auto make_mesh() {
-  atlas::StructuredGrid structuredGrid = atlas::Grid("O2");
-  atlas::MeshGenerator::Parameters generatorParams;
-  generatorParams.set("triangulate", true);
-  generatorParams.set("angle", -1.0);
-
-  atlas::StructuredMeshGenerator generator(generatorParams);
-
-  return generator.generate(structuredGrid);
-}
+#include "tests/util/atlas_util.hpp"
 
 int main() {
-  auto mesh = make_mesh();
+  auto mesh = atlas_util::make_mesh();
   atlas::mesh::actions::build_edges(mesh);
   atlas::mesh::actions::build_node_to_edge_connectivity(mesh);
 

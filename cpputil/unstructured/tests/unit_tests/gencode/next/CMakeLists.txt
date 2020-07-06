@@ -1,0 +1,5 @@
+add_executable(test_atlas_array_view_adapter test_atlas_array_view_adapter.cc)
+target_link_libraries(test_atlas_array_view_adapter gencode)
+target_link_libraries(test_atlas_array_view_adapter GridTools::gridtools atlas eckit gtest gtest_main)
+
+add_test(NAME test_atlas_array_view_adapter COMMAND $<TARGET_FILE:test_atlas_array_view_adapter>)
