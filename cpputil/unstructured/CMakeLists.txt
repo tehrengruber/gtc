@@ -7,8 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 include(FetchContent)
 FetchContent_Declare(GridTools
-    GIT_REPOSITORY https://github.com/GridTools/gridtools.git
-    GIT_TAG        master
+    GIT_REPOSITORY https://github.com/anstaf/gridtools.git
+    GIT_TAG        rename_dim_fix
     # URL https://github.com/GridTools/gridtools/archive/???.tar.gz
 )
 FetchContent_MakeAvailable(GridTools)

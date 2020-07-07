@@ -10,9 +10,11 @@
 #include <gridtools/storage/sid.hpp>
 
 #include <gridtools/storage/cpu_ifirst.hpp>
+#include <mesh/Connectivity.h>
 
 #include "mesh.hpp"
 #include "unstructured.hpp"
+#include <gridtools/next/atlas_field_util.hpp>
 
 namespace gridtools::next::atlas_wrappers {
 
@@ -26,9 +28,18 @@ struct regular_connectivity {
   };
 
   decltype(builder{}(std::size_t{})()) tbl_;
-  const atlas::idx_t missing_value_; // Not sure if we can leave the type open
+  const atlas::idx_t
+      missing_value_; // TODO Not sure if we can leave the type open
 
   regular_connectivity(atlas::mesh::IrregularConnectivity const &conn)
+      : tbl_{builder{}(conn.rows())
+                 .initializer([&conn](std::size_t row, std::size_t col) {
+                   return col < conn.cols(row) ? conn.row(row)(col)
+                                               : conn.missing_value();
+                 })()},
+        missing_value_{conn.missing_value()} {}
+
+  regular_connectivity(atlas::mesh::MultiBlockConnectivity const &conn)
       : tbl_{builder{}(conn.rows())
                  .initializer([&conn](std::size_t row, std::size_t col) {
                    return col < conn.cols(row) ? conn.row(row)(col)
@@ -52,9 +63,12 @@ struct regular_connectivity {
 
   friend auto connectivity_neighbor_table(regular_connectivity const &conn) {
 
+    // return gridtools::sid::rename_all_dimensions<
+    //     gridtools::hymap::keys<LocationType, neighbor>>(conn.tbl_);
     return gridtools::sid::rename_dimension<
         gridtools::integral_constant<int, 1>, neighbor>(
-        gridtools::sid::rename_dimension<gridtools::integral_constant<int, 0>,
+        gridtools::sid::rename_dimension<gridtools::integral_constant<int,
+        0>,
                                          LocationType>(conn.tbl_));
   }
 };
@@ -71,6 +85,14 @@ decltype(auto) mesh_connectivity(const Mesh &mesh) {
       vertex, 7
       // TODO this number must passed by the user (probably wrap atlas mesh)
       >{mesh.nodes().edge_connectivity()};
+}
+
+template <class Key,
+          std::enable_if_t<std::is_same_v<Key, std::tuple<edge, vertex>>, int> =
+              0> // TODO protect
+decltype(auto) mesh_connectivity(const Mesh &mesh) {
+  return gridtools::next::atlas_wrappers::regular_connectivity<edge, 2>{
+      mesh.edges().node_connectivity()};
 }
 
 } // namespace atlas

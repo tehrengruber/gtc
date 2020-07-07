@@ -38,6 +38,7 @@ _Computation_ has
 
 _unstructured SID (uSID)_ is a SID with the following dimensions:
 - the unstructured dimension is identified with key _LocationType_
-- a possible sparse dimension is identified with a _NeighborChain_ (TODO try implementation)
+- a possible sparse dimension is identified with the `neighbor` tag
+  \[TODO maybe something like `local<LocationType>` or `neighbor<LocationType>`, but then the same for the neighbor table to be able to iterate both with the same tag.\]
 - the vertical dimension is identified with `namespace dim {struct k;}` (TODO better ideas?)
 - TODO what to do with extra dimensions?

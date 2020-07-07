@@ -8,7 +8,11 @@
 #include <type_traits>
 
 #include <gridtools/next/atlas_adapter.hpp>
+#include <gridtools/next/atlas_array_view_adapter.hpp>
 #include <gridtools/next/mesh.hpp>
+
+#include <gridtools/common/tuple_util.hpp>
+#include <gridtools/sid/composite.hpp>
 
 #include "tests/include/util/atlas_util.hpp"
 
@@ -27,6 +31,12 @@ int main() {
   auto v2e_tbl = gridtools::next::connectivity::neighbor_table(v2e);
 
   static_assert(gridtools::is_sid<decltype(v2e_tbl)>{});
+  namespace tu = gridtools::tuple_util;
+  auto composite =
+      tu::make<gridtools::sid::composite::keys<edge // TODO just a dummy
+                                               >::values>(v2e_tbl);
+  //   auto tmp = sid_get_lower_bounds(composite);
+  static_assert(gridtools::sid::concept_impl_::is_sid<decltype(composite)>{});
 
   auto strides = gridtools::sid::get_strides(v2e_tbl);
 

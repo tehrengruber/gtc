@@ -4,56 +4,12 @@
 #include <atlas/functionspace.h>
 #include <gridtools/common/hymap.hpp>
 #include <gridtools/next/atlas_array_view_adapter.hpp>
+#include <gridtools/next/sid_rename_all.hpp>
 #include <gridtools/sid/delegate.hpp>
 
 #include "unstructured.hpp"
 
 #pragma once
-
-// TODO this needs to live in GT or the SID converter needs to be implemented
-// differently
-
-namespace gridtools {
-namespace sid {
-namespace rename_all_dimensions_impl_ {
-template <class NewHymapKeys, class Map> auto remap(Map map) {
-  return hymap::convert_to<hymap::keys, NewHymapKeys>(std::move(map));
-}
-
-template <class NewHymapKeys, class Sid> struct renamed_sid : delegate<Sid> {
-  template <class Map>
-  using remapped_t = decltype(remap<NewHymapKeys>(std::declval<Map>()));
-
-  template <class T>
-  renamed_sid(T &&obj) : delegate<Sid>(std::forward<T>(obj)) {}
-
-  friend remapped_t<strides_type<Sid>> sid_get_strides(renamed_sid const &obj) {
-    return remap<NewHymapKeys>(sid_get_strides(obj.impl()));
-  }
-  friend remapped_t<lower_bounds_type<Sid>>
-  sid_get_lower_bounds(renamed_sid const &obj) {
-    return remap<NewHymapKeys>(sid_get_lower_bounds(obj.impl()));
-  }
-  friend remapped_t<upper_bounds_type<Sid>>
-  sid_get_upper_bounds(renamed_sid const &obj) {
-    return remap<NewHymapKeys>(sid_get_upper_bounds(obj.impl()));
-  }
-};
-
-template <class...> struct stride_kind_wrapper {};
-
-template <class NewHymapKeys, class Sid>
-stride_kind_wrapper<NewHymapKeys, strides_kind<Sid>>
-sid_get_strides_kind(renamed_sid<NewHymapKeys, Sid> const &);
-
-template <class NewHymapKeys, class Sid>
-renamed_sid<NewHymapKeys, Sid> rename_all_dimensions(Sid &&sid) {
-  return renamed_sid<NewHymapKeys, Sid>{std::forward<Sid>(sid)};
-}
-} // namespace rename_all_dimensions_impl_
-using rename_all_dimensions_impl_::rename_all_dimensions;
-} // namespace sid
-} // namespace gridtools
 
 namespace gridtools::next::atlas_util {
 
@@ -80,26 +36,30 @@ template <class... DimensionTags> struct as {
 
   // Atlas field dimensions order (TODO double check):
   // 1. unstructured dimension
-  // 2. k
+  // 2. vertical
   // 3. other dimensions
   // from this we can derive some checks:
-  // - type of unstructured dimension (Done)
-  // - no unstructured dimension tag after first dimension
-  // - dim::k only in second (have unstructured dim) or first (no unstructured)
-  // dimension
+  // - runtime: type of unstructured dimension (Done)
+  // - static: dim::k in first (no unstructured) or second dimension
+  // - static: no unstructured dimension tag after first dimension
   template <class DataType> struct with_type {
     auto operator()(atlas::Field &field) {
       assert(field.rank() == sizeof...(DimensionTags) && "Rank mismatch");
 
       if constexpr (std::is_same<first_t, edge>{}) {
-        if (field.functionspace().type().compare("Edges") != 0)
-          atlas::throw_Exception("Not an edge field", Here());
+        if (field.functionspace().type().compare("EdgeColumns") != 0 &&
+            field.functionspace().type().compare("Edges") !=
+                0) // TODO EdgeColumns vs Edges
+          atlas::throw_Exception(field.name() + " is not an edge field",
+                                 Here());
       } else if constexpr (std::is_same<first_t, cell>{}) {
         if (field.functionspace().type().compare("Cells") != 0)
-          atlas::throw_Exception("Not a cell field", Here());
+          atlas::throw_Exception(field.name() + " is not a cell field", Here());
       } else if constexpr (std::is_same<first_t, vertex>{}) {
-        if (field.functionspace().type().compare("Nodes") != 0)
-          atlas::throw_Exception("Not a vertex field", Here());
+        if (field.functionspace().type().compare("NodeColumns") !=
+            0) // TODO NodeColumns vs Nodes
+          atlas::throw_Exception(field.name() + " is not a vertex field",
+                                 Here());
       }
 
       static_assert(

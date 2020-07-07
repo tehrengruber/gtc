@@ -10,9 +10,19 @@
 #include "atlas/meshgenerator.h"
 #include "atlas/option/Options.h"
 #include "atlas/output/Gmsh.h"
+#include "gridtools/next/mesh.hpp"
 #include <atlas/array.h>
 #include <atlas/mesh.h>
 #include <atlas/mesh/Nodes.h>
+
+#include <gridtools/sid/composite.hpp>
+
+#include <gridtools/next/atlas_adapter.hpp>
+#include <gridtools/next/atlas_array_view_adapter.hpp>
+#include <gridtools/next/atlas_field_util.hpp>
+#include <tuple>
+
+#include <gtest/gtest.h>
 
 namespace {
 std::tuple<double, double, double> min_max(atlas::Field const &field) {
@@ -118,16 +128,16 @@ public:
     atlas::mesh::actions::build_median_dual_mesh(mesh_);
 
     initialize_S();
-    print_min_max(m_S_MXX);
-    print_min_max(m_S_MYY);
+    // print_min_max(m_S_MXX);
+    // print_min_max(m_S_MYY);
     initialize_sign();
     initialize_vol();
-    print_min_max(m_vol);
+    // print_min_max(m_vol);
   }
 
 private:
   void initialize_vol() {
-    print_min_max_1d(mesh_.nodes().field("dual_volumes"));
+    // print_min_max_1d(mesh_.nodes().field("dual_volumes"));
     const auto vol_atlas =
         atlas::array::make_view<double, 1>(mesh_.nodes().field("dual_volumes"));
     auto vol = atlas::array::make_view<double, 2>(m_vol);
@@ -254,7 +264,228 @@ public:
   }
 };
 
-int main() {
+struct connectivity_tag;
+struct S_MXX_tag;
+struct S_MYY_tag;
+struct zavgS_MXX_tag;
+struct zavgS_MYY_tag;
+
+struct pnabla_MXX_tag;
+struct pnabla_MYY_tag;
+struct vol_tag;
+struct sign_tag;
+
+template <class Mesh, class S_MXX_t, class S_MYY_t, class zavgS_MXX_t,
+          class zavgS_MYY_t, class pp_t, class pnabla_MXX_t, class pnabla_MYY_t,
+          class vol_t, class sign_t>
+void nabla(Mesh &&mesh, S_MXX_t &&S_MXX, S_MYY_t &&S_MYY,
+           zavgS_MXX_t &&zavgS_MXX, zavgS_MYY_t &&zavgS_MYY, pp_t &&pp,
+           pnabla_MXX_t &&pnabla_MXX, pnabla_MYY_t &&pnabla_MYY, vol_t &&vol,
+           sign_t &&sign) {
+  namespace tu = gridtools::tuple_util;
+
+  static_assert(gridtools::is_sid<S_MXX_t>{});
+  static_assert(gridtools::is_sid<S_MYY_t>{});
+  static_assert(gridtools::is_sid<zavgS_MXX_t>{});
+  static_assert(gridtools::is_sid<zavgS_MYY_t>{});
+  static_assert(gridtools::is_sid<pp_t>{});
+  static_assert(gridtools::is_sid<pnabla_MXX_t>{});
+  static_assert(gridtools::is_sid<pnabla_MYY_t>{});
+  static_assert(gridtools::is_sid<vol_t>{});
+  static_assert(gridtools::is_sid<sign_t>{});
+
+  { // first edge loop (this is the fused version without temporary)
+    // ===
+    //   for (auto const &t : getEdges(LibTag{}, mesh)) {
+    //     double zavg =
+    //         (double)0.5 *
+    //         (m_sparse_dimension_idx = 0,
+    //          reduceVertexToEdge(mesh, t, (double)0.0,
+    //                             [&](auto &lhs, auto const &redIdx) {
+    //                               lhs += pp(deref(LibTag{}, redIdx), k);
+    //                               m_sparse_dimension_idx++;
+    //                               return lhs;
+    //                             }));
+    //     zavgS_MXX(deref(LibTag{}, t), k) =
+    //         S_MXX(deref(LibTag{}, t), k) * zavg;
+    //     zavgS_MYY(deref(LibTag{}, t), k) =
+    //         S_MYY(deref(LibTag{}, t), k) * zavg;
+    //   }
+    // ===
+    auto e2v =
+        gridtools::next::mesh::connectivity<std::tuple<edge, vertex>>(mesh);
+    static_assert(gridtools::is_sid<decltype(
+                      gridtools::next::connectivity::neighbor_table(e2v))>{});
+
+    auto edge_fields = tu::make<
+        gridtools::sid::composite::keys<connectivity_tag, S_MXX_tag, S_MYY_tag,
+                                        zavgS_MXX_tag, zavgS_MYY_tag>::values>(
+        gridtools::next::connectivity::neighbor_table(e2v), S_MXX, S_MYY,
+        zavgS_MXX, zavgS_MYY);
+    static_assert(
+        gridtools::sid::concept_impl_::is_sid<decltype(edge_fields)>{});
+
+    auto ptrs = gridtools::sid::get_origin(edge_fields)();
+    auto strides = gridtools::sid::get_strides(edge_fields);
+    for (int i = 0; i < gridtools::next::connectivity::primary_size(e2v); ++i) {
+      double acc = 0.;
+      { // reduce
+        for (int neigh = 0;
+             neigh < gridtools::next::connectivity::max_neighbors(e2v);
+             ++neigh) {
+          // body
+          auto absolute_neigh_index =
+              *gridtools::at_key<connectivity_tag>(ptrs);
+
+          auto pp_ptr = gridtools::sid::get_origin(pp)();
+          gridtools::sid::shift(
+              pp_ptr,
+              gridtools::at_key<vertex>(gridtools::sid::get_strides(pp)),
+              absolute_neigh_index);
+          acc += *pp_ptr;
+          // body end
+
+          gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides),
+                                1); // TODO or only the connectivity tagged ptr
+        }
+        gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides),
+                              -gridtools::next::connectivity::max_neighbors(
+                                  e2v)); // or reset ptr to origin and shift ?
+      }
+      double zavg = 0.5 * acc;
+      *gridtools::at_key<zavgS_MXX_tag>(ptrs) =
+          *gridtools::at_key<S_MXX_tag>(ptrs) * zavg;
+      *gridtools::at_key<zavgS_MYY_tag>(ptrs) =
+          *gridtools::at_key<S_MYY_tag>(ptrs) * zavg;
+
+      gridtools::sid::shift(ptrs, gridtools::at_key<edge>(strides), 1);
+    }
+  }
+  {
+    // vertex loop
+    // for (auto const &t : getVertices(LibTag{}, mesh)) {
+    //     pnabla_MXX(deref(LibTag{}, t), k) =
+    //         (m_sparse_dimension_idx = 0,
+    //          reduceEdgeToVertex(
+    //              mesh, t, (double)0.0, [&](auto &lhs, auto const &redIdx) {
+    //                lhs += zavgS_MXX(deref(LibTag{}, redIdx), k) *
+    //                       sign(deref(LibTag{}, t), m_sparse_dimension_idx,
+    //                       k);
+    //                m_sparse_dimension_idx++;
+    //                return lhs;
+    //              }));
+    //     pnabla_MXX(deref(LibTag{}, t), k) =
+    //         pnabla_MXX(deref(LibTag{}, t), k) / vol(deref(LibTag{}, t), k);
+    //   }
+    //   for (auto const &t : getVertices(LibTag{}, mesh)) {
+    //     pnabla_MYY(deref(LibTag{}, t), k) =
+    //         (m_sparse_dimension_idx = 0,
+    //          reduceEdgeToVertex(
+    //              mesh, t, (double)0.0, [&](auto &lhs, auto const &redIdx) {
+    //                lhs += zavgS_MYY(deref(LibTag{}, redIdx), k) *
+    //                       sign(deref(LibTag{}, t), m_sparse_dimension_idx,
+    //                       k);
+    //                m_sparse_dimension_idx++;
+    //                return lhs;
+    //              }));
+    //     pnabla_MYY(deref(LibTag{}, t), k) =
+    //         pnabla_MYY(deref(LibTag{}, t), k) / vol(deref(LibTag{}, t), k);
+    //   }
+    auto v2e =
+        gridtools::next::mesh::connectivity<std::tuple<vertex, edge>>(mesh);
+    static_assert(gridtools::is_sid<decltype(
+                      gridtools::next::connectivity::neighbor_table(v2e))>{});
+
+    auto vertex_fields =
+        tu::make<gridtools::sid::composite::keys<connectivity_tag,
+                                                 pnabla_MXX_tag, pnabla_MYY_tag,
+                                                 sign_tag, vol_tag>::values>(
+            gridtools::next::connectivity::neighbor_table(v2e), pnabla_MXX,
+            pnabla_MYY, sign, vol);
+    static_assert(
+        gridtools::sid::concept_impl_::is_sid<decltype(vertex_fields)>{});
+
+    auto ptrs = gridtools::sid::get_origin(vertex_fields)();
+    auto strides = gridtools::sid::get_strides(vertex_fields);
+
+    for (int i = 0; i < gridtools::next::connectivity::primary_size(v2e); ++i) {
+      *gridtools::at_key<pnabla_MXX_tag>(ptrs) = 0.;
+      { // reduce
+        for (int neigh = 0;
+             neigh < gridtools::next::connectivity::max_neighbors(v2e);
+             ++neigh) {
+          // body
+          auto absolute_neigh_index =
+              *gridtools::at_key<connectivity_tag>(ptrs);
+          if (absolute_neigh_index !=
+              gridtools::next::connectivity::skip_value(v2e)) {
+
+            auto zavgS_MXX_ptr = gridtools::sid::get_origin(zavgS_MXX)();
+            gridtools::sid::shift(
+                zavgS_MXX_ptr,
+                gridtools::at_key<edge>(gridtools::sid::get_strides(zavgS_MXX)),
+                absolute_neigh_index);
+            auto zavgS_MXX_value = *zavgS_MXX_ptr;
+
+            auto sign_ptr = gridtools::at_key<sign_tag>(
+                ptrs); // if the sparse dimension is tagged with neighbor, the
+                       // ptr is already correct
+            auto sign_value = *sign_ptr;
+
+            *gridtools::at_key<pnabla_MXX_tag>(ptrs) +=
+                zavgS_MXX_value * sign_value;
+            // body end
+          }
+          gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides), 1);
+        }
+        gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides),
+                              -gridtools::next::connectivity::max_neighbors(
+                                  v2e)); // or reset ptr to origin and shift ?
+      }
+      *gridtools::at_key<pnabla_MYY_tag>(ptrs) = 1;
+      { // reduce
+        for (int neigh = 0;
+             neigh < gridtools::next::connectivity::max_neighbors(v2e);
+             ++neigh) {
+          // body
+          auto absolute_neigh_index =
+              *gridtools::at_key<connectivity_tag>(ptrs);
+          if (absolute_neigh_index !=
+              gridtools::next::connectivity::skip_value(v2e)) {
+
+            auto zavgS_MYY_ptr = gridtools::sid::get_origin(zavgS_MYY)();
+            gridtools::sid::shift(
+                zavgS_MYY_ptr,
+                gridtools::at_key<edge>(gridtools::sid::get_strides(zavgS_MYY)),
+                absolute_neigh_index);
+            auto zavgS_YY_value = *zavgS_MYY_ptr;
+
+            // if the sparse dimension is tagged with `neighbor`, the ptr is
+            // already correct
+            auto sign_ptr = gridtools::at_key<sign_tag>(ptrs);
+            auto sign_value = *sign_ptr;
+
+            *gridtools::at_key<pnabla_MYY_tag>(ptrs) +=
+                zavgS_YY_value * sign_value;
+            // body end
+          }
+          gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides), 1);
+        }
+        // the following or reset ptr to origin and shift ?
+        gridtools::sid::shift(
+            ptrs, gridtools::at_key<neighbor>(strides),
+            -gridtools::next::connectivity::max_neighbors(v2e));
+      }
+      *gridtools::at_key<pnabla_MXX_tag>(ptrs) /=
+          *gridtools::at_key<vol_tag>(ptrs);
+      *gridtools::at_key<pnabla_MYY_tag>(ptrs) /=
+          *gridtools::at_key<vol_tag>(ptrs);
+      gridtools::sid::shift(ptrs, gridtools::at_key<vertex>(strides), 1);
+    }
+  }
+}
+
+TEST(FVM, nabla) {
 
   FVMDriver driver{"O32", 1};
 
@@ -275,42 +506,34 @@ int main() {
       driver.fs_edges().createField<double>(atlas::option::name("zavgS_MYY"));
 
   driver.fillInputData(m_pp);
-  print_min_max(m_pp);
+  //   print_min_max(m_pp);
 
   atlas::output::Gmsh gmesh("mymesh.msh");
   gmesh.write(driver.mesh());
   gmesh.write(m_pp);
 
-  //   // prepare views to pass to the generated code
-  //   atlasInterface::Field<double> vol =
-  //       atlas::array::make_view<double, 2>(driver.vol());
-  //   atlasInterface::Field<double> S_MXX =
-  //       atlas::array::make_view<double, 2>(driver.S_MXX());
-  //   atlasInterface::Field<double> S_MYY =
-  //       atlas::array::make_view<double, 2>(driver.S_MYY());
-  //   atlasInterface::Field<double> zavgS_MXX =
-  //       atlas::array::make_view<double, 2>(m_zavgS_MXX);
-  //   atlasInterface::Field<double> zavgS_MYY =
-  //       atlas::array::make_view<double, 2>(m_zavgS_MYY);
-  //   atlasInterface::Field<double> pp = atlas::array::make_view<double,
-  //   2>(m_pp); atlasInterface::Field<double> pnabla_MXX =
-  //       atlas::array::make_view<double, 2>(m_pnabla_MXX);
-  //   atlasInterface::Field<double> pnabla_MYY =
-  //       atlas::array::make_view<double, 2>(m_pnabla_MYY);
-  //   atlasInterface::SparseDimension<double> sign =
-  //       atlas::array::make_view<double, 3>(driver.sign());
+  auto edge_sid = [](auto &&field) {
+    return gridtools::next::atlas_util::as<edge, dim::k>::with_type<double>{}(
+        field);
+  };
+  auto node_sid = [](auto &&field) {
+    return gridtools::next::atlas_util::as<vertex, dim::k>::with_type<double>{}(
+        field);
+  };
 
-  //   atlasInterface::Mesh atlasInterfaceMesh{driver.mesh()};
-  //   dawn_generated::cxxnaiveico::generated<atlasInterface::atlasTag>(
-  //       atlasInterfaceMesh, driver.nb_levels(), S_MXX, S_MYY, zavgS_MXX,
-  //       zavgS_MYY, pp, pnabla_MXX, pnabla_MYY, vol, sign)
-  //       .run();
+  nabla(driver.mesh(), edge_sid(driver.S_MXX()), edge_sid(driver.S_MYY()),
+        edge_sid(m_zavgS_MXX), edge_sid(m_zavgS_MYY), node_sid(m_pp),
+        node_sid(m_pnabla_MXX), node_sid(m_pnabla_MYY), node_sid(driver.vol()),
+        gridtools::next::atlas_util::as<vertex, dim::k, neighbor>::with_type<
+            double>{}(driver.sign()));
 
   //   gmesh.write(m_pnabla_MXX);
 
-  //   std::cout << "after nabla: " << std::endl;
-  //   //   print_min_max(m_zavgS_MXX);
-  //   //   print_min_max(m_zavgS_MYY);
-  //   print_min_max(m_pnabla_MXX);
-  //   print_min_max(m_pnabla_MYY);
+  auto [x_min, x_max, x_avg] = min_max(m_pnabla_MXX);
+  auto [y_min, y_max, y_avg] = min_max(m_pnabla_MYY);
+
+  ASSERT_DOUBLE_EQ(-3.5455427772566003E-003, x_min);
+  ASSERT_DOUBLE_EQ(3.5455427772565435E-003, x_max);
+  ASSERT_DOUBLE_EQ(-3.3540113705465301E-003, y_min);
+  ASSERT_DOUBLE_EQ(3.3540113705465301E-003, y_max);
 }
