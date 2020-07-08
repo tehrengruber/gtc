@@ -42,3 +42,8 @@ _unstructured SID (uSID)_ is a SID with the following dimensions:
   \[TODO maybe something like `local<LocationType>` or `neighbor<LocationType>`, but then the same for the neighbor table to be able to iterate both with the same tag.\]
 - the vertical dimension is identified with `namespace dim {struct k;}` (TODO better ideas?)
 - TODO what to do with extra dimensions?
+
+
+## TODO
+
+- If elements are not indexed contiguously, we need to abstract the mechanism for iterating the primary location loop. E.g. loop over pole edges.

@@ -47,6 +47,30 @@ struct regular_connectivity {
                  })()},
         missing_value_{conn.missing_value()} {}
 
+//   template <class Filter>
+//   auto initialize_filtered(atlas::mesh::MultiBlockConnectivity const &conn,
+//                            Filter &&filter) {
+//     static_assert(
+//         false,
+//         "This idea is broken, because I don't know which edge I am on...");
+//     std::vector<atlas::idx_t> tmp;
+//     for (atlas::idx_t i = 0; i < conn.rows(); ++i) {
+//       if (filter(i))
+//         tmp.push_back(i);
+//     }
+//     return builder{}(tmp.size())
+//         .initializer([&conn, &tmp](std::size_t row, std::size_t col) {
+//           return col < conn.cols(tmp[row]) ? conn.row(tmp[row])(col)
+//                                            : conn.missing_value();
+//         })();
+//   }
+
+//   template <class Filter>
+//   regular_connectivity(atlas::mesh::MultiBlockConnectivity const &conn,
+//                        Filter &&filter)
+//       : tbl_{initialize_filtered(conn, std::forward<Filter>(filter))},
+//         missing_value_{conn.missing_value()} {}
+
   friend std::size_t
   connectivity_primary_size(regular_connectivity const &conn) {
     return conn.tbl_->lengths()[0];
@@ -67,8 +91,7 @@ struct regular_connectivity {
     //     gridtools::hymap::keys<LocationType, neighbor>>(conn.tbl_);
     return gridtools::sid::rename_dimension<
         gridtools::integral_constant<int, 1>, neighbor>(
-        gridtools::sid::rename_dimension<gridtools::integral_constant<int,
-        0>,
+        gridtools::sid::rename_dimension<gridtools::integral_constant<int, 0>,
                                          LocationType>(conn.tbl_));
   }
 };
@@ -94,5 +117,19 @@ decltype(auto) mesh_connectivity(const Mesh &mesh) {
   return gridtools::next::atlas_wrappers::regular_connectivity<edge, 2>{
       mesh.edges().node_connectivity()};
 }
+
+// struct pole_edge;
+
+// template <class Key,
+//           std::enable_if_t<std::is_same_v<Key, std::tuple<pole_edge, vertex>>,
+//                            int> = 0> // TODO protect
+// decltype(auto) mesh_connectivity(const Mesh &mesh) {
+//   const auto edge_flags = array::make_view<int, 1>(mesh.edges().flags());
+//   return gridtools::next::atlas_wrappers::regular_connectivity<pole_edge, 2>{
+//       mesh.edges().node_connectivity(), [&edge_flags](atlas::idx_t edge) {
+//         return atlas::mesh::Nodes::Topology::check(
+//             edge_flags(edge), atlas::mesh::Nodes::Topology::POLE);
+//       }};
+// }
 
 } // namespace atlas
