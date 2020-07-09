@@ -22,12 +22,15 @@ namespace sid_adapter_impl_ {
 template <class> struct to_hymap;
 
 template <std::size_t... I> struct to_hymap<std::index_sequence<I...>> {
-  template <std::size_t II> using intifier = int;
+  template <std::size_t II>struct intifier{
+    using type = int;
+  };
+  // template <std::size_t II> using intifier = int;
 
   auto operator()(idx_t const *strides) const {
     using keys_t =
         gridtools::hymap::keys<gridtools::integral_constant<int, I>...>;
-    using hymap_t = typename keys_t::template values<intifier<I>...>;
+    using hymap_t = typename keys_t::template values<typename intifier<I>::type...>;
     return hymap_t(strides[I]...);
   }
 };
@@ -35,11 +38,14 @@ template <std::size_t... I> struct to_hymap<std::index_sequence<I...>> {
 template <class> struct lower_bounds;
 
 template <std::size_t... I> struct lower_bounds<std::index_sequence<I...>> {
-  template <std::size_t II> using zero = gridtools::integral_constant<int, 0>;
+  // template <std::size_t II> using zero = gridtools::integral_constant<int, 0>;
+    template <std::size_t II>struct zero{
+    using type = gridtools::integral_constant<int, 0>;
+  };
 
   using keys_t =
       gridtools::hymap::keys<gridtools::integral_constant<int, I>...>;
-  using type = typename keys_t::template values<zero<I>...>;
+  using type = typename keys_t::template values<typename zero<I>::type...>;
 };
 
 template <class T> using lower_bounds_t = typename lower_bounds<T>::type;
