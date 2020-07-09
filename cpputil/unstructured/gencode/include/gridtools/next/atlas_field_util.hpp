@@ -1,3 +1,4 @@
+#include <array_fwd.h>
 #include <cassert>
 
 #include <atlas/field/Field.h>
@@ -7,6 +8,14 @@
 #include <gridtools/next/sid_rename_all.hpp>
 #include <gridtools/sid/delegate.hpp>
 
+#include <gridtools/storage/builder.hpp>
+#include <gridtools/storage/sid.hpp>
+#include <utility>
+#ifdef __CUDACC__ // TODO in a proper place
+#include <gridtools/storage/gpu.hpp>
+#else
+#include <gridtools/storage/cpu_ifirst.hpp>
+#endif
 #include "unstructured.hpp"
 
 #pragma once
@@ -71,6 +80,41 @@ template <class... DimensionTags> struct as {
       return gridtools::sid::rename_all_dimensions<
           gridtools::hymap::keys<DimensionTags...>>(
           atlas::array::make_view<DataType, sizeof...(DimensionTags)>(field));
+    }
+  };
+};
+
+// TODO just a temporary solution, maybe a SID transformer would make sense
+// (requirement would be upper and lower bounds are available for the input SID)
+template <class... DimensionTags> struct as_data_store {
+  template <class DataType> struct with_type {
+    template <class> struct custom_builder;
+    template <std::size_t... Is>
+    struct custom_builder<std::index_sequence<Is...>> {
+      template <class StorageTrait> auto build(atlas::Field const &field) {
+        auto const &shape = field.shape();
+        auto view =
+            atlas::array::make_view<DataType, sizeof...(DimensionTags)>(field);
+        return gridtools::sid::rename_all_dimensions<
+            gridtools::hymap::keys<DimensionTags...>>(std::move(
+                    gridtools::storage::builder<StorageTrait>.template
+            dimensions(                shape[Is]...)
+            .template type<DataType>()
+                .initializer([&](auto... indices){
+                    return view(indices...);
+                })()
+            ));
+      }
+    };
+
+    auto operator()(atlas::Field &field) {
+      auto builder =
+          custom_builder<std::make_index_sequence<sizeof...(DimensionTags)>>{};
+#ifdef __CUDACC__ // TODO in a proper place
+      return builder.template build<gridtools::storage::gpu>(field);
+#else
+      return builder.template build<gridtools::storage::cpu_ifirst>(field);
+#endif
     }
   };
 };

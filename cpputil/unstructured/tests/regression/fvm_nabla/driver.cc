@@ -345,8 +345,7 @@ void nabla(Mesh &&mesh, S_MXX_t &&S_MXX, S_MYY_t &&S_MYY,
           acc += *pp_ptr;
           // body end
 
-          gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides),
-                                1); // TODO or only the connectivity tagged ptr
+          gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides), 1);
         }
         gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides),
                               -gridtools::next::connectivity::max_neighbors(

@@ -26,35 +26,6 @@ namespace dim {
 struct k;
 } // namespace dim
 
-// field to sid converter
-
-// template <class LocationType, class DataType> auto as(atlas::Field &field) {
-//   assert(field.rank() == 2 && "only rank 2 can be converted to "
-//                               "uSID");
-
-//   if constexpr (std::is_same<LocationType, edge>{}) {
-//     assert(field.functionspace().type().compare("Edges") == 0 &&
-//            "wrong location type");
-//   } else if constexpr (std::is_same<LocationType, cell>{}) {
-//     assert(field.functionspace().type().compare("Cells") == 0 &&
-//            "wrong location type");
-//   } else if constexpr (std::is_same<LocationType, vertex>{}) {
-//     assert(field.functionspace().type().compare("Nodes") == 0 &&
-//            "wrong location type");
-//   }
-//   using strides_t =
-//       typename gridtools::hymap::keys<LocationType,
-//                                       dim::k>::template values<int, int>;
-
-//   return gridtools::sid::synthetic()
-//       .set<gridtools::sid::property::origin>(
-//           gridtools::sid::make_simple_ptr_holder(
-//               &atlas::array::make_view<DataType, 2>(field)(0, 0)))
-//       .template set<gridtools::sid::property::strides>(
-//           strides_t(field.strides()[0], field.strides()[1]))
-//       .template set<gridtools::sid::property::strides_kind, strides_t>();
-// }
-
 int main() {
   auto mesh = atlas_util::make_mesh();
   atlas::mesh::actions::build_edges(mesh);
@@ -71,20 +42,25 @@ int main() {
     for (int k = 0; k < nb_levels; ++k)
       view(i, k) = i * 10 + k;
 
-  //   auto my_field_sidified = as<edge, double>(my_field);
-  //   static_assert(gridtools::is_sid<decltype(my_field_sidified)>{});
-
   auto my_field_sidified =
       gridtools::next::atlas_util::as<edge, dim::k>::with_type<double>{}(
           my_field);
   static_assert(gridtools::is_sid<decltype(my_field_sidified)>{});
 
+  auto my_field_as_data_store = gridtools::next::atlas_util::as_data_store<
+      edge, dim::k>::with_type<double>{}(my_field);
+  static_assert(gridtools::is_sid<decltype(my_field_as_data_store)>{});
+
   auto strides = gridtools::sid::get_strides(my_field_sidified);
+  auto strides_ds = gridtools::sid::get_strides(my_field_as_data_store);
   for (int i = 0; i < fs_edges.size(); ++i)
     for (int k = 0; k < nb_levels; ++k) {
       auto ptr = gridtools::sid::get_origin(my_field_sidified)();
       gridtools::sid::shift(ptr, gridtools::at_key<edge>(strides), i);
       gridtools::sid::shift(ptr, gridtools::at_key<dim::k>(strides), k);
-      std::cout << view(i, k) << "/" << *ptr << std::endl;
+      auto ptr2 = gridtools::sid::get_origin(my_field_as_data_store)();
+      gridtools::sid::shift(ptr2, gridtools::at_key<edge>(strides_ds), i);
+      gridtools::sid::shift(ptr2, gridtools::at_key<dim::k>(strides_ds), k);
+      std::cout << view(i, k) << "/" << *ptr << "/" << *ptr2 << std::endl;
     }
 }
