@@ -23,44 +23,41 @@
 #include "tests/include/util/atlas_util.hpp"
 
 namespace dim {
-struct k;
+    struct k;
 } // namespace dim
 
 int main() {
-  auto mesh = atlas_util::make_mesh();
-  atlas::mesh::actions::build_edges(mesh);
+    auto mesh = atlas_util::make_mesh();
+    atlas::mesh::actions::build_edges(mesh);
 
-  int nb_levels = 5;
-  atlas::functionspace::EdgeColumns fs_edges(
-      mesh, atlas::option::levels(nb_levels) | atlas::option::halo(1));
+    int nb_levels = 5;
+    atlas::functionspace::EdgeColumns fs_edges(mesh, atlas::option::levels(nb_levels) | atlas::option::halo(1));
 
-  atlas::Field f;
-  auto my_field = fs_edges.createField<double>(atlas::option::name("my_field"));
+    atlas::Field f;
+    auto my_field = fs_edges.createField<double>(atlas::option::name("my_field"));
 
-  auto view = atlas::array::make_view<double, 2>(my_field);
-  for (int i = 0; i < fs_edges.size(); ++i)
-    for (int k = 0; k < nb_levels; ++k)
-      view(i, k) = i * 10 + k;
+    auto view = atlas::array::make_view<double, 2>(my_field);
+    for (int i = 0; i < fs_edges.size(); ++i)
+        for (int k = 0; k < nb_levels; ++k)
+            view(i, k) = i * 10 + k;
 
-  auto my_field_sidified =
-      gridtools::next::atlas_util::as<edge, dim::k>::with_type<double>{}(
-          my_field);
-  static_assert(gridtools::is_sid<decltype(my_field_sidified)>{});
+    auto my_field_sidified = gridtools::next::atlas_util::as<edge, dim::k>::with_type<double>{}(my_field);
+    static_assert(gridtools::is_sid<decltype(my_field_sidified)>{});
 
-  auto my_field_as_data_store = gridtools::next::atlas_util::as_data_store<
-      edge, dim::k>::with_type<double>{}(my_field);
-  static_assert(gridtools::is_sid<decltype(my_field_as_data_store)>{});
+    auto my_field_as_data_store =
+        gridtools::next::atlas_util::as_data_store<edge, dim::k>::with_type<double>{}(my_field);
+    static_assert(gridtools::is_sid<decltype(my_field_as_data_store)>{});
 
-  auto strides = gridtools::sid::get_strides(my_field_sidified);
-  auto strides_ds = gridtools::sid::get_strides(my_field_as_data_store);
-  for (int i = 0; i < fs_edges.size(); ++i)
-    for (int k = 0; k < nb_levels; ++k) {
-      auto ptr = gridtools::sid::get_origin(my_field_sidified)();
-      gridtools::sid::shift(ptr, gridtools::at_key<edge>(strides), i);
-      gridtools::sid::shift(ptr, gridtools::at_key<dim::k>(strides), k);
-      auto ptr2 = gridtools::sid::get_origin(my_field_as_data_store)();
-      gridtools::sid::shift(ptr2, gridtools::at_key<edge>(strides_ds), i);
-      gridtools::sid::shift(ptr2, gridtools::at_key<dim::k>(strides_ds), k);
-      std::cout << view(i, k) << "/" << *ptr << "/" << *ptr2 << std::endl;
-    }
+    auto strides = gridtools::sid::get_strides(my_field_sidified);
+    auto strides_ds = gridtools::sid::get_strides(my_field_as_data_store);
+    for (int i = 0; i < fs_edges.size(); ++i)
+        for (int k = 0; k < nb_levels; ++k) {
+            auto ptr = gridtools::sid::get_origin(my_field_sidified)();
+            gridtools::sid::shift(ptr, gridtools::at_key<edge>(strides), i);
+            gridtools::sid::shift(ptr, gridtools::at_key<dim::k>(strides), k);
+            auto ptr2 = gridtools::sid::get_origin(my_field_as_data_store)();
+            gridtools::sid::shift(ptr2, gridtools::at_key<edge>(strides_ds), i);
+            gridtools::sid::shift(ptr2, gridtools::at_key<dim::k>(strides_ds), k);
+            std::cout << view(i, k) << "/" << *ptr << "/" << *ptr2 << std::endl;
+        }
 }

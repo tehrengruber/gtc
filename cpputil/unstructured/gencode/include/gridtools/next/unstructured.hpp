@@ -9,5 +9,5 @@ struct cell;
 struct neighbor;
 
 namespace dim {
-struct k;
+    struct k;
 }
