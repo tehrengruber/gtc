@@ -19,7 +19,6 @@
 #include <gridtools/next/mesh.hpp>
 #include <gridtools/sid/synthetic.hpp>
 
-#include "gridtools/sid/rename_dimension.hpp"
 #include "tests/include/util/atlas_util.hpp"
 
 namespace dim {
