@@ -97,12 +97,12 @@ template <class... DimensionTags> struct as_data_store {
             atlas::array::make_view<DataType, sizeof...(DimensionTags)>(field);
         return gridtools::sid::rename_all_dimensions<
             gridtools::hymap::keys<DimensionTags...>>(std::move(
-                    gridtools::storage::builder<StorageTrait>.template
-            dimensions(                shape[Is]...)
-            .template type<DataType>()
-                .initializer([&](auto... indices){
-                    return view(indices...);
-                })()
+                    gridtools::storage::builder<StorageTrait>.template dimensions(shape[Is]...)
+               .template type<DataType>()
+                .initializer([&](auto first, auto... indices){
+                    return view(first, indices...);
+                })
+                ()
             ));
       }
     };
