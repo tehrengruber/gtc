@@ -5,8 +5,8 @@
 #include <atlas/functionspace.h>
 #include <gridtools/common/hymap.hpp>
 #include <gridtools/next/atlas_array_view_adapter.hpp>
-#include <gridtools/next/sid_rename_all.hpp>
 #include <gridtools/sid/delegate.hpp>
+#include <gridtools/sid/rename_dimensions.hpp>
 
 #include <gridtools/storage/builder.hpp>
 #include <gridtools/storage/sid.hpp>
@@ -74,7 +74,7 @@ namespace gridtools::next::atlas_util {
                     gridtools::is_sid<decltype(atlas::array::make_view<DataType, sizeof...(DimensionTags)>(field))>{},
                     "ArrayView is not SID. Did you include "
                     "\"atlas_array_view_adapter.hpp\"?");
-                return gridtools::sid::rename_all_dimensions<gridtools::hymap::keys<DimensionTags...>>(
+                return gridtools::sid::rename_numbered_dimensions<DimensionTags...>(
                     atlas::array::make_view<DataType, sizeof...(DimensionTags)>(field));
             }
         };
@@ -94,14 +94,13 @@ namespace gridtools::next::atlas_util {
                 auto build(atlas::Field const &field) {
                     auto const &shape = field.shape();
                     auto view = atlas::array::make_view<DataType, sizeof...(DimensionTags)>(field);
-                    return gridtools::sid::rename_all_dimensions<
-            gridtools::hymap::keys<DimensionTags...>>(std::move(
-                    gridtools::storage::builder<StorageTrait>.template dimensions(shape[Is]...)
-               .template type<DataType>()
-                .initializer([&](auto first, auto... indices){
-                    return view(first, indices...);
-                })
-                ()
+                    return gridtools::sid::rename_numbered_dimensions<DimensionTags...>(std::move(
+                    gridtools::storage::builder<StorageTrait>.template
+            dimensions(                shape[Is]...)
+            .template type<DataType>()
+                .initializer([&](auto... indices){
+                    return view(indices...);
+                })()
             ));
                 }
             };

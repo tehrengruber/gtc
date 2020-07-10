@@ -5,7 +5,7 @@
 #include "gridtools/common/layout_map.hpp"
 #include <atlas/mesh.h>
 #include <gridtools/sid/concept.hpp>
-#include <gridtools/sid/rename_dimension.hpp>
+#include <gridtools/sid/rename_dimensions.hpp>
 #include <gridtools/storage/builder.hpp>
 #include <gridtools/storage/sid.hpp>
 
@@ -78,11 +78,7 @@ namespace gridtools::next::atlas_wrappers {
         friend int connectivity_skip_value(regular_connectivity const &conn) { return conn.missing_value_; }
 
         friend auto connectivity_neighbor_table(regular_connectivity const &conn) {
-
-            // return gridtools::sid::rename_all_dimensions<
-            //     gridtools::hymap::keys<LocationType, neighbor>>(conn.tbl_);
-            return gridtools::sid::rename_dimension<gridtools::integral_constant<int, 1>, neighbor>(
-                gridtools::sid::rename_dimension<gridtools::integral_constant<int, 0>, LocationType>(conn.tbl_));
+            return gridtools::sid::rename_numbered_dimensions<LocationType, neighbor>(conn.tbl_);
         }
     };
 
