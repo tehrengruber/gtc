@@ -24,6 +24,13 @@ using storage_trait = gridtools::storage::cpu_ifirst;
 #endif
 
 namespace gridtools::next::atlas_wrappers {
+    // not really a connectivity
+    template <class LocationType>
+    struct primary_connectivity {
+        std::size_t size_;
+
+        GT_FUNCTION friend std::size_t connectivity_size(primary_connectivity const &conn) { return conn.size_; }
+    };
 
     template <class LocationType, std::size_t MaxNeighbors>
     struct regular_connectivity {
@@ -36,7 +43,7 @@ namespace gridtools::next::atlas_wrappers {
 
         decltype(builder{}(std::size_t{})()) tbl_;
         const atlas::idx_t missing_value_; // TODO Not sure if we can leave the type open
-        const int size_;
+        const gridtools::uint_t size_;
 
         regular_connectivity(atlas::mesh::IrregularConnectivity const &conn)
             : tbl_{builder{}(conn.rows()).initializer([&conn](std::size_t row, std::size_t col) {
@@ -74,9 +81,7 @@ namespace gridtools::next::atlas_wrappers {
         //       : tbl_{initialize_filtered(conn, std::forward<Filter>(filter))},
         //         missing_value_{conn.missing_value()} {}
 
-        GT_FUNCTION friend std::size_t connectivity_primary_size(regular_connectivity const &conn) {
-            return conn.size_;
-        }
+        GT_FUNCTION friend std::size_t connectivity_size(regular_connectivity const &conn) { return conn.size_; }
 
         GT_FUNCTION friend std::integral_constant<std::size_t, MaxNeighbors> connectivity_max_neighbors(
             regular_connectivity const &conn) {
@@ -85,7 +90,7 @@ namespace gridtools::next::atlas_wrappers {
 
         GT_FUNCTION friend int connectivity_skip_value(regular_connectivity const &conn) { return conn.missing_value_; }
 
-        GT_FUNCTION friend auto connectivity_neighbor_table(regular_connectivity const &conn) {
+        friend auto connectivity_neighbor_table(regular_connectivity const &conn) {
             return gridtools::sid::rename_numbered_dimensions<LocationType, neighbor>(conn.tbl_);
         }
     };
@@ -129,7 +134,7 @@ namespace gridtools::next::atlas_wrappers {
     //         missing_value_{conn.missing_value()} {}
 
     //   friend std::size_t
-    //   connectivity_primary_size(sparse_connectivity const &conn) {
+    //   connectivity_size(sparse_connectivity const &conn) {
     //     return conn.tbl_->lengths()[0];
     //   }
 
@@ -168,6 +173,15 @@ namespace atlas {
     template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<edge, vertex>>, int> = 0> // TODO protect
     decltype(auto) mesh_connectivity(const Mesh &mesh) {
         return gridtools::next::atlas_wrappers::regular_connectivity<edge, 2>{mesh.edges().node_connectivity()};
+    }
+
+    template <class Key, std::enable_if_t<std::is_same_v<Key, edge>, int> = 0> // TODO protect
+    decltype(auto) mesh_connectivity(const Mesh &mesh) {
+        return gridtools::next::atlas_wrappers::primary_connectivity<edge>{mesh.edges().size()};
+    }
+    template <class Key, std::enable_if_t<std::is_same_v<Key, vertex>, int> = 0> // TODO protect
+    decltype(auto) mesh_connectivity(const Mesh &mesh) {
+        return gridtools::next::atlas_wrappers::primary_connectivity<vertex>{mesh.nodes().size()};
     }
 
     // struct pole_edge;

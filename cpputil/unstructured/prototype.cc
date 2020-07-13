@@ -31,7 +31,7 @@ namespace my_personal_connectivity {
     }
 
     template <std::size_t MaxNeighbors, class LocationType>
-    std::size_t connectivity_primary_size(myCon<MaxNeighbors, LocationType> const &conn) {
+    std::size_t connectivity_size(myCon<MaxNeighbors, LocationType> const &conn) {
         return conn.neighborTable.size();
     }
 
@@ -63,7 +63,7 @@ auto indirect_access(SID &&field, NeighPtrT const &neighptr) {
 
 template <class Mesh, class In, class Out>
 void sum_vertex_to_cell(Mesh const &mesh, In &&in, Out &&out) {
-    auto n_cells = gridtools::next::connectivity::primary_size(gridtools::at_key<cell2vertex>(mesh));
+    auto n_cells = gridtools::next::connectivity::size(gridtools::at_key<cell2vertex>(mesh));
 
     auto cell_to_vertex =
         gridtools::next::connectivity::neighbor_table(gridtools::next::mesh::connectivity<cell2vertex>(mesh));

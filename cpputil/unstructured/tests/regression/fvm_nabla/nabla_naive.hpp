@@ -71,7 +71,7 @@ void nabla(Mesh &&mesh,
 
         auto ptrs = gridtools::sid::get_origin(edge_fields)();
         auto strides = gridtools::sid::get_strides(edge_fields);
-        for (int i = 0; i < gridtools::next::connectivity::primary_size(e2v); ++i) {
+        for (int i = 0; i < gridtools::next::connectivity::size(e2v); ++i) {
             double acc = 0.;
             { // reduce
                 for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(e2v); ++neigh) {
@@ -134,7 +134,7 @@ void nabla(Mesh &&mesh,
         auto ptrs = gridtools::sid::get_origin(vertex_fields)();
         auto strides = gridtools::sid::get_strides(vertex_fields);
 
-        for (int i = 0; i < gridtools::next::connectivity::primary_size(v2e); ++i) {
+        for (int i = 0; i < gridtools::next::connectivity::size(v2e); ++i) {
             *gridtools::at_key<pnabla_MXX_tag>(ptrs) = 0.;
             { // reduce
                 for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(v2e); ++neigh) {
@@ -203,7 +203,7 @@ void nabla(Mesh &&mesh,
     //   {
     //     auto pe2v = gridtools::next::mesh::connectivity<
     //         std::tuple<atlas::pole_edge, vertex>>(mesh);
-    //     for (int i = 0; i < gridtools::next::connectivity::primary_size(pe2v);
+    //     for (int i = 0; i < gridtools::next::connectivity::size(pe2v);
     //          ++i) {
     //     }
     //   }
@@ -227,7 +227,7 @@ void nabla(Mesh &&mesh,
         auto ptrs = gridtools::sid::get_origin(vertex_fields)();
         auto strides = gridtools::sid::get_strides(vertex_fields);
 
-        for (int i = 0; i < gridtools::next::connectivity::primary_size(v2e); ++i) {
+        for (int i = 0; i < gridtools::next::connectivity::size(v2e); ++i) {
             *gridtools::at_key<pnabla_MXX_tag>(ptrs) /= *gridtools::at_key<vol_tag>(ptrs);
             *gridtools::at_key<pnabla_MYY_tag>(ptrs) /= *gridtools::at_key<vol_tag>(ptrs);
             gridtools::sid::shift(ptrs, gridtools::at_key<vertex>(strides), 1);

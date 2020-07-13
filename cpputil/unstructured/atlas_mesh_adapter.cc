@@ -23,7 +23,7 @@ int main() {
 
     auto const &v2e = gridtools::next::mesh::connectivity<std::tuple<vertex, edge>>(mesh);
 
-    auto n_vertices = gridtools::next::connectivity::primary_size(v2e);
+    auto n_vertices = gridtools::next::connectivity::size(v2e);
     std::cout << n_vertices << std::endl;
     std::cout << gridtools::next::connectivity::max_neighbors(v2e) << std::endl;
     std::cout << gridtools::next::connectivity::skip_value(v2e) << std::endl;
@@ -41,7 +41,7 @@ int main() {
     std::cout << gridtools::at_key<neighbor>(strides) << std::endl;
     std::cout << gridtools::at_key<vertex>(strides) << std::endl;
 
-    for (std::size_t v = 0; v < gridtools::next::connectivity::primary_size(v2e); ++v) {
+    for (std::size_t v = 0; v < gridtools::next::connectivity::size(v2e); ++v) {
         auto ptr = gridtools::sid::get_origin(v2e_tbl)();
         gridtools::sid::shift(ptr, gridtools::at_key<vertex>(strides), v);
         for (std::size_t i = 0; i < gridtools::next::connectivity::max_neighbors(v2e); ++i) {

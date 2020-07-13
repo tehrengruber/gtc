@@ -7,8 +7,9 @@ namespace gridtools {
     namespace next {
 
         namespace connectivity {
+            // Doesn't need to be callable on device
             template <class Connectivity>
-            GT_FUNCTION auto neighbor_table(Connectivity const &connectivity) {
+            GT_FUNCTION_HOST auto neighbor_table(Connectivity const &connectivity) {
                 return connectivity_neighbor_table(connectivity);
             };
 
@@ -18,8 +19,8 @@ namespace gridtools {
             }
 
             template <class Connectivity>
-            GT_FUNCTION std::size_t primary_size(Connectivity const &connectivity) {
-                return connectivity_primary_size(connectivity);
+            GT_FUNCTION std::size_t size(Connectivity const &connectivity) {
+                return connectivity_size(connectivity);
             }
 
             template <class Connectivity>
