@@ -8,22 +8,22 @@ namespace gridtools {
 
         namespace connectivity {
             template <class Connectivity>
-            auto neighbor_table(Connectivity const &connectivity) {
+            GT_FUNCTION auto neighbor_table(Connectivity const &connectivity) {
                 return connectivity_neighbor_table(connectivity);
             };
 
             template <class Connectivity>
-            auto max_neighbors(Connectivity const &connectivity) {
+            GT_FUNCTION auto max_neighbors(Connectivity const &connectivity) {
                 return connectivity_max_neighbors(connectivity);
             }
 
             template <class Connectivity>
-            std::size_t primary_size(Connectivity const &connectivity) {
+            GT_FUNCTION std::size_t primary_size(Connectivity const &connectivity) {
                 return connectivity_primary_size(connectivity);
             }
 
             template <class Connectivity>
-            auto skip_value(Connectivity const &connectivity) {
+            GT_FUNCTION auto skip_value(Connectivity const &connectivity) {
                 return connectivity_skip_value(connectivity);
             }
         } // namespace connectivity

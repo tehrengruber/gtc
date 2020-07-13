@@ -9,12 +9,19 @@
 #include <gridtools/storage/builder.hpp>
 #include <gridtools/storage/sid.hpp>
 
-#include <gridtools/storage/cpu_ifirst.hpp>
 #include <mesh/Connectivity.h>
 
 #include "mesh.hpp"
 #include "unstructured.hpp"
 #include <gridtools/next/atlas_field_util.hpp>
+
+#ifdef __CUDACC__ // TODO proper handling
+#include <gridtools/storage/gpu.hpp>
+using storage_trait = gridtools::storage::gpu;
+#else
+#include <gridtools/storage/cpu_ifirst.hpp>
+using storage_trait = gridtools::storage::cpu_ifirst;
+#endif
 
 namespace gridtools::next::atlas_wrappers {
 
@@ -22,25 +29,26 @@ namespace gridtools::next::atlas_wrappers {
     struct regular_connectivity {
         struct builder {
             auto operator()(std::size_t size) {
-                return gridtools::storage::builder<gridtools::storage::cpu_ifirst>.template type<int>().template layout<0,1>().template dimensions(size, std::integral_constant<std::size_t,
-        MaxNeighbors>{});
+                return gridtools::storage::builder<storage_trait>.template type<int>().template layout<0, 1>().template dimensions(
+                    size, std::integral_constant<std::size_t, MaxNeighbors>{});
             }
         };
 
         decltype(builder{}(std::size_t{})()) tbl_;
         const atlas::idx_t missing_value_; // TODO Not sure if we can leave the type open
+        const int size_;
 
         regular_connectivity(atlas::mesh::IrregularConnectivity const &conn)
             : tbl_{builder{}(conn.rows()).initializer([&conn](std::size_t row, std::size_t col) {
                   return col < conn.cols(row) ? conn.row(row)(col) : conn.missing_value();
               })()},
-              missing_value_{conn.missing_value()} {}
+              missing_value_{conn.missing_value()}, size_{tbl_->lengths()[0]} {}
 
         regular_connectivity(atlas::mesh::MultiBlockConnectivity const &conn)
             : tbl_{builder{}(conn.rows()).initializer([&conn](std::size_t row, std::size_t col) {
                   return col < conn.cols(row) ? conn.row(row)(col) : conn.missing_value();
               })()},
-              missing_value_{conn.missing_value()} {}
+              missing_value_{conn.missing_value()}, size_{tbl_->lengths()[0]} {}
 
         //   template <class Filter>
         //   auto initialize_filtered(atlas::mesh::MultiBlockConnectivity const &conn,
@@ -66,18 +74,18 @@ namespace gridtools::next::atlas_wrappers {
         //       : tbl_{initialize_filtered(conn, std::forward<Filter>(filter))},
         //         missing_value_{conn.missing_value()} {}
 
-        friend std::size_t connectivity_primary_size(regular_connectivity const &conn) {
-            return conn.tbl_->lengths()[0];
+        GT_FUNCTION friend std::size_t connectivity_primary_size(regular_connectivity const &conn) {
+            return conn.size_;
         }
 
-        friend std::integral_constant<std::size_t, MaxNeighbors> connectivity_max_neighbors(
+        GT_FUNCTION friend std::integral_constant<std::size_t, MaxNeighbors> connectivity_max_neighbors(
             regular_connectivity const &conn) {
             return {};
         }
 
-        friend int connectivity_skip_value(regular_connectivity const &conn) { return conn.missing_value_; }
+        GT_FUNCTION friend int connectivity_skip_value(regular_connectivity const &conn) { return conn.missing_value_; }
 
-        friend auto connectivity_neighbor_table(regular_connectivity const &conn) {
+        GT_FUNCTION friend auto connectivity_neighbor_table(regular_connectivity const &conn) {
             return gridtools::sid::rename_numbered_dimensions<LocationType, neighbor>(conn.tbl_);
         }
     };
