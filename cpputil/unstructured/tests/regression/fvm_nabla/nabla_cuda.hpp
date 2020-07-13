@@ -1,10 +1,14 @@
 #pragma once
 
+#include <gridtools/next/tmp_gpu_storage.hpp>
+#include <gridtools/sid/allocator.hpp>
+
 struct connectivity_tag;
 struct S_MXX_tag;
 struct S_MYY_tag;
 struct zavgS_MXX_tag;
 struct zavgS_MYY_tag;
+struct zavg_tmp_tag;
 
 struct pnabla_MXX_tag;
 struct pnabla_MYY_tag;
@@ -62,9 +66,9 @@ __global__ void nabla_edge_1(ConnE2V e2v,
                 gridtools::device::at_key<neighbor>(edge_strides),
                 -gridtools::next::connectivity::max_neighbors(e2v)); // or reset ptr to origin and shift ?
         }
-        double zavg = 0.5 * acc;
-        *gridtools::device::at_key<zavgS_MXX_tag>(edge_ptrs) = *gridtools::device::at_key<S_MXX_tag>(edge_ptrs) * zavg;
-        *gridtools::device::at_key<zavgS_MYY_tag>(edge_ptrs) = *gridtools::device::at_key<S_MYY_tag>(edge_ptrs) * zavg;
+        *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs) = 0.5 * acc; // via temporary for non-optimized parallel model
+        *gridtools::device::at_key<zavgS_MXX_tag>(edge_ptrs) = *gridtools::device::at_key<S_MXX_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs) ;
+        *gridtools::device::at_key<zavgS_MYY_tag>(edge_ptrs) = *gridtools::device::at_key<S_MYY_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs) ;
     }
 }
 
@@ -224,9 +228,14 @@ void nabla(Mesh &&mesh,
         auto e2v = gridtools::next::mesh::connectivity<std::tuple<edge, vertex>>(mesh);
         static_assert(gridtools::is_sid<decltype(gridtools::next::connectivity::neighbor_table(e2v))>{});
 
+
+        int k_size = 1; // TODO
+        auto cuda_alloc = gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>);// TODO
+        auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<edge, double>((int)gridtools::next::connectivity::size(e2v), k_size, cuda_alloc);
+
         auto edge_fields = tu::make<gridtools::sid::composite::
-                keys<connectivity_tag, S_MXX_tag, S_MYY_tag, zavgS_MXX_tag, zavgS_MYY_tag>::values>(
-            gridtools::next::connectivity::neighbor_table(e2v), S_MXX, S_MYY, zavgS_MXX, zavgS_MYY);
+                keys<connectivity_tag, S_MXX_tag, S_MYY_tag, zavgS_MXX_tag, zavgS_MYY_tag, zavg_tmp_tag>::values>(
+            gridtools::next::connectivity::neighbor_table(e2v), S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, zavg_tmp);
         static_assert(gridtools::sid::concept_impl_::is_sid<decltype(edge_fields)>{});
 
         auto edge_ptrs = gridtools::sid::get_origin(edge_fields);

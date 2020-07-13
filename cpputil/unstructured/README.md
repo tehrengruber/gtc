@@ -58,3 +58,4 @@ is a SID with the following dimensions:
 ## TODO
 
 - If elements are not indexed contiguously, we need to abstract the mechanism for iterating the primary location loop. E.g. loop over pole edges.
+- k size?
