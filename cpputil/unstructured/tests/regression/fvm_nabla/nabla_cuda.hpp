@@ -66,9 +66,12 @@ __global__ void nabla_edge_1(ConnE2V e2v,
                 gridtools::device::at_key<neighbor>(edge_strides),
                 -gridtools::next::connectivity::max_neighbors(e2v)); // or reset ptr to origin and shift ?
         }
-        *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs) = 0.5 * acc; // via temporary for non-optimized parallel model
-        *gridtools::device::at_key<zavgS_MXX_tag>(edge_ptrs) = *gridtools::device::at_key<S_MXX_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs) ;
-        *gridtools::device::at_key<zavgS_MYY_tag>(edge_ptrs) = *gridtools::device::at_key<S_MYY_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs) ;
+        *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs) =
+            0.5 * acc; // via temporary for non-optimized parallel model
+        *gridtools::device::at_key<zavgS_MXX_tag>(edge_ptrs) =
+            *gridtools::device::at_key<S_MXX_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs);
+        *gridtools::device::at_key<zavgS_MYY_tag>(edge_ptrs) =
+            *gridtools::device::at_key<S_MYY_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs);
     }
 }
 
@@ -174,9 +177,7 @@ __global__ void nabla_vertex_2(ConnV2E v2e,
 //     }
 //   }
 template <class ConnV2E /*Connectivity not needed*/, class VertexOrigins, class VertexStrides>
-__global__ void nabla_vertex_4(ConnV2E v2e,
-    VertexOrigins vertex_origins,
-    VertexStrides vertex_strides) {
+__global__ void nabla_vertex_4(ConnV2E v2e, VertexOrigins vertex_origins, VertexStrides vertex_strides) {
     // vertex loop
     // for (auto const &t : getVertices(LibTag{}, mesh)) {
     //     pnabla_MXX(deref(LibTag{}, t), k) =
@@ -228,10 +229,11 @@ void nabla(Mesh &&mesh,
         auto e2v = gridtools::next::mesh::connectivity<std::tuple<edge, vertex>>(mesh);
         static_assert(gridtools::is_sid<decltype(gridtools::next::connectivity::neighbor_table(e2v))>{});
 
-
         int k_size = 1; // TODO
-        auto cuda_alloc = gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>);// TODO
-        auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<edge, double>((int)gridtools::next::connectivity::size(e2v), k_size, cuda_alloc);
+        auto cuda_alloc =
+            gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>); // TODO
+        auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<edge, double>(
+            (int)gridtools::next::connectivity::size(e2v), k_size, cuda_alloc);
 
         auto edge_fields = tu::make<gridtools::sid::composite::
                 keys<connectivity_tag, S_MXX_tag, S_MYY_tag, zavgS_MXX_tag, zavgS_MYY_tag, zavg_tmp_tag>::values>(
@@ -250,7 +252,7 @@ void nabla(Mesh &&mesh,
         nabla_edge_1<<<blocks, threads_per_block>>>(
             e2v, edge_ptrs, edge_strides, vertex_neighbor_ptrs, vertex_neighbor_strides);
         GT_CUDA_CHECK(cudaDeviceSynchronize());
-    }
+    } // namespace gridtools::tuple_util;
     {
         auto v2e = gridtools::next::mesh::connectivity<std::tuple<vertex, edge>>(mesh);
         static_assert(gridtools::is_sid<decltype(gridtools::next::connectivity::neighbor_table(v2e))>{});
@@ -274,16 +276,13 @@ void nabla(Mesh &&mesh,
     {
         auto vertices = gridtools::next::mesh::connectivity<vertex>(mesh);
 
-        auto vertex_fields = tu::make<gridtools::sid::composite::
-                keys<pnabla_MXX_tag, pnabla_MYY_tag, vol_tag>::values>(
+        auto vertex_fields = tu::make<gridtools::sid::composite::keys<pnabla_MXX_tag, pnabla_MYY_tag, vol_tag>::values>(
             pnabla_MXX, pnabla_MYY, vol);
         static_assert(gridtools::sid::concept_impl_::is_sid<decltype(vertex_fields)>{});
 
         auto [blocks, threads_per_block] = cuda_setup(gridtools::next::connectivity::size(vertices));
-        nabla_vertex_4<<<blocks, threads_per_block>>>(vertices,
-            gridtools::sid::get_origin(vertex_fields),
-            gridtools::sid::get_strides(vertex_fields)
-            );
+        nabla_vertex_4<<<blocks, threads_per_block>>>(
+            vertices, gridtools::sid::get_origin(vertex_fields), gridtools::sid::get_strides(vertex_fields));
         GT_CUDA_CHECK(cudaDeviceSynchronize());
     }
 }
