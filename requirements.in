@@ -1,13 +1,14 @@
 
 black>=19.3b0
 boltons>=20.0
+dataclasses; python_version < "3.7"
 devtools>=0.5
 jinja2>=2.10
 lark-parser>=0.8
 mako>=1.1
 packaging>=20.0
-pydantic>=1.0
+pydantic>=1.5
 typing_extensions>=3.4
-xxhash>=1.4
+xxhash>=1.4.4
 
 clang-format>=9.0

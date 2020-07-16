@@ -18,13 +18,11 @@
 
 
 import collections.abc
-import itertools
-import string
 import typing
-from typing import Any, Callable, Dict, Optional, Sequence, Type, TypeVar, Union
+from typing import Any, Callable, Iterable, Optional, Sequence, Union
 
 import xxhash
-from boltons.iterutils import flatten, flatten_iter
+from boltons.iterutils import flatten, flatten_iter  # noqa: F401
 from boltons.strutils import (  # noqa: F401
     a10n,
     args2cmd,
@@ -53,6 +51,14 @@ from boltons.strutils import (  # noqa: F401
 
 
 WordSequenceType = Union[str, Sequence[str]]
+
+
+def call_all(funcs_iterable: Iterable[Callable]) -> Callable:
+    def _caller(*args: Any, **kwargs: Any) -> None:
+        for f in funcs_iterable:
+            f(*args, **kwargs)
+
+    return _caller
 
 
 def join_canonical_cased(words: WordSequenceType) -> str:

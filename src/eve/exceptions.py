@@ -14,31 +14,30 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Definitions of builtin ("") dialect nodes and vtypes."""
+"""Definitions of specific Eve exceptions."""
+
+from typing import Any
 
 
-class PydanticErrorMixin:
-    code: str
-    msg_template: str
+class EveError:
+    message_template = "Generic Eve error (info: {info}) "
 
-    def __init__(self, **ctx: Any) -> None:
-        self.__dict__ = ctx
+    def __init__(self, message: str = None, **kwargs: Any) -> None:
+        self.message = message
+        self.info = kwargs
 
     def __str__(self) -> str:
-        return self.msg_template.format(**self.__dict__)
+        message = self.message or self.__class__.message_template
+        return message.format(**self.info, info=self.info)
 
 
-class PydanticTypeError(PydanticErrorMixin, TypeError):
-    pass
+class EveTypeError(EveError, TypeError):
+    message_template = "Invalid or unexpected type (info: {info}) "
 
 
-class PydanticValueError(PydanticErrorMixin, ValueError):
-    pass
+class EveValueError(EveError, ValueError):
+    message_template = "Invalid value (info: {info}) "
 
 
-class ConfigError(RuntimeError):
-    pass
-
-
-class MissingError(PydanticValueError):
-    msg_template = "field required"
+class EveRuntimeError(EveError, RuntimeError):
+    message_template = "Runtime error (info: {info}) "
