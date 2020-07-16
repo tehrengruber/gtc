@@ -84,8 +84,7 @@ class BinaryOp(Expr):
 
 
 class SidCompositeEntry(Node):
-    tag: Str
-    field: Str  # ensure exists via symboltable
+    name: Str  # ensure field exists via symbol table
 
 
 class SidComposite(Node):
@@ -111,10 +110,24 @@ class SidTag(Node):
     name: Str
 
 
+class VerticalDimension(Node):
+    pass
+
+
+class SecondaryLocation(Node):
+    chain: List[LocationType]
+
+
+class USid(Node):
+    name: Str
+    dimensions: List[Union[LocationType, SecondaryLocation, VerticalDimension]]  # Set?
+
+
 class Computation(Node):
     name: Str
-    tags: List[SidTag]
-    kernels: List[Kernel]
+    parameters: List[USid]
+    # tags: List[SidTag]
+    kernels: List[Kernel]  # probably replace by ctrlflow ast (where Kernel is one CtrlFlowStmt)
 
 
 # template <class ConnV2E /*Connectivity not needed*/, class VertexOrigins, class VertexStrides>

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Eve toolchain
 
+import os
+
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
@@ -13,17 +15,20 @@ from gt_toolchain.unstructured.ugpu import (
     FieldAccess,
     Kernel,
     LocationType,
+    SecondaryLocation,
     SidComposite,
     SidCompositeEntry,
-    SidTag,
+    USid,
+    VerticalDimension,
 )
 
 
 nabla_vertex_4_composite = SidComposite(
     name="vertex_things",
     entries=[
-        SidCompositeEntry(tag="vol", field="vol"),
-        SidCompositeEntry(tag="pnabla_MXX", field="pnabla_MXX"),
+        SidCompositeEntry(name="vol"),
+        SidCompositeEntry(name="pnabla_MXX"),
+        SidCompositeEntry(name="pnabla_MYY"),
     ],
 )
 
@@ -49,15 +54,37 @@ nabla_vertex_4 = Kernel(
     ast=[assign, assign2],
 )
 
+S_MXX = USid(name="S_MXX", dimensions=[LocationType.Edge, VerticalDimension()])
+S_MYY = USid(name="S_MYY", dimensions=[LocationType.Edge, VerticalDimension()])
+zavgS_MXX = USid(name="zavgS_MXX", dimensions=[LocationType.Edge, VerticalDimension()])
+zavgS_MYY = USid(name="zavgS_MYY", dimensions=[LocationType.Edge, VerticalDimension()])
+pp = USid(name="pp", dimensions=[LocationType.Vertex, VerticalDimension()])
+pnabla_MXX = USid(name="pnabla_MXX", dimensions=[LocationType.Vertex, VerticalDimension()])
+pnabla_MYY = USid(name="pnabla_MYY", dimensions=[LocationType.Vertex, VerticalDimension()])
+vol = USid(name="vol", dimensions=[LocationType.Vertex, VerticalDimension()])
+sign = USid(
+    name="sign",
+    dimensions=[
+        LocationType.Vertex,
+        SecondaryLocation(chain=[LocationType.Edge]),
+        VerticalDimension(),
+    ],
+)
 
 comp = Computation(
     name="fvm_nabla",
-    tags=[SidTag(name="vol"), SidTag(name="pnabla_MYY"), SidTag(name="pnabla_MXX")],
+    parameters=[S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, pp, pnabla_MXX, pnabla_MYY, vol, sign],
+    # tags=[SidTag(name="vol"), SidTag(name="pnabla_MYY"), SidTag(name="pnabla_MXX")],
     kernels=[nabla_vertex_4],
-    ast=[],
+    # ast=[],
 )
 
 
 debug(comp)
 
-print(ugpu_codegen.UgpuCodeGenerator.apply(comp))
+generated_code = ugpu_codegen.UgpuCodeGenerator.apply(comp)
+print(generated_code)
+
+output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_fvm_nabla_ugpu.hpp"
+with open(output_file, "w+") as output:
+    output.write(generated_code)

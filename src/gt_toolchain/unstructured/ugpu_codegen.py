@@ -20,8 +20,7 @@ from typing import ClassVar, Mapping
 from mako import template as mako_tpl
 
 from eve import codegen
-
-from .ugpu import LocationType
+from gt_toolchain.unstructured.ugpu import Kernel, LocationType
 
 
 # from gt_toolchain import common
@@ -31,6 +30,23 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
     LOCATION_TYPE_TO_STR: ClassVar[Mapping[LocationType, Mapping[str, str]]] = MappingProxyType(
         {LocationType.Vertex: "vertex", LocationType.Edge: "edge", LocationType.Cell: "cell"}
     )
+
+    def make_kernel_call(self, kernel: Kernel):
+        location = self.LOCATION_TYPE_TO_STR[kernel.primary_connectivity]
+        return mako_tpl.Template(
+            """{
+            auto primary_connectivity = gridtools::next::mesh::connectivity<${ location }>(mesh);
+
+            auto ${ kernel.primary_sid_composite.name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(e.name + '_tag' for e in kernel.primary_sid_composite.entries) }>::values>(
+                ${ ','.join(e.name for e in kernel.primary_sid_composite.entries) });
+            static_assert(gridtools::is_sid<decltype(${ kernel.primary_sid_composite.name }_fields)>{});
+
+            auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(${ kernel.primary_sid_composite.name }_fields));
+            ${ kernel.name }_impl_::${ kernel.name }<<<blocks, threads_per_block>>>(
+                primary_connectivity, gridtools::sid::get_origin(${ kernel.primary_sid_composite.name }_fields), gridtools::sid::get_strides(${ kernel.primary_sid_composite.name }_fields));
+            GT_CUDA_CHECK(cudaDeviceSynchronize());
+        }"""
+        ).render(kernel=kernel, location=location)
 
     class Templates:
         Node = mako_tpl.Template("${_this_node.__class__.__name__.upper()}")  # only for testing
@@ -66,7 +82,8 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         """
         )
 
-        FieldAccess = "gridtools::device::at_key<{tag}>({sid_composite}_ptrs)"
+        # TODO improve tag handling
+        FieldAccess = "gridtools::device::at_key<{tag}_tag>({sid_composite}_ptrs)"
 
         AssignStmt = "{left} = {right};"
 
@@ -75,9 +92,31 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         SidTag = "struct {name};"
 
         Computation = mako_tpl.Template(
-            """${ ''.join(tags) }
+            """<%
+                sid_tags = set()
+                for k in _this_node.kernels:
+                    for e in k.primary_sid_composite.entries:
+                        sid_tags.add("struct " + e.name + "_tag;")
+                kernel_calls = map(_this_generator.make_kernel_call, _this_node.kernels)
+            %>#include <gridtools/next/cuda_util.hpp>
+#include <gridtools/next/tmp_gpu_storage.hpp>
+#include <gridtools/sid/allocator.hpp>
+#include <gridtools/sid/composite.hpp>
+#include <gridtools/next/atlas_adapter.hpp>
+#include <gridtools/next/atlas_array_view_adapter.hpp>
+#include <gridtools/next/atlas_field_util.hpp>
 
-        ${ ''.join(kernels) }"""
+        namespace ${ name }_impl_ {
+        ${ ''.join(sid_tags) }
+
+        ${ ''.join(kernels) }
+        }
+
+        template<class mesh_t, ${ ','.join('class ' + p.name + '_t' for p in _this_node.parameters) }>
+        void ${ name }(mesh_t&& mesh, ${ ','.join(p.name + '_t&& ' + p.name for p in _this_node.parameters) }){
+            ${ ''.join(kernel_calls) }
+        }
+        """
         )
 
     @classmethod
