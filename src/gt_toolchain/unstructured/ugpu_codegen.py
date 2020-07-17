@@ -218,14 +218,15 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             parent_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]
             %>for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ parent_location }2${ body_location }_connectivity); ++neigh) {
                 // body
-                auto ${ body_location }_ptrs = ${ body_location }_origins();
-                auto absolute_neigh_index = *gridtools::device::at_key<connectivity_tag>(${ body_location }_ptrs);
-                gridtools::sid::shift(
-                    ${ body_location }_ptrs, gridtools::device::at_key<${ body_location }>(${ body_location }_strides), absolute_neigh_index);
+                auto absolute_neigh_index = *gridtools::device::at_key<connectivity_tag>(${ parent_location }_ptrs);
+                if (absolute_neigh_index != gridtools::next::connectivity::skip_value(${ parent_location }2${ body_location }_connectivity)) {
+                    auto ${ body_location }_ptrs = ${ body_location }_origins();
+                    gridtools::sid::shift(
+                        ${ body_location }_ptrs, gridtools::device::at_key<${ body_location }>(${ body_location }_strides), absolute_neigh_index);
 
-                ${ ''.join(body) }
-                // body end
-
+                    ${ ''.join(body) }
+                    // body end
+                }
                 gridtools::sid::shift(${ parent_location }_ptrs, gridtools::device::at_key<neighbor>(${ parent_location }_strides), 1);
             }
             gridtools::sid::shift(${ parent_location }_ptrs,

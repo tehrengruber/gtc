@@ -22,7 +22,6 @@ from gt_toolchain.unstructured.ugpu import (
     SidComposite,
     SidCompositeEntry,
     USid,
-    VarAccess,
     VerticalDimension,
 )
 
@@ -79,13 +78,17 @@ pp_acc = FieldAccess(name="pp", location_type=LocationType.Vertex)
 zavg_tmp_acc = FieldAccess(name="zavg_tmp", location_type=LocationType.Edge)
 zavgS_MXX_acc = FieldAccess(name="zavgS_MXX", location_type=LocationType.Edge)
 zavgS_MYY_acc = FieldAccess(name="zavgS_MYY", location_type=LocationType.Edge)
-acc_acc = VarAccess(name="acc", location_type=LocationType.Edge)
+# acc_acc = VarAccess(name="acc", location_type=LocationType.Edge)
+
+edge1_assign0 = AssignStmt(
+    left=zavg_tmp_acc, right=Literal(value="0.0", location_type=LocationType.Edge),
+)
 
 edge1_assign1 = AssignStmt(
     left=zavg_tmp_acc,
     right=BinaryOp(
         left=Literal(value="0.5", location_type=LocationType.Edge),
-        right=acc_acc,
+        right=zavg_tmp_acc,
         op=common.BinaryOperator.MUL,
     ),
 )
@@ -104,9 +107,9 @@ vertex_on_edge_loop = NeighborLoop(
     body=[
         AssignStmt(
             location_type=LocationType.Vertex,
-            left=acc_acc,
+            left=zavg_tmp_acc,
             right=BinaryOp(
-                left=acc_acc,
+                left=zavg_tmp_acc,
                 right=pp_acc,
                 op=common.BinaryOperator.ADD,
                 location_type=LocationType.Vertex,
@@ -121,7 +124,7 @@ nabla_edge_1 = Kernel(
     primary_sid_composite=nabla_edge_1_primary_composite,
     other_connectivities=[NeighborChain(chain=[LocationType.Edge, LocationType.Vertex])],
     other_sid_composites=[nabla_vertex_composite],
-    ast=[vertex_on_edge_loop, edge1_assign1, edge1_assign2, edge1_assign3],
+    ast=[edge1_assign0, vertex_on_edge_loop, edge1_assign1, edge1_assign2, edge1_assign3],
 )
 
 
