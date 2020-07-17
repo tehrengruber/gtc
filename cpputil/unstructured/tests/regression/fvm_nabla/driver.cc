@@ -25,7 +25,8 @@
 #include <gtest/gtest.h>
 
 #ifdef __CUDACC__
-#include "nabla_cuda.hpp"
+#include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_ugpu.hpp"
+// #include "nabla_cuda.hpp"
 #else
 #include "nabla_naive.hpp"
 #endif
@@ -304,7 +305,8 @@ TEST(FVM, nabla) {
     auto m_pnabla_MXX_ds = node_sid(m_pnabla_MXX);
     auto m_pnabla_MYY_ds = node_sid(m_pnabla_MYY);
     auto vol_ds = node_sid(driver.vol());
-    auto sign_ds = gridtools::next::atlas_util::as_data_store<vertex, dim::k, neighbor>::with_type<double>{}(driver.sign());
+    auto sign_ds =
+        gridtools::next::atlas_util::as_data_store<vertex, dim::k, neighbor>::with_type<double>{}(driver.sign());
 
     nabla(driver.mesh(),
         S_MXX_ds,

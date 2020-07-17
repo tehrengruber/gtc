@@ -67,6 +67,8 @@ nabla_edge_1_primary_composite = SidComposite(
         SidCompositeEntry(name="zavg_tmp"),
         SidCompositeEntry(name="zavgS_MXX"),
         SidCompositeEntry(name="zavgS_MYY"),
+        SidCompositeEntry(name="S_MXX"),
+        SidCompositeEntry(name="S_MYY"),
     ],
 )
 nabla_vertex_composite = SidComposite(
@@ -78,6 +80,8 @@ pp_acc = FieldAccess(name="pp", location_type=LocationType.Vertex)
 zavg_tmp_acc = FieldAccess(name="zavg_tmp", location_type=LocationType.Edge)
 zavgS_MXX_acc = FieldAccess(name="zavgS_MXX", location_type=LocationType.Edge)
 zavgS_MYY_acc = FieldAccess(name="zavgS_MYY", location_type=LocationType.Edge)
+S_MXX_acc = FieldAccess(name="S_MXX", location_type=LocationType.Edge)
+S_MYY_acc = FieldAccess(name="S_MYY", location_type=LocationType.Edge)
 # acc_acc = VarAccess(name="acc", location_type=LocationType.Edge)
 
 edge1_assign0 = AssignStmt(
@@ -94,11 +98,11 @@ edge1_assign1 = AssignStmt(
 )
 edge1_assign2 = AssignStmt(
     left=zavgS_MXX_acc,
-    right=BinaryOp(left=zavgS_MXX_acc, right=zavg_tmp_acc, op=common.BinaryOperator.MUL),
+    right=BinaryOp(left=S_MXX_acc, right=zavg_tmp_acc, op=common.BinaryOperator.MUL),
 )
 edge1_assign3 = AssignStmt(
     left=zavgS_MYY_acc,
-    right=BinaryOp(left=zavgS_MYY_acc, right=zavg_tmp_acc, op=common.BinaryOperator.MUL),
+    right=BinaryOp(left=S_MYY_acc, right=zavg_tmp_acc, op=common.BinaryOperator.MUL),
 )
 
 vertex_on_edge_loop = NeighborLoop(
@@ -171,7 +175,7 @@ nabla_vertex_2_to_edge_composite = SidComposite(
     entries=[SidCompositeEntry(name="zavgS_MXX"), SidCompositeEntry(name="zavgS_MYY")],
 )
 
-edge_on_vertex_loop = NeighborLoop(
+edge_on_vertex_loop_x = NeighborLoop(
     body_location_type=LocationType.Edge,
     location_type=LocationType.Vertex,
     body=[
@@ -193,8 +197,35 @@ edge_on_vertex_loop = NeighborLoop(
     ],
 )
 
-vertex_2_init_to_zero = AssignStmt(
-    left=zavgS_MXX_acc,
+edge_on_vertex_loop_y = NeighborLoop(
+    body_location_type=LocationType.Edge,
+    location_type=LocationType.Vertex,
+    body=[
+        AssignStmt(
+            location_type=LocationType.Vertex,
+            left=pnabla_MYY_acc,
+            right=BinaryOp(
+                left=pnabla_MYY_acc,
+                right=BinaryOp(
+                    left=zavgS_MYY_acc,
+                    right=sign_acc,
+                    op=common.BinaryOperator.MUL,
+                    location_type=LocationType.Edge,
+                ),
+                op=common.BinaryOperator.ADD,
+                location_type=LocationType.Vertex,
+            ),
+        )
+    ],
+)
+
+vertex_2_init_to_zero_x = AssignStmt(
+    left=pnabla_MXX_acc,
+    right=Literal(value="0.0", location_type=LocationType.Vertex),
+    location_type=LocationType.Vertex,
+)
+vertex_2_init_to_zero_y = AssignStmt(
+    left=pnabla_MYY_acc,
     right=Literal(value="0.0", location_type=LocationType.Vertex),
     location_type=LocationType.Vertex,
 )
@@ -206,7 +237,12 @@ nabla_vertex_2 = Kernel(
     primary_sid_composite=nabla_vertex_2_primary_composite,
     other_connectivities=[NeighborChain(chain=[LocationType.Vertex, LocationType.Edge])],
     other_sid_composites=[nabla_vertex_2_to_edge_composite],
-    ast=[vertex_2_init_to_zero, edge_on_vertex_loop],
+    ast=[
+        vertex_2_init_to_zero_x,
+        edge_on_vertex_loop_x,
+        vertex_2_init_to_zero_y,
+        edge_on_vertex_loop_y,
+    ],
 )
 
 nabla_vertex_4_composite = SidComposite(
@@ -257,7 +293,7 @@ sign = USid(
 zavg_tmp = USid(name="zavg_tmp", dimensions=[LocationType.Edge, VerticalDimension()])
 
 comp = Computation(
-    name="fvm_nabla",
+    name="nabla",
     parameters=[S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, pp, pnabla_MXX, pnabla_MYY, vol, sign],
     temporaries=[zavg_tmp],
     # tags=[SidTag(name="vol"), SidTag(name="pnabla_MYY"), SidTag(name="pnabla_MXX")],

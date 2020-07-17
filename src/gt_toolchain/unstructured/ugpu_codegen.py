@@ -116,7 +116,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             ${ ''.join(composed_sids) }
 
             auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(primary_connectivity));
-            ${ kernel.name }_impl_::${ kernel.name }<<<blocks, threads_per_block>>>(${','.join(connectivity_args)}, ${ ','.join(composed_sids_arguments) });
+            ${ kernel.name }<<<blocks, threads_per_block>>>(${','.join(connectivity_args)}, ${ ','.join(composed_sids_arguments) });
             GT_CUDA_CHECK(cudaDeviceSynchronize());
         }"""
         ).render(
@@ -140,19 +140,20 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
     class Templates:
         Node = mako_tpl.Template("${_this_node.__class__.__name__.upper()}")  # only for testing
 
+        # template<${ ','.join("class {}_t".format(c) for c in connectivities) }, ${ ','.join("class {0}_origins_t, class {0}_strides_t".format(s) for s in all_sid_names) } >
         Kernel = mako_tpl.Template(
             """<%
             primary_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_connectivity]
             connectivities = [_this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_connectivity] + "_connectivity" ]
             connectivities.extend(map(_this_generator.make_connectivity_name, _this_node.other_connectivities or []))
             all_sids = [_this_node.primary_sid_composite] + (_this_node.other_sid_composites or [])
-            all_sid_names = map(lambda s: _this_generator.LOCATION_TYPE_TO_STR[s.location_type], all_sids)
+            all_sid_names = list(map(lambda s: _this_generator.LOCATION_TYPE_TO_STR[s.location_type], all_sids))
             primary_sid_name =_this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_sid_composite.location_type]
             primary_origins = primary_sid_name + "_origins"
             primary_strides = primary_sid_name + "_strides"
             primary_ptrs = primary_sid_name + "_ptrs"
-            primary_sid_params = map(lambda s: "{0}_origins_t {0}_origins, {0}_strides_t {0}_strides".format(s), all_sid_names)
-            %>template<${ ','.join("class {}_t".format(c) for c in connectivities) }>
+            primary_sid_params = list(map(lambda s: "{0}_origins_t {0}_origins, {0}_strides_t {0}_strides".format(s), all_sid_names))
+            %>template<${ ','.join("class {}_t".format(c) for c in connectivities) }, ${ ','.join("class {0}_origins_t, class {0}_strides_t".format(s) for s in all_sid_names) }>
         __global__ void ${ name }(${ ','.join( "{0}_t {0}".format(c) for c in connectivities ) }, ${ ','.join(primary_sid_params) }) {
             auto idx = blockIdx.x * blockDim.x + threadIdx.x;
             if (idx >= gridtools::next::connectivity::size(${ primary_location }_connectivity))
@@ -174,7 +175,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 raise ValueError("Symbol not found or not unique!")
             location_type = _this_generator.location_type_from_dimensions(usid[0].dimensions)
             location_str = _this_generator.LOCATION_TYPE_TO_STR[location_type]
-        %>gridtools::device::at_key<${ name }_tag>(${ location_str }_ptrs)"""
+        %>*gridtools::device::at_key<${ name }_tag>(${ location_str }_ptrs)"""
         )
 
         AssignStmt = "{left} = {right};"
@@ -188,8 +189,11 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 sid_tags = set()
                 sid_tags.add("struct connectivity_tag;")
                 for k in _this_node.kernels:
-                    for e in k.primary_sid_composite.entries:
-                        sid_tags.add("struct " + e.name + "_tag;")
+                    all_sids = [k.primary_sid_composite]
+                    all_sids.extend(k.other_sid_composites or [])
+                    for s in all_sids:
+                        for e in s.entries:
+                            sid_tags.add("struct " + e.name + "_tag;")
                 kernel_calls = map(_this_generator.make_kernel_call, _this_node.kernels)
             %>#include <gridtools/next/cuda_util.hpp>
 #include <gridtools/next/tmp_gpu_storage.hpp>
@@ -207,6 +211,14 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
         template<class mesh_t, ${ ','.join('class ' + p.name + '_t' for p in _this_node.parameters) }>
         void ${ name }(mesh_t&& mesh, ${ ','.join(p.name + '_t&& ' + p.name for p in _this_node.parameters) }){
+            namespace tu = gridtools::tuple_util;
+            using namespace ${ name }_impl_;
+
+                    auto cuda_alloc =
+            gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>); // TODO
+        auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<edge, double>(
+            (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<edge, vertex>>(mesh)), 1, cuda_alloc);
+
             ${ ''.join(kernel_calls) }
         }
         """
