@@ -16,6 +16,7 @@ from gt_toolchain.unstructured.ugpu import (
     Kernel,
     Literal,
     LocationType,
+    NeighborChain,
     NeighborLoop,
     SecondaryLocation,
     SidComposite,
@@ -118,7 +119,91 @@ nabla_edge_1 = Kernel(
     name="nabla_edge_1",
     primary_connectivity=LocationType.Edge,
     primary_sid_composite=nabla_edge_1_primary_composite,
+    other_connectivities=[NeighborChain(chain=[LocationType.Edge, LocationType.Vertex])],
+    other_sid_composites=[nabla_vertex_composite],
     ast=[vertex_on_edge_loop, edge1_assign1, edge1_assign2, edge1_assign3],
+)
+
+
+# *gridtools::device::at_key<pnabla_MXX_tag>(vertex_ptrs) = 0.;
+# { // reduce
+#     for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(v2e); ++neigh) {
+#         // body
+#         auto absolute_neigh_index = *gridtools::device::at_key<connectivity_tag>(vertex_ptrs);
+#         if (absolute_neigh_index != gridtools::next::connectivity::skip_value(v2e)) {
+#             auto edge_ptrs = edge_neighbor_origins();
+#             gridtools::sid::shift(
+#                 edge_ptrs, gridtools::device::at_key<edge>(edge_neighbor_strides), absolute_neigh_index);
+
+#             auto zavgS_MXX_value = *gridtools::device::at_key<zavgS_MXX_tag>(edge_ptrs);
+#             auto sign_value = *gridtools::device::at_key<sign_tag>(vertex_ptrs);
+
+#             *gridtools::device::at_key<pnabla_MXX_tag>(vertex_ptrs) += zavgS_MXX_value * sign_value;
+#             // body end
+#         }
+#         gridtools::sid::shift(vertex_ptrs, gridtools::device::at_key<neighbor>(vertex_strides), 1);
+#     }
+#     gridtools::sid::shift(vertex_ptrs,
+#         gridtools::device::at_key<neighbor>(vertex_strides),
+#         -gridtools::next::connectivity::max_neighbors(v2e)); // or reset ptr to origin and shift ?
+# }
+
+pnabla_MXX_acc = FieldAccess(name="pnabla_MXX", location_type=LocationType.Vertex)
+pnabla_MYY_acc = FieldAccess(name="pnabla_MYY", location_type=LocationType.Vertex)
+# zavgS_MXX_acc = FieldAccess(name="zavgS_MXX", location_type=LocationType.Edge)
+# zavgS_MYY_acc = FieldAccess(name="zavgS_MYY", location_type=LocationType.Edge)
+sign_acc = FieldAccess(name="sign", location_type=LocationType.Vertex)
+
+nabla_vertex_2_primary_composite = SidComposite(
+    location_type=LocationType.Vertex,
+    entries=[
+        SidCompositeEntry(name="pnabla_MXX"),
+        SidCompositeEntry(name="pnabla_MYY"),
+        SidCompositeEntry(name="sign"),
+    ],
+)
+
+nabla_vertex_2_to_edge_composite = SidComposite(
+    location_type=LocationType.Edge,
+    entries=[SidCompositeEntry(name="zavgS_MXX"), SidCompositeEntry(name="zavgS_MYY")],
+)
+
+edge_on_vertex_loop = NeighborLoop(
+    body_location_type=LocationType.Edge,
+    location_type=LocationType.Vertex,
+    body=[
+        AssignStmt(
+            location_type=LocationType.Vertex,
+            left=pnabla_MXX_acc,
+            right=BinaryOp(
+                left=pnabla_MXX_acc,
+                right=BinaryOp(
+                    left=zavgS_MXX_acc,
+                    right=sign_acc,
+                    op=common.BinaryOperator.MUL,
+                    location_type=LocationType.Edge,
+                ),
+                op=common.BinaryOperator.ADD,
+                location_type=LocationType.Vertex,
+            ),
+        )
+    ],
+)
+
+vertex_2_init_to_zero = AssignStmt(
+    left=zavgS_MXX_acc,
+    right=Literal(value="0.0", location_type=LocationType.Vertex),
+    location_type=LocationType.Vertex,
+)
+
+
+nabla_vertex_2 = Kernel(
+    name="nabla_vertex_2",
+    primary_connectivity=LocationType.Vertex,
+    primary_sid_composite=nabla_vertex_2_primary_composite,
+    other_connectivities=[NeighborChain(chain=[LocationType.Vertex, LocationType.Edge])],
+    other_sid_composites=[nabla_vertex_2_to_edge_composite],
+    ast=[vertex_2_init_to_zero, edge_on_vertex_loop],
 )
 
 nabla_vertex_4_composite = SidComposite(
@@ -173,7 +258,7 @@ comp = Computation(
     parameters=[S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, pp, pnabla_MXX, pnabla_MYY, vol, sign],
     temporaries=[zavg_tmp],
     # tags=[SidTag(name="vol"), SidTag(name="pnabla_MYY"), SidTag(name="pnabla_MXX")],
-    kernels=[nabla_edge_1, nabla_vertex_4],
+    kernels=[nabla_edge_1, nabla_vertex_2, nabla_vertex_4],
     # ast=[],
 )
 

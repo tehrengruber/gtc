@@ -20,7 +20,13 @@ from typing import ClassVar, Mapping
 from mako import template as mako_tpl
 
 from eve import codegen
-from gt_toolchain.unstructured.ugpu import Computation, Kernel, LocationType
+from gt_toolchain.unstructured.ugpu import (
+    Computation,
+    Kernel,
+    LocationType,
+    NeighborChain,
+    SidComposite,
+)
 
 
 # Ugpu Codegen convention:
@@ -28,8 +34,11 @@ from gt_toolchain.unstructured.ugpu import Computation, Kernel, LocationType
 #   and the respective SID entities are <LocationType>_origins, <LocationType>_ptrs, <LocationType>_strides.
 #   Sparse fields are in the composite of the primary location.
 #   (i.e. the correct composite name can be found by the location type, let's see where this goes)
-# - connectivities are named <From>2<To>_conn
+#   (pure vertical fields should probably go into the primary composite)
+# - connectivities are named <From>2<To>_connectivity
 # - tags have a suffix `_tag`
+
+# TODO: think about having only one composite with all fields
 
 
 class UgpuCodeGenerator(codegen.TemplatedGenerator):
@@ -37,23 +46,90 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         {LocationType.Vertex: "vertex", LocationType.Edge: "edge", LocationType.Cell: "cell"}
     )
 
+    def make_connectivity_name(self, chain: NeighborChain):
+        return "2".join(self.LOCATION_TYPE_TO_STR[e] for e in chain.chain) + "_connectivity"
+
     def make_kernel_call(self, kernel: Kernel):
+        def compose_sid_composite(composite: SidComposite, **kwargs):
+            tags = [e.name + "_tag" for e in composite.entries]
+            # tags = ",".join(e.name + "_tag" for e in composite.entries)
+            fields = [e.name for e in composite.entries]
+
+            connectivity = kwargs.get("connectivity", None)
+            if connectivity:
+                tags.append("connectivity_tag")
+                fields.append(
+                    "gridtools::next::connectivity::neighbor_table({})".format(
+                        self.make_connectivity_name(connectivity)
+                    )
+                )
+
+            sid_name = self.LOCATION_TYPE_TO_STR[composite.location_type]
+            return mako_tpl.Template(
+                """
+                auto ${ sid_name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(tags) }>::values>(
+                    ${ ','.join(fields)});
+                static_assert(gridtools::is_sid<decltype(${ sid_name }_fields)>{});
+                """
+            ).render(tags=tags, fields=fields, sid_name=sid_name)
+
+        def make_composite_args(composite: SidComposite):
+            sid_name = self.LOCATION_TYPE_TO_STR[composite.location_type]
+            return mako_tpl.Template(
+                "gridtools::sid::get_origin(${ sid_name }_fields), gridtools::sid::get_strides(${ sid_name }_fields)"
+            ).render(sid_name=sid_name)
+
+        def make_connectivities(chain: NeighborChain):
+            return mako_tpl.Template(
+                "auto ${ make_connectivity_name(chain) } = gridtools::next::mesh::connectivity<std::tuple<${ ','.join(loc2str[e] for e in chain.chain) }>>(mesh);"
+            ).render(
+                chain=chain,
+                loc2str=self.LOCATION_TYPE_TO_STR,
+                make_connectivity_name=self.make_connectivity_name,
+            )
+
         location = self.LOCATION_TYPE_TO_STR[kernel.primary_connectivity]
-        primary_sid_name = self.LOCATION_TYPE_TO_STR[kernel.primary_sid_composite.location_type]
+
+        # FIXME we need to be able to pass more than one
+        first_other_connectivity = None
+        if kernel.other_connectivities and len(kernel.other_connectivities) == 1:
+            first_other_connectivity = kernel.other_connectivities[0]
+
+        all_composites = [kernel.primary_sid_composite] + (kernel.other_sid_composites or [])
+        composed_sids = [
+            compose_sid_composite(
+                kernel.primary_sid_composite, connectivity=first_other_connectivity
+            )
+        ]
+        composed_sids.extend(map(compose_sid_composite, kernel.other_sid_composites or []))
+        composed_sids_arguments = map(make_composite_args, all_composites)
+        connectivities = map(make_connectivities, kernel.other_connectivities or [])
+        connectivity_args = ["primary_connectivity"]
+        connectivity_args.extend(
+            map(self.make_connectivity_name, kernel.other_connectivities or [])
+        )
         return mako_tpl.Template(
             """{
             auto primary_connectivity = gridtools::next::mesh::connectivity<${ location }>(mesh);
+            ${ ''.join(connectivities) }
 
-            auto ${ primary_sid_name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(e.name + '_tag' for e in kernel.primary_sid_composite.entries) }>::values>(
-                ${ ','.join(e.name for e in kernel.primary_sid_composite.entries) });
-            static_assert(gridtools::is_sid<decltype(${ primary_sid_name }_fields)>{});
+            ${ ''.join(composed_sids) }
 
             auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(primary_connectivity));
-            ${ kernel.name }_impl_::${ kernel.name }<<<blocks, threads_per_block>>>(
-                primary_connectivity, gridtools::sid::get_origin(${ primary_sid_name }_fields), gridtools::sid::get_strides(${ primary_sid_name }_fields));
+            ${ kernel.name }_impl_::${ kernel.name }<<<blocks, threads_per_block>>>(${','.join(connectivity_args)}, ${ ','.join(composed_sids_arguments) });
             GT_CUDA_CHECK(cudaDeviceSynchronize());
         }"""
-        ).render(kernel=kernel, location=location, primary_sid_name=primary_sid_name)
+        ).render(
+            kernel=kernel,
+            location=location,
+            composed_sids=composed_sids,
+            composed_sids_arguments=composed_sids_arguments,
+            connectivities=connectivities,
+            connectivity_args=connectivity_args,
+        )
+        # auto ${ primary_sid_name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(e.name + '_tag' for e in kernel.primary_sid_composite.entries) }>::values>(
+        #     ${ ','.join(e.name for e in kernel.primary_sid_composite.entries) });
+        # ${ ''.join(other_sid_composites)}
 
     def location_type_from_dimensions(self, dimensions):
         location_type = [dim for dim in dimensions if isinstance(dim, LocationType)]
@@ -67,15 +143,19 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         Kernel = mako_tpl.Template(
             """<%
             primary_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_connectivity]
+            connectivities = [_this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_connectivity] + "_connectivity" ]
+            connectivities.extend(map(_this_generator.make_connectivity_name, _this_node.other_connectivities or []))
+            all_sids = [_this_node.primary_sid_composite] + (_this_node.other_sid_composites or [])
+            all_sid_names = map(lambda s: _this_generator.LOCATION_TYPE_TO_STR[s.location_type], all_sids)
             primary_sid_name =_this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_sid_composite.location_type]
             primary_origins = primary_sid_name + "_origins"
             primary_strides = primary_sid_name + "_strides"
             primary_ptrs = primary_sid_name + "_ptrs"
-            primary_sid_param = "{0}_t {0}, {1}_t {1}".format(primary_origins, primary_strides)
-            %>template<class ${ primary_location }_conn_t>
-        __global__ void ${ name }(${ primary_location }_conn_t ${ primary_location }_conn, ${ primary_sid_param }) {
+            primary_sid_params = map(lambda s: "{0}_origins_t {0}_origins, {0}_strides_t {0}_strides".format(s), all_sid_names)
+            %>template<${ ','.join("class {}_t".format(c) for c in connectivities) }>
+        __global__ void ${ name }(${ ','.join( "{0}_t {0}".format(c) for c in connectivities ) }, ${ ','.join(primary_sid_params) }) {
             auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-            if (idx >= gridtools::next::connectivity::size(${ primary_location }_conn))
+            if (idx >= gridtools::next::connectivity::size(${ primary_location }_connectivity))
                 return;
 
             auto ${ primary_ptrs } = ${ primary_origins }();
@@ -99,13 +179,14 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
         AssignStmt = "{left} = {right};"
 
-        BinaryOp = "{left} {op} {right}"
+        BinaryOp = "({left} {op} {right})"
 
         SidTag = "struct {name};"
 
         Computation = mako_tpl.Template(
             """<%
                 sid_tags = set()
+                sid_tags.add("struct connectivity_tag;")
                 for k in _this_node.kernels:
                     for e in k.primary_sid_composite.entries:
                         sid_tags.add("struct " + e.name + "_tag;")
@@ -135,10 +216,10 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             """<%
             body_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.body_location_type]
             parent_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]
-            %>for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ parent_location }2${ body_location }); ++neigh) {
+            %>for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ parent_location }2${ body_location }_connectivity); ++neigh) {
                 // body
-                auto absolute_neigh_index = *gridtools::device::at_key<connectivity_tag>(${ body_location }_ptrs);
                 auto ${ body_location }_ptrs = ${ body_location }_origins();
+                auto absolute_neigh_index = *gridtools::device::at_key<connectivity_tag>(${ body_location }_ptrs);
                 gridtools::sid::shift(
                     ${ body_location }_ptrs, gridtools::device::at_key<${ body_location }>(${ body_location }_strides), absolute_neigh_index);
 
@@ -149,7 +230,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             }
             gridtools::sid::shift(${ parent_location }_ptrs,
                 gridtools::device::at_key<neighbor>(${ parent_location }_strides),
-                -gridtools::next::connectivity::max_neighbors(${ parent_location }2${ body_location }));
+                -gridtools::next::connectivity::max_neighbors(${ parent_location }2${ body_location }_connectivity));
             """
         )
 
