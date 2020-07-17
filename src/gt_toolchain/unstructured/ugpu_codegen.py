@@ -20,10 +20,16 @@ from typing import ClassVar, Mapping
 from mako import template as mako_tpl
 
 from eve import codegen
-from gt_toolchain.unstructured.ugpu import Kernel, LocationType
+from gt_toolchain.unstructured.ugpu import Computation, Kernel, LocationType
 
 
-# from gt_toolchain import common
+# Ugpu Codegen convention:
+# - fields of the same LocationType are composed in a SID composite with name <LocationType>_sid,
+#   and the respective SID entities are <LocationType>_origins, <LocationType>_ptrs, <LocationType>_strides.
+#   Sparse fields are in the composite of the primary location.
+#   (i.e. the correct composite name can be found by the location type, let's see where this goes)
+# - connectivities are named <From>2<To>_conn
+# - tags have a suffix `_tag`
 
 
 class UgpuCodeGenerator(codegen.TemplatedGenerator):
@@ -33,37 +39,35 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
     def make_kernel_call(self, kernel: Kernel):
         location = self.LOCATION_TYPE_TO_STR[kernel.primary_connectivity]
+        primary_sid_name = self.LOCATION_TYPE_TO_STR[kernel.primary_sid_composite.location_type]
         return mako_tpl.Template(
             """{
             auto primary_connectivity = gridtools::next::mesh::connectivity<${ location }>(mesh);
 
-            auto ${ kernel.primary_sid_composite.name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(e.name + '_tag' for e in kernel.primary_sid_composite.entries) }>::values>(
+            auto ${ primary_sid_name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(e.name + '_tag' for e in kernel.primary_sid_composite.entries) }>::values>(
                 ${ ','.join(e.name for e in kernel.primary_sid_composite.entries) });
-            static_assert(gridtools::is_sid<decltype(${ kernel.primary_sid_composite.name }_fields)>{});
+            static_assert(gridtools::is_sid<decltype(${ primary_sid_name }_fields)>{});
 
-            auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(${ kernel.primary_sid_composite.name }_fields));
+            auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(primary_connectivity));
             ${ kernel.name }_impl_::${ kernel.name }<<<blocks, threads_per_block>>>(
-                primary_connectivity, gridtools::sid::get_origin(${ kernel.primary_sid_composite.name }_fields), gridtools::sid::get_strides(${ kernel.primary_sid_composite.name }_fields));
+                primary_connectivity, gridtools::sid::get_origin(${ primary_sid_name }_fields), gridtools::sid::get_strides(${ primary_sid_name }_fields));
             GT_CUDA_CHECK(cudaDeviceSynchronize());
         }"""
-        ).render(kernel=kernel, location=location)
+        ).render(kernel=kernel, location=location, primary_sid_name=primary_sid_name)
+
+    def location_type_from_dimensions(self, dimensions):
+        location_type = [dim for dim in dimensions if isinstance(dim, LocationType)]
+        if len(location_type) != 1:
+            raise ValueError("Doesn't contain a LocationType!")
+        return location_type[0]
 
     class Templates:
         Node = mako_tpl.Template("${_this_node.__class__.__name__.upper()}")  # only for testing
 
-        #         UnstructuredField = mako_tpl.Template(
-        #             """<%
-        #     loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"]
-        #     data_type = _this_generator.DATA_TYPE_TO_STR[_this_node.data_type]
-        #     sparseloc = "sparse_" if _this_node.sparse_location_type else ""
-        # %>
-        #   dawn::${ sparseloc }${ loc_type }_field_t<LibTag, ${ data_type }>& ${ name };"""
-        #         )
-
         Kernel = mako_tpl.Template(
             """<%
             primary_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_connectivity]
-            primary_sid_name = _this_node.primary_sid_composite.name
+            primary_sid_name =_this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_sid_composite.location_type]
             primary_origins = primary_sid_name + "_origins"
             primary_strides = primary_sid_name + "_strides"
             primary_ptrs = primary_sid_name + "_ptrs"
@@ -82,8 +86,16 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         """
         )
 
-        # TODO improve tag handling
-        FieldAccess = "gridtools::device::at_key<{tag}_tag>({sid_composite}_ptrs)"
+        FieldAccess = mako_tpl.Template(
+            """<%
+            # TODO lookup symbol table for the tag/name of the field (instead of kwargs)
+            usid = [p for p in computation_fields if p.name == _this_node.name]
+            if len(usid) != 1:
+                raise ValueError("Symbol not found or not unique!")
+            location_type = _this_generator.location_type_from_dimensions(usid[0].dimensions)
+            location_str = _this_generator.LOCATION_TYPE_TO_STR[location_type]
+        %>gridtools::device::at_key<${ name }_tag>(${ location_str }_ptrs)"""
+        )
 
         AssignStmt = "{left} = {right};"
 
@@ -119,14 +131,42 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         """
         )
 
+        NeighborLoop = mako_tpl.Template(
+            """<%
+            body_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.body_location_type]
+            parent_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]
+            %>for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ parent_location }2${ body_location }); ++neigh) {
+                // body
+                auto absolute_neigh_index = *gridtools::device::at_key<connectivity_tag>(${ body_location }_ptrs);
+                auto ${ body_location }_ptrs = ${ body_location }_origins();
+                gridtools::sid::shift(
+                    ${ body_location }_ptrs, gridtools::device::at_key<${ body_location }>(${ body_location }_strides), absolute_neigh_index);
+
+                ${ ''.join(body) }
+                // body end
+
+                gridtools::sid::shift(${ parent_location }_ptrs, gridtools::device::at_key<neighbor>(${ parent_location }_strides), 1);
+            }
+            gridtools::sid::shift(${ parent_location }_ptrs,
+                gridtools::device::at_key<neighbor>(${ parent_location }_strides),
+                -gridtools::next::connectivity::max_neighbors(${ parent_location }2${ body_location }));
+            """
+        )
+
+        Literal = "{value}"
+
+        VarAccess = "{name}"
+
     @classmethod
     def apply(cls, root, **kwargs) -> str:
         generated_code = super().apply(root, **kwargs)
         formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
         return formatted_code
 
-    # def visit_HorizontalLoop(self, node, **kwargs) -> str:
-    #     return self.generic_visit(node, iter_var="t", **kwargs)
+    def visit_Computation(self, node: Computation, **kwargs) -> str:
+        return self.generic_visit(
+            node, computation_fields=node.parameters + node.temporaries, **kwargs
+        )
 
     # def visit_ReduceOverNeighbourExpr(self, node, *, iter_var, **kwargs) -> str:
     #     outer_iter_var = iter_var

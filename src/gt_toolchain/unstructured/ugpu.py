@@ -43,24 +43,39 @@ class Stmt(Node):
 
 
 class FieldAccess(Expr):
-    tag: Str
-    sid_composite: Str  # via symbol table
-    pass
+    name: Str
+    # TODO verify that the tag exists in the location_type composite (reachable via symbol table)
+
+
+class VarDecl(Stmt):
+    name: Str
+    init: Expr
+    # TODO type etc
+
+
+class Literal(Expr):
+    value: Str
+
+
+class VarAccess(Expr):
+    name: Str  # via symbol table
 
 
 class AssignStmt(Stmt):
-    left: Union[FieldAccess]  # VarAccess
+    left: Union[FieldAccess, VarAccess]
     right: Expr
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        if values["left"].location_type != values["right"].location_type:
-            raise ValueError("Location type mismatch")
+        # if values["left"].location_type != values["right"].location_type:
+        #     raise ValueError("Location type mismatch")
 
-        if "location_type" not in values:
+        # if "location_type" not in values:
+        #     values["location_type"] = values["left"].location_type
+        # elif values["left"] != values["location_type"]:
+        #     raise ValueError("Location type mismatch")
+        if values["left"].location_type == values["right"].location_type:
             values["location_type"] = values["left"].location_type
-        elif values["left"] != values["location_type"]:
-            raise ValueError("Location type mismatch")
 
         return values
 
@@ -72,15 +87,24 @@ class BinaryOp(Expr):
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        if values["left"].location_type != values["right"].location_type:
-            raise ValueError("Location type mismatch")
+        # if values["left"].location_type != values["right"].location_type:
+        #     raise ValueError("Location type mismatch")
 
-        if "location_type" not in values:
+        # if "location_type" not in values:
+        #     values["location_type"] = values["left"].location_type
+        # elif values["left"] != values["location_type"]:
+        #     raise ValueError("Location type mismatch")
+
+        # TODO we need to protect (but above protection doesn't work in neighbor loop for accessing a variable from the parent location)
+        if values["left"].location_type == values["right"].location_type:
             values["location_type"] = values["left"].location_type
-        elif values["left"] != values["location_type"]:
-            raise ValueError("Location type mismatch")
 
         return values
+
+
+class NeighborLoop(Stmt):
+    body_location_type: LocationType
+    body: List[Stmt]
 
 
 class SidCompositeEntry(Node):
@@ -88,7 +112,7 @@ class SidCompositeEntry(Node):
 
 
 class SidComposite(Node):
-    name: Str  # symbol table entry (other nodes refer to this composite via this name)
+    location_type: LocationType
     entries: List[SidCompositeEntry]
 
 
@@ -126,6 +150,7 @@ class USid(Node):
 class Computation(Node):
     name: Str
     parameters: List[USid]
+    temporaries: List[USid]
     # tags: List[SidTag]
     kernels: List[Kernel]  # probably replace by ctrlflow ast (where Kernel is one CtrlFlowStmt)
 
