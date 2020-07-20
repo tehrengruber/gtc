@@ -4,7 +4,11 @@
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from gt_toolchain.unstructured import common, naive, naive_codegen, sir, sir_to_naive
+from gt_toolchain import common, sir
+from gt_toolchain.unstructured import naive_codegen, sir_to_naive
+from gt_toolchain.unstructured.sir_passes.infer_local_variable_location_type import (
+    InferLocalVariableLocationTypeTransformation,
+)
 
 
 statements = []
@@ -106,9 +110,6 @@ sign = sir.Field(
 )
 fields.append(sign)
 
-s2n = sir_to_naive.SirToNaive()
-s2n.current_loc_type_stack.append(naive.LocationType.Edge)  # TODO hack
-
 # sir_utils.make_var_decl_stmt(
 #     sir_utils.make_type(SIR.BuiltinType.Float),
 #     "zavg",
@@ -130,20 +131,20 @@ zavg_red = sir.ReductionOverNeighborExpr(
     op="+",
     rhs=sir.FieldAccessExpr(name="pp", vertical_offset=0, horizontal_offset=sir.ZeroOffset()),
     init=sir.LiteralAccessExpr(
-        value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+        value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
     ),
     chain=[sir.LocationType.Edge, sir.LocationType.Vertex],
 )
 zavg_mul = sir.BinaryOperator(
     op="*",
     left=sir.LiteralAccessExpr(
-        value="0.5", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+        value="0.5", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
     ),
     right=zavg_red,
 )
 zavg_decl = sir.VarDeclStmt(
     data_type=sir.Type(
-        data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+        data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
         is_const=False,
         is_volatile=False,
     ),
@@ -220,7 +221,7 @@ assign_pnabla_MXX = sir.ExprStmt(
                 ),
             ),
             init=sir.LiteralAccessExpr(
-                value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+                value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
             ),
             chain=[sir.LocationType.Vertex, sir.LocationType.Edge],
         ),
@@ -255,7 +256,7 @@ assign_pnabla_MYY = sir.ExprStmt(
                 ),
             ),
             init=sir.LiteralAccessExpr(
-                value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT32),
+                value="0.0", data_type=sir.BuiltinType(type_id=common.DataType.FLOAT64),
             ),
             chain=[sir.LocationType.Vertex, sir.LocationType.Edge],
         ),
@@ -325,5 +326,6 @@ vert_decl_stmt = sir.VerticalRegionDeclStmt(
 ctrl_flow_ast = sir.AST(root=sir.BlockStmt(statements=[vert_decl_stmt]))
 stencil = sir.Stencil(name="nabla", ast=ctrl_flow_ast, params=fields)
 
-nir = s2n.visit(stencil)
-print(naive_codegen.NaiveCodeGenerator.apply(nir))
+var_loc_type_inferred = InferLocalVariableLocationTypeTransformation.apply(stencil)
+naive_ir = sir_to_naive.SirToNaive().visit(var_loc_type_inferred)
+print(naive_codegen.NaiveCodeGenerator.apply(naive_ir))

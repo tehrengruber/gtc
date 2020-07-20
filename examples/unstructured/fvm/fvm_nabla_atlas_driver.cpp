@@ -182,6 +182,7 @@ private:
 
 public:
   atlas::Mesh const &mesh() const { return mesh_; }
+  atlas::Mesh &mesh() { return mesh_; }
   atlas::functionspace::EdgeColumns const &fs_edges() const {
     return fs_edges_;
   }
@@ -299,9 +300,10 @@ int main() {
   atlasInterface::SparseDimension<double> sign =
       atlas::array::make_view<double, 3>(driver.sign());
 
+  atlasInterface::Mesh atlasInterfaceMesh{driver.mesh()};
   dawn_generated::cxxnaiveico::generated<atlasInterface::atlasTag>(
-      driver.mesh(), driver.nb_levels(), S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, pp,
-      pnabla_MXX, pnabla_MYY, vol, sign)
+      atlasInterfaceMesh, driver.nb_levels(), S_MXX, S_MYY, zavgS_MXX,
+      zavgS_MYY, pp, pnabla_MXX, pnabla_MYY, vol, sign)
       .run();
 
   gmesh.write(m_pnabla_MXX);

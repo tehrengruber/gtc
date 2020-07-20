@@ -18,6 +18,15 @@
                 "cwd": "${workspaceFolder}"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "rebuild atlas4py",
+            "type": "shell",
+            "command": "python setup.py develop",
+            "options": {
+                "cwd": "${workspaceFolder}/../atlas4py"
+            },
+            "problemMatcher": []
         }
     ]
 }

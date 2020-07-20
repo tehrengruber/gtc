@@ -142,8 +142,6 @@ class NodeTranslator(NodeVisitor):
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             tmp_items: Collection[ValidNodeType] = []
-            if isinstance(node, Node):
-                tmp_items = {key: self.visit(value, **kwargs) for key, value in node}
                 result = node.__class__(  # type: ignore
                     **{key: value for key, value in node.attributes()},
                     **{key: value for key, value in tmp_items.items() if value is not NOTHING},
