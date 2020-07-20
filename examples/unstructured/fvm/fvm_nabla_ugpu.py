@@ -22,6 +22,7 @@ from gt_toolchain.unstructured.ugpu import (
     SidComposite,
     SidCompositeEntry,
     USid,
+    Temporary,
     VerticalDimension,
 )
 
@@ -290,7 +291,7 @@ sign = USid(
 )
 
 
-zavg_tmp = USid(name="zavg_tmp", dimensions=[LocationType.Edge, VerticalDimension()])
+zavg_tmp = Temporary(name="zavg_tmp", dimensions=[LocationType.Edge, VerticalDimension()])
 
 comp = Computation(
     name="nabla",

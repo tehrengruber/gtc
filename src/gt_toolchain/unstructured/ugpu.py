@@ -147,34 +147,13 @@ class USid(Node):
     dimensions: List[Union[LocationType, SecondaryLocation, VerticalDimension]]  # Set?
 
 
+class Temporary(USid):
+    name: Str
+    dimensions: List[Union[LocationType, SecondaryLocation, VerticalDimension]]  # Set?
+
+
 class Computation(Node):
     name: Str
     parameters: List[USid]
-    temporaries: List[USid]
-    # tags: List[SidTag]
+    temporaries: List[Temporary]
     kernels: List[Kernel]  # probably replace by ctrlflow ast (where Kernel is one CtrlFlowStmt)
-
-
-# template <class ConnV2E /*Connectivity not needed*/, class VertexOrigins, class VertexStrides>
-# __global__ void nabla_vertex_4(ConnV2E v2e,
-#     VertexOrigins vertex_origins,
-#     VertexStrides vertex_strides) {
-#     // vertex loop
-#     // for (auto const &t : getVertices(LibTag{}, mesh)) {
-#     //     pnabla_MXX(deref(LibTag{}, t), k) =
-#     //         pnabla_MXX(deref(LibTag{}, t), k) / vol(deref(LibTag{}, t), k);
-#     //     pnabla_MYY(deref(LibTag{}, t), k) =
-#     //         pnabla_MYY(deref(LibTag{}, t), k) / vol(deref(LibTag{}, t), k);
-#     //   }
-
-#     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-#     if (idx >= gridtools::next::connectivity::size(v2e))
-#         return;
-
-#     auto vertex_ptrs = vertex_origins();
-
-#     gridtools::sid::shift(vertex_ptrs, gridtools::device::at_key<vertex>(vertex_strides), idx);
-
-#     *gridtools::device::at_key<pnabla_MXX_tag>(vertex_ptrs) /= *gridtools::device::at_key<vol_tag>(vertex_ptrs);
-#     *gridtools::device::at_key<pnabla_MYY_tag>(vertex_ptrs) /= *gridtools::device::at_key<vol_tag>(vertex_ptrs);
-# }

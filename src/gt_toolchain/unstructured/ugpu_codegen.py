@@ -195,6 +195,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                         for e in s.entries:
                             sid_tags.add("struct " + e.name + "_tag;")
                 kernel_calls = map(_this_generator.make_kernel_call, _this_node.kernels)
+                cache_allocator = "auto cuda_alloc = gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>);"
             %>#include <gridtools/next/cuda_util.hpp>
 #include <gridtools/next/tmp_gpu_storage.hpp>
 #include <gridtools/sid/allocator.hpp>
@@ -214,14 +215,19 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             namespace tu = gridtools::tuple_util;
             using namespace ${ name }_impl_;
 
-                    auto cuda_alloc =
-            gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>); // TODO
-        auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<edge, double>(
-            (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<edge, vertex>>(mesh)), 1, cuda_alloc);
+            ${ cache_allocator if len(temporaries) > 0 else '' }
+            ${ ''.join(temporaries) }
 
             ${ ''.join(kernel_calls) }
         }
         """
+        )
+
+        Temporary = mako_tpl.Template(
+            """<%
+            loctype = _this_generator.LOCATION_TYPE_TO_STR[_this_generator.location_type_from_dimensions(_this_node.dimensions)]
+            %>auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<${ loctype }, double /*TODO type*/>(
+                (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<${ loctype }>(mesh)), 1 /* TODO ksize */, cuda_alloc);"""
         )
 
         NeighborLoop = mako_tpl.Template(
@@ -261,7 +267,3 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         return self.generic_visit(
             node, computation_fields=node.parameters + node.temporaries, **kwargs
         )
-
-    # def visit_ReduceOverNeighbourExpr(self, node, *, iter_var, **kwargs) -> str:
-    #     outer_iter_var = iter_var
-    #     return self.generic_visit(node, outer_iter_var=outer_iter_var, iter_var="redIdx", **kwargs,)
