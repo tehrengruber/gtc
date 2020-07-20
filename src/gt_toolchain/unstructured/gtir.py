@@ -157,8 +157,6 @@ class HorizontalLoop(Node):
 
 class VerticalLoop(Node):
     # each statement inside a `with location_type` is interpreted as a full horizontal loop (see parallel model of SIR)
-    # TODO maybe still wrap it in a HorizontalLoop and force providing the location_type there
-    #      (because for Stmts we allow to deduce it)
     horizontal_loops: List[HorizontalLoop]
     loop_order: common.LoopOrder
 
