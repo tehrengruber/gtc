@@ -44,8 +44,9 @@ import jinja2
 from mako import template as mako_tpl
 
 from . import utils
-from .concepts import Node, NodeVisitor, ValidNodeType
+from .concepts import Node
 from .types import StrEnum
+from .visitors import NodeVisitor, ValidNodeType
 
 
 try:

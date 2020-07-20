@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import random
+import random  # noqa: F401
 
 import pydantic
 import pytest
@@ -51,113 +51,23 @@ class TestSourceLocation:
         assert str(loc) == "<source: Line 1, Col 1>"
 
 
-class TestDialect:
-    def test_create_dialect(self):
-        class Dialect1(eve.Dialect):
-            name = "dialect1"
-
-        assert Dialect1.name in eve.registered_dialects
-        assert eve.registered_dialects[Dialect1.name] is Dialect1
-
-        with pytest.raises(TypeError, match="Invalid"):
-
-            class Dialect1B:
-                name = "dialect1"
-
-            eve.concepts._register_dialect(Dialect1B)
-
-        with pytest.raises(TypeError, match="must define"):
-
-            class Dialect1C(eve.Dialect):
-                nameNN = "dialect1"
-
-        with pytest.raises(ValueError, match="not unique"):
-
-            class Dialect1D(eve.Dialect):
-                name = "dialect1"
-
-    def test_node_member(self, sample_dialect):
-        @sample_dialect.register
-        class NewNode(eve.Node):
-            _name_ = "simple_node__xxx"
-
-        @sample_dialect.register
-        class AbstractNewNode(eve.Node):
-            _name_ = None
-
-        with pytest.raises(TypeError, match="not a DialectMember"):
-
-            @sample_dialect.register
-            class NewNode2(eve.BaseModel):
-                _name_ = "simple_node__xxx"
-
-        with pytest.raises(ValueError, match="already registered"):
-
-            @sample_dialect.register
-            class NewNode3(eve.Node):
-                _name_ = "simple_node__xxx"
-
-    def test_vtype_member(self, sample_dialect):
-        @sample_dialect.register
-        class NewVType(eve.VType):
-            _name_ = "simple_vtype__xxx"
-
-        @sample_dialect.register
-        class AbstractNewVType(eve.VType):
-            _name_ = None
-
-        with pytest.raises(TypeError, match="not a DialectMember"):
-
-            @sample_dialect.register
-            class NewVType2(eve.BaseModel):
-                _name_ = "simple_vtype__xxx"
-
-        with pytest.raises(ValueError, match="already registered"):
-
-            @sample_dialect.register
-            class NewVType3(eve.VType):
-                _name_ = "simple_vtype__xxx"
-
-
-class TestDialectMember:
-    def test_invalid_key(self):
-        with pytest.raises(TypeError, match="invalid '_name_'"):
-
-            class NewMember(eve.DialectMember):
-                _name_ = 33
-
-        with pytest.raises(TypeError, match="Invalid dialect"):
-
-            class NewMember2(eve.DialectMember):
-                _dialect_ = 44.4
-
-    def test_invalid_dialect(self):
-        pass
-
-
-class TestVType:
-    def test_valid_key(self, sample_vtype):
-        assert isinstance(sample_vtype.key(), str) and len(sample_vtype.key())
-        assert sample_vtype.key().startswith(sample_vtype._dialect_.name)
-
-
 class TestNode:
     def test_unique_id(self, sample_node_maker):
         node_a = sample_node_maker()
         node_b = sample_node_maker()
         node_c = sample_node_maker()
 
-        assert node_a.id__ != node_b.id__ != node_c.id__
+        assert node_a.id_attr_ != node_b.id_attr_ != node_c.id_attr_
 
     def test_custom_id(self, source_location, sample_node_maker):
         custom_id = "my_custom_id"
         my_node = common.LocationNode(id__=custom_id, loc=source_location)
         other_node = sample_node_maker()
 
-        assert my_node.id__ == custom_id
-        assert my_node.id__ != other_node.id__
+        assert my_node.id_attr_ == custom_id
+        assert my_node.id_attr_ != other_node.id_attr_
 
-        with pytest.raises(pydantic.ValidationError, match="id__"):
+        with pytest.raises(pydantic.ValidationError, match="id_attr_"):
             common.LocationNode(id__=32, loc=source_location)
 
     def test_dialect(self, sample_node):

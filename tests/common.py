@@ -18,12 +18,12 @@
 import enum
 import random
 import string
-from typing import ClassVar, Collection, Dict, List, Mapping, Optional, Sequence, Set, Type, TypeVar
+from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set, Type, TypeVar
 
 from pydantic import Field, validator  # noqa: F401
 
-from eve.concepts import Dialect, Node, SourceLocation, ValueNode, VType
-from eve.types import Bool, Bytes, Enum, Float, Int, IntEnum, Str, StrEnum
+from eve.concepts import Node, SourceLocation, VType
+from eve.types import Bool, Bytes, Float, Int, IntEnum, Str, StrEnum
 
 
 T = TypeVar("T")
@@ -165,32 +165,18 @@ class StrKind(StrEnum):
     FUZ = "fuz"
 
 
-class TestDialect(Dialect):
-    name = "__test"
+SimpleVType = VType("simple")
 
 
-@TestDialect.register
-class SimpleVType(VType):
-    _name_: ClassVar[Optional[str]] = "simple"
-
-
-@TestDialect.register
 class EmptyNode(Node):
-    _name_: ClassVar[Optional[str]] = "empty"
     pass
 
 
-@TestDialect.register
 class LocationNode(Node):
-    _name_: ClassVar[Optional[str]] = "location"
-
     loc: SourceLocation
 
 
-@TestDialect.register
 class SimpleNode(Node):
-    _name_ = "simple"
-
     bool_value: Bool
     int_value: Int
     float_value: Float
@@ -200,27 +186,20 @@ class SimpleNode(Node):
     str_kind: StrKind
 
 
-@TestDialect.register
 class SimpleNodeWithOptionals(Node):
-    _name_ = "simple_opt"
-
     int_value: Optional[Int]
     float_value: Optional[Float]
     str_value: Optional[Str]
 
 
-@TestDialect.register
 class SimpleNodeWithHiddenMembers(Node):
-    _name_ = "simpe_hidden"
 
     hidden_attr_: Int
     int_value: Int
     hidden_value_: Int
 
 
-@TestDialect.register
 class SimpleNodeWithLoc(Node):
-    _name_ = "simple_loc"
 
     int_value: Int
     float_value: Float
@@ -228,9 +207,7 @@ class SimpleNodeWithLoc(Node):
     loc: Optional[SourceLocation]
 
 
-@TestDialect.register
 class SimpleNodeWithCollections(Node):
-    _name_ = "simple_collections"
 
     int_list: List[Int]
     str_set: Set[Str]
@@ -238,9 +215,7 @@ class SimpleNodeWithCollections(Node):
     loc: Optional[SourceLocation]
 
 
-@TestDialect.register
 class SimpleNodeWithAbstractCollections(Node):
-    _name_ = "simple_abs_collections"
 
     int_sequence: Sequence[Int]
     str_set: Set[Str]
@@ -248,22 +223,12 @@ class SimpleNodeWithAbstractCollections(Node):
     loc: Optional[SourceLocation]
 
 
-@TestDialect.register
 class CompoundNode(Node):
-    _name_ = "compound"
-
     location: LocationNode
     simple: SimpleNode
     simple_loc: SimpleNodeWithLoc
     simple_opt: SimpleNodeWithOptionals
     other_simple_opt: Optional[SimpleNodeWithOptionals]
-
-
-@TestDialect.register
-class SimpleValueNode(ValueNode):
-    _name_ = "result"
-
-    location: SourceLocation
 
 
 # -- Maker functions --
@@ -368,10 +333,6 @@ def make_compound_node(randomize: bool = True) -> CompoundNode:
         simple_opt=make_simple_node_with_optionals(),
         other_simple_opt=None,
     )
-
-
-def make_simple_value_node(randomize: bool = True) -> LocationNode:
-    return SimpleValueNode(location=make_source_location(randomize), result=SimpleVType())
 
 
 # -- Makers of invalid nodes --

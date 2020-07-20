@@ -19,43 +19,14 @@
 
 import collections.abc
 import copy
-import itertools
 import operator
-import types
-import typing
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    ClassVar,
-    Collection,
-    Dict,
-    Generator,
-    Iterable,
-    List,
-    Mapping,
-    MutableSequence,
-    MutableSet,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, Collection, Iterable, MutableSequence, MutableSet, Tuple, Union
 
-from typing_extensions import TypedDict
-
-from . import utils
-from .types import IntEnum, PositiveInt, Str, StrEnum, modelclass, validator
-
-
-if TYPE_CHECKING:
-    from pydantic.dataclasses import DataclassType
+from .concepts import NOTHING, Node
+from .types import IntEnum, StrEnum
 
 
 ValidLeafNodeType = Union[bool, bytes, int, float, str, IntEnum, StrEnum, Node, None]
-
 ValidNodeType = Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]
 
 
@@ -83,7 +54,7 @@ class NodeVisitor:
 
     ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
 
-    def visit(self, node: ValidNodeType, **kwargs) -> Any:
+    def visit(self, node: "ValidNodeType", **kwargs: Any) -> Any:
         visitor = self.generic_visit
         if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
@@ -97,10 +68,10 @@ class NodeVisitor:
 
         return visitor(node, **kwargs)
 
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+    def generic_visit(self, node: "ValidNodeType", **kwargs: Any) -> Any:
         items: Iterable[Tuple[Any, Any]] = []
         if isinstance(node, Node):
-            items = node.children()
+            items = list(node.iter_children())
         elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
@@ -132,34 +103,34 @@ class NodeTranslator(NodeVisitor):
        node = YourTranslator().visit(node)
     """
 
-    def __init__(self, *, memo: dict = None, **kwargs):
+    def __init__(self, *, memo: dict = None, **kwargs: Any):
         assert memo is None or isinstance(memo, dict)
         self.memo = memo or {}
 
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+    def generic_visit(self, node: "ValidNodeType", **kwargs: Any) -> Any:
         result: Any
         if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
-            tmp_items: Collection[ValidNodeType] = []
-                result = node.__class__(  # type: ignore
-                    **{key: value for key, value in node.attributes()},
-                    **{key: value for key, value in tmp_items.items() if value is not NOTHING},
-                )
+            tmp_items: Collection["ValidNodeType"] = []
+            result = node.__class__(  # type: ignore
+                **{key: value for key, value in node.iter_attributes()},
+                **{key: value for key, value in tmp_items.items() if value is not NOTHING},
+            )
 
-            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
-                # Sequence or set: create a new container instance with the new values
-                tmp_items = [self.visit(value, **kwargs) for value in node]
-                result = node.__class__(  # type: ignore
-                    [value for value in tmp_items if value is not NOTHING]
-                )
+        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+            # Sequence or set: create a new container instance with the new values
+            tmp_items = [self.visit(value, **kwargs) for value in node]
+            result = node.__class__(  # type: ignore
+                [value for value in tmp_items if value is not NOTHING]
+            )
 
-            elif isinstance(node, collections.abc.Mapping):
-                # Mapping: create a new mapping instance with the new values
-                tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
-                result = node.__class__(  # type: ignore
-                    {key: value for key, value in tmp_items.items() if value is not NOTHING}
-                )
+        elif isinstance(node, collections.abc.Mapping):
+            # Mapping: create a new mapping instance with the new values
+            tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
+            result = node.__class__(  # type: ignore
+                {key: value for key, value in tmp_items.items() if value is not NOTHING}
+            )
 
         else:
             result = copy.deepcopy(node, memo=self.memo)
@@ -186,25 +157,25 @@ class NodeModifier(NodeVisitor):
        node = YourTransformer().visit(node)
     """
 
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+    def generic_visit(self, node: "ValidNodeType", **kwargs: Any) -> Any:
         result: Any = node
         if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             items: Iterable[Tuple[Any, Any]] = []
-            tmp_items: Collection[ValidNodeType] = []
+            tmp_items: Collection["ValidNodeType"] = []
             set_op: Union[Callable[[Any, str, Any], None], Callable[[Any, int, Any], None]]
             del_op: Union[Callable[[Any, str], None], Callable[[Any, int], None]]
 
             if isinstance(node, Node):
-                items = node.children()
+                items = list(node.iter_children())
                 set_op = setattr
                 del_op = delattr
             elif isinstance(node, collections.abc.MutableSequence):
                 items = enumerate(node)
                 index_shift = 0
 
-                def set_op(container: MutableSequence, idx: int, value: ValidNodeType) -> None:
+                def set_op(container: MutableSequence, idx: int, value: "ValidNodeType") -> None:
                     container[idx - index_shift] = value
 
                 def del_op(container: MutableSequence, idx: int) -> None:
@@ -215,7 +186,7 @@ class NodeModifier(NodeVisitor):
             elif isinstance(node, collections.abc.MutableSet):
                 items = list(enumerate(node))
 
-                def set_op(container: MutableSet, idx: Any, value: ValidNodeType) -> None:
+                def set_op(container: MutableSet, idx: Any, value: "ValidNodeType") -> None:
                     container.add(value)
 
                 def del_op(container: MutableSet, idx: int) -> None:

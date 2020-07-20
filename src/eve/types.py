@@ -17,12 +17,9 @@
 """Definitions of general infrastructure."""
 
 
-import collections.abc
-import dataclasses
 import enum
-import json
-import typing
-from typing import Any, Callable, Dict, Generator, Mapping, Optional, Type, TypeVar, Union
+import sys
+from typing import Any, Callable, Generator
 
 import boltons.typeutils
 import pydantic
@@ -39,115 +36,13 @@ from pydantic import (  # noqa: F401
 )
 
 
-if typing.TYPE_CHECKING:
-    from pydantic.dataclasses import DataclassT, DataclassType
+if sys.version_info < (3, 8):
+    from typing_extensions import Literal, TypedDict  # noqa: F401
+else:
+    from typing import Literal, TypedDict  # noqa: F401
 
-    # Typing proxies
-    ModelclassT = TypeVar("ModelclassT", bound="ModelclassType")
-
-    class ModelclassType(DataclassType):
-        __dataclass_fields__: Dict[str, Any]
-
-        def to_dict(self: "ModelclassT") -> Dict[str, Any]:
-            ...
-
-        def to_json(self: "ModelclassT") -> str:
-            ...
-
-        @classmethod
-        def schema(cls: Type["ModelclassT"]) -> Dict[str, Any]:
-            ...
-
-        @classmethod
-        def schema_json(cls: Type["ModelclassT"]) -> str:
-            ...
-
-
-def field(
-    *,
-    default: Union[Any, dataclasses._MISSING_TYPE] = dataclasses.MISSING,
-    default_factory: Union[Callable, dataclasses._MISSING_TYPE] = dataclasses.MISSING,
-    init: bool = True,
-    repr: bool = True,  # noqa: A002
-    hash: Optional[bool] = None,  # noqa: A002
-    compare: bool = True,
-    metadata: Optional[Mapping[str, Any]] = None,
-    schema_info: Optional[Mapping[str, Any]] = None,
-) -> dataclasses.Field:
-
-    assert default is dataclasses.MISSING or default_factory is dataclasses.MISSING
-
-    return dataclasses.field(  # type: ignore
-        default=default,
-        default_factory=default_factory,
-        init=init,
-        repr=repr,
-        hash=hash,
-        compare=compare,
-        metadata=metadata,
-    )
-
-
-def modelclass(
-    class_: Optional[Type] = None,
-    *,
-    # dataclass params
-    init: bool = True,
-    repr: bool = True,  # noqa: A002
-    eq: bool = True,
-    order: bool = False,
-    unsafe_hash: bool = False,
-    frozen: bool = False,
-    # pydantic params
-    config: Optional[Union[Type, Dict[str, Any]]] = None,
-) -> Union[Callable[[Type], "ModelclassType"], "ModelclassType"]:
-
-    if config is None:
-        config_cls: Type = _DefaultPydanticConfig
-    else:
-        if isinstance(config, collections.abc.Mapping):
-            config_cls = type("_PydanticConfig", (object,), config)
-        elif not isinstance(config, type):
-            raise TypeError(f"Invalid config class ({config})")
-
-        for name, value in _DefaultPydanticConfig.__dict__.items():
-            if not name.startswith("_") and not hasattr(config_cls, name):
-                setattr(config_cls, name, value)
-
-    assert isinstance(config_cls, type)
-
-    def _wrapper(cls_: Type) -> "ModelclassType":
-        model_cls = pydantic.dataclasses.dataclass(
-            init=init,
-            repr=repr,
-            eq=eq,
-            order=order,
-            unsafe_hash=unsafe_hash,
-            frozen=frozen,
-            config=config_cls,
-        )(cls_)
-
-        def _typedclass_to_dict(self: "DataclassT") -> Dict[str, Any]:
-            return typing.cast(Dict[str, Any], pydantic.json.pydantic_encoder(self))
-
-        model_cls.to_dict = _typedclass_to_dict  # type: ignore
-
-        def _typedclass_to_json(self: "DataclassT", *, indent: int = 4) -> str:
-            return json.dumps(self, indent=indent, default=pydantic.json.pydantic_encoder)
-
-        model_cls.to_json = _typedclass_to_json  # type: ignore
-
-        model_cls.schema = model_cls.__pydantic_model__.schema  # type: ignore
-        model_cls.schema_json = model_cls.__pydantic_model__.schema_json  # type: ignore
-
-        return typing.cast("ModelclassType", model_cls)
-
-    return _wrapper(class_) if class_ else _wrapper
-
-
-class _DefaultPydanticConfig:
-    extra = "forbid"
-    arbitrary_types_allowed = True
+AnyCallable = Callable[..., Any]
+NoArgAnyCallable = Callable[[], Any]
 
 
 classproperty = boltons.typeutils.classproperty

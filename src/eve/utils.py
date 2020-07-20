@@ -50,7 +50,13 @@ from boltons.strutils import (  # noqa: F401
 )
 
 
-WordSequenceType = Union[str, Sequence[str]]
+class _NOTHING_TYPE:
+    pass
+
+
+#: Marker value used to avoid confusion with `None`
+#: (specially in contexts where `None` could be a valid value)
+NOTHING = _NOTHING_TYPE()
 
 
 def call_all(funcs_iterable: Iterable[Callable]) -> Callable:
@@ -59,6 +65,9 @@ def call_all(funcs_iterable: Iterable[Callable]) -> Callable:
             f(*args, **kwargs)
 
     return _caller
+
+
+WordSequenceType = Union[str, Sequence[str]]
 
 
 def join_canonical_cased(words: WordSequenceType) -> str:
