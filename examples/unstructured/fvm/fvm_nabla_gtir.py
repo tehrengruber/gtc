@@ -4,7 +4,7 @@
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from gt_toolchain.common import BinaryOperator, DataType, LoopOrder
+from gt_toolchain.common import BinaryOperator, DataType, LocationType, LoopOrder
 from gt_toolchain.unstructured.gtir import (
     AssignStmt,
     BinaryOp,
@@ -14,7 +14,6 @@ from gt_toolchain.unstructured.gtir import (
     HorizontalDimension,
     HorizontalLoop,
     Literal,
-    LocationType,
     NeighborChain,
     NeighborReduce,
     ReduceOperator,
@@ -23,6 +22,7 @@ from gt_toolchain.unstructured.gtir import (
     UField,
     VerticalLoop,
 )
+from gt_toolchain.unstructured.gtir_to_nir import GtirToNir
 
 
 vertical_loops = []
@@ -225,3 +225,6 @@ nabla_stencil = Stencil(
 )
 
 comp = Computation(name="fvm_nabla", params=fields, stencils=[nabla_stencil])
+
+nir_comp = GtirToNir().visit(comp)
+debug(nir_comp)

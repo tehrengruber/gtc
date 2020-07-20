@@ -49,6 +49,31 @@ class NeighborChain(Node):
         return elements
 
 
+class LocalVar(Node):
+    name: Str
+    location_type: common.LocationType
+
+
+class BlockStmt(Stmt):
+    declarations: List[LocalVar]
+    statements: List[Stmt]
+
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        statements = values["statements"]
+        if len(statements) == 0:
+            raise ValueError("BlockStmt is empty")
+
+        if any(s.location_type != statements[0].location_type for s in statements):
+            raise ValueError("Location type mismatch: not all statements have the same")
+
+        if "location_type" not in values:
+            values["location_type"] = statements[0].location_type
+        elif statements[0].location_type != values["location_type"]:
+            raise ValueError("Location type mismatch")
+        return values
+
+
 @enum.unique
 class ReduceOperator(StrEnum):
     """Reduction operator identifier."""
@@ -59,14 +84,13 @@ class ReduceOperator(StrEnum):
     MIN = "MIN"
 
 
-class NeighborReduce(Expr):
-    operand: Expr
-    op: ReduceOperator
+class NeighborLoop(Stmt):
     neighbors: NeighborChain
+    body: BlockStmt
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        if values["neighbors"].elements[-1] != values["operand"].location_type:
+        if values["neighbors"].elements[-1] != values["body"].location_type:
             raise ValueError("Location type mismatch")
         return values
 
@@ -136,7 +160,7 @@ class TemporaryField(UField):
 
 
 class HorizontalLoop(Node):
-    stmt: Stmt
+    stmt: BlockStmt
     location_type: common.LocationType
 
     @root_validator(pre=True)

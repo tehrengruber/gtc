@@ -69,3 +69,11 @@ class LoopOrder(IntEnum):
     FORWARD = 1
     BACKWARD = 2
     # PARALLEL = 3
+
+
+@enum.unique
+class LocationType(IntEnum):
+    Vertex = 0
+    Edge = 1
+    Cell = 2
+    NoLocation = 3

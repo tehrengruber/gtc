@@ -21,8 +21,8 @@ from gt_toolchain.unstructured.ugpu import (
     SecondaryLocation,
     SidComposite,
     SidCompositeEntry,
-    USid,
     Temporary,
+    USid,
     VerticalDimension,
 )
 
