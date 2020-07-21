@@ -15,15 +15,39 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-# from types import MappingProxyType
-# from typing import ClassVar, Mapping
+from types import MappingProxyType
+from typing import ClassVar, Mapping
 
 import eve  # noqa: F401
 from eve.core import NodeTranslator
+from gt_toolchain import common
 from gt_toolchain.unstructured import gtir, nir
 
 
 class GtirToNir(NodeTranslator):
+    REDUCE_OP_INIT_VAL: ClassVar[
+        Mapping[gtir.ReduceOperator, nir.BuiltInLiteral]
+    ] = MappingProxyType(
+        {
+            gtir.ReduceOperator.ADD: nir.BuiltInLiteral.ZERO,
+            gtir.ReduceOperator.MUL: nir.BuiltInLiteral.ONE,
+            gtir.ReduceOperator.MIN: nir.BuiltInLiteral.MIN_VALUE,
+            gtir.ReduceOperator.MAX: nir.BuiltInLiteral.MAX_VALUE,
+        }
+    )
+
+    REDUCE_OP_TO_BINOP: ClassVar[
+        Mapping[gtir.ReduceOperator, nir.BuiltInLiteral]
+    ] = MappingProxyType(
+        {
+            gtir.ReduceOperator.ADD: common.BinaryOperator.ADD,
+            gtir.ReduceOperator.MUL: common.BinaryOperator.MUL,
+            # TODO
+            # gtir.ReduceOperator.MIN: nir.BuiltInLiteral.MIN_VALUE,
+            # gtir.ReduceOperator.MAX: nir.BuiltInLiteral.MAX_VALUE,
+        }
+    )
+
     def visit_NeighborChain(self, node: gtir.NeighborChain, **kwargs):
         return nir.NeighborChain(elements=node.elements)
 
@@ -48,30 +72,75 @@ class GtirToNir(NodeTranslator):
         return nir.FieldAccess(name=node.name, location_type=node.location_type)
 
     def visit_NeighborReduce(self, node: gtir.NeighborReduce, **kwargs):
-        return nir.Expr(location_type=node.location_type)  # TODO
+        if "last_block" not in kwargs:
+            raise ValueError("no block defined")
+        last_block = kwargs["last_block"]
+        body_location = node.neighbors.elements[-1]
+        reduce_var_name = "my_TODO_unique_local_var"
+        last_block.declarations.append(
+            nir.LocalVar(
+                name=reduce_var_name,
+                vtype=common.DataType.FLOAT64,  # TODO
+                location_type=node.location_type,
+            )
+        )
+        last_block.statements.append(
+            nir.AssignStmt(
+                left=nir.VarAccess(name=reduce_var_name, location_type=node.location_type),
+                right=nir.Literal(
+                    value=self.REDUCE_OP_INIT_VAL[node.op],
+                    location_type=node.location_type,
+                    vtype=common.DataType.FLOAT64,  # TODO
+                ),
+                location_type=node.location_type,
+            ),
+        )
+        body = nir.BlockStmt(
+            declarations=[],
+            statements=[
+                nir.AssignStmt(
+                    left=nir.VarAccess(name=reduce_var_name, location_type=body_location),
+                    right=nir.BinaryOp(
+                        left=nir.VarAccess(name=reduce_var_name, location_type=body_location),
+                        op=self.REDUCE_OP_TO_BINOP[node.op],
+                        right=self.visit(node.operand),
+                        location_type=body_location,
+                    ),
+                    location_type=body_location,
+                )
+            ],
+            location_type=body_location,
+        )
+        last_block.statements.append(
+            nir.NeighborLoop(
+                neighbors=self.visit(node.neighbors), body=body, location_type=node.location_type
+            )
+        )
+        return nir.VarAccess(name=reduce_var_name, location_type=node.location_type)  # TODO
+
+    def visit_Literal(self, node: gtir.Literal, **kwargs):
+        return nir.Literal(value=node.value, vtype=node.vtype, location_type=node.location_type)
 
     def visit_BinaryOp(self, node: gtir.BinaryOp, **kwargs):
         return nir.BinaryOp(
-            left=self.visit(node.left),
+            left=self.visit(node.left, **kwargs),
             op=node.op,
-            right=self.visit(node.right),
+            right=self.visit(node.right, **kwargs),
             location_type=node.location_type,
         )
 
     def visit_AssignStmt(self, node: gtir.AssignStmt, **kwargs):
         return nir.AssignStmt(
-            left=self.visit(node.left),
-            right=self.visit(node.right),
+            left=self.visit(node.left, **kwargs),
+            right=self.visit(node.right, **kwargs),
             location_type=node.location_type,
         )
 
     def visit_HorizontalLoop(self, node: gtir.HorizontalLoop, **kwargs):
-        return nir.HorizontalLoop(
-            stmt=nir.BlockStmt(
-                statements=[self.visit(node.stmt)], location_type=node.stmt.location_type,
-            ),
-            location_type=node.location_type,
-        )
+        block = nir.BlockStmt(declarations=[], statements=[], location_type=node.stmt.location_type)
+        stmt = self.visit(node.stmt, last_block=block)
+        block.statements.append(stmt)
+        return nir.HorizontalLoop(stmt=block, location_type=node.location_type,)
 
     def visit_VerticalLoop(self, node: gtir.VerticalLoop, **kwargs):
         return nir.VerticalLoop(

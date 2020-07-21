@@ -15,12 +15,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from devtools import debug  # noqa: F401
 from pydantic import root_validator, validator
 
-from eve import Node, Str, StrEnum
+from eve import IntEnum, Node, Str
 from gt_toolchain import common
 
 
@@ -34,8 +34,16 @@ class Stmt(Node):
     pass
 
 
+@enum.unique
+class BuiltInLiteral(IntEnum):
+    MAX_VALUE = 0
+    MIN_VALUE = 1
+    ZERO = 2
+    ONE = 3
+
+
 class Literal(Expr):
-    value: Str
+    value: Union[Str, BuiltInLiteral]
     vtype: common.DataType
 
 
@@ -51,6 +59,7 @@ class NeighborChain(Node):
 
 class LocalVar(Node):
     name: Str
+    vtype: common.DataType
     location_type: common.LocationType
 
 
@@ -58,30 +67,28 @@ class BlockStmt(Stmt):
     declarations: List[LocalVar]
     statements: List[Stmt]
 
+    class Config:
+        validate_assignment = True
+
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        statements = values["statements"]
-        if len(statements) == 0:
-            raise ValueError("BlockStmt is empty")
+        all_locations = [s.location_type for s in values["statements"]] + [
+            d.location_type for d in values["declarations"]
+        ]
 
-        if any(s.location_type != statements[0].location_type for s in statements):
-            raise ValueError("Location type mismatch: not all statements have the same")
+        if len(all_locations) == 0:
+            return values  # nothing to validate
+
+        if any(location != all_locations[0] for location in all_locations):
+            raise ValueError(
+                "Location type mismatch: not all statements and declarations have the same location type"
+            )
 
         if "location_type" not in values:
-            values["location_type"] = statements[0].location_type
-        elif statements[0].location_type != values["location_type"]:
+            values["location_type"] = all_locations[0]
+        elif all_locations[0] != values["location_type"]:
             raise ValueError("Location type mismatch")
         return values
-
-
-@enum.unique
-class ReduceOperator(StrEnum):
-    """Reduction operator identifier."""
-
-    ADD = "ADD"
-    MUL = "MUL"
-    MAX = "MAX"
-    MIN = "MIN"
 
 
 class NeighborLoop(Stmt):
@@ -95,12 +102,20 @@ class NeighborLoop(Stmt):
         return values
 
 
-class FieldAccess(Expr):
-    name: Str  # via symbol table
+class Access(Expr):
+    name: Str
+
+
+class FieldAccess(Access):
+    pass
+
+
+class VarAccess(Access):
+    pass
 
 
 class AssignStmt(Stmt):
-    left: FieldAccess  # there are no local variables in gtir, only fields
+    left: Access  # there are no local variables in gtir, only fields
     right: Expr
 
     @root_validator(pre=True)
