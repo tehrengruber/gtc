@@ -514,7 +514,7 @@ class TemplatedGenerator(NodeVisitor):
         )
 
     def transform_children(self, node: ValidNodeType, **kwargs) -> Dict[str, Any]:
-        return {key: self.visit(value, **kwargs) for key, value in node.children()}
+        return {key: self.visit(value, **kwargs) for key, value in node.iter_children()}
 
     def transform_attrs(self, node: ValidNodeType, **kwargs) -> Dict[str, Any]:
-        return {key: self.visit(value, **kwargs) for key, value in node.attributes()}
+        return {key: self.visit(value, **kwargs) for key, value in node.iter_attributes()}

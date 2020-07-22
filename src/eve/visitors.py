@@ -35,8 +35,9 @@ from typing import (
     Union,
 )
 
-from .concepts import NOTHING, Node
+from .concepts import Node
 from .types import IntEnum, StrEnum
+from .utils import NOTHING
 
 
 ValidLeafNodeType = Union[bool, bytes, int, float, str, IntEnum, StrEnum, Node, None]
@@ -103,7 +104,7 @@ class NodeTranslator(NodeVisitor):
     The `NodeTranslator` will walk the tree and use the return value of
     the visitor methods to replace or remove the old node in a new copy
     of the tree. If the return value of the visitor method is
-    `eve.core.NOTHING`, the node will be removed from its location in the
+    `eve.NOTHING`, the node will be removed from its location in the
     result tree, otherwise it is replaced with the return value. In the
     default case, a `deepcopy` of the original node is returned.
 
@@ -126,24 +127,28 @@ class NodeTranslator(NodeVisitor):
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             tmp_items: Collection[ValidNodeType] = []
-            result = node.__class__(  # type: ignore
-                **{key: value for key, value in node.iter_attributes()},
-                **{key: value for key, value in tmp_items.items() if value is not NOTHING},
-            )
+            if isinstance(node, Node):
+                tmp_items = {
+                    key: self.visit(value, **kwargs) for key, value in node.iter_children()
+                }
+                result = node.__class__(  # type: ignore
+                    **{key: value for key, value in node.iter_attributes()},
+                    **{key: value for key, value in tmp_items.items() if value is not NOTHING},
+                )
 
-        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
-            # Sequence or set: create a new container instance with the new values
-            tmp_items = [self.visit(value, **kwargs) for value in node]
-            result = node.__class__(  # type: ignore
-                [value for value in tmp_items if value is not NOTHING]
-            )
+            elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
+                # Sequence or set: create a new container instance with the new values
+                tmp_items = [self.visit(value, **kwargs) for value in node]
+                result = node.__class__(  # type: ignore
+                    value for value in tmp_items if value is not NOTHING  # type: ignore
+                )
 
-        elif isinstance(node, collections.abc.Mapping):
-            # Mapping: create a new mapping instance with the new values
-            tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
-            result = node.__class__(  # type: ignore
-                {key: value for key, value in tmp_items.items() if value is not NOTHING}
-            )
+            elif isinstance(node, collections.abc.Mapping):
+                # Mapping: create a new mapping instance with the new values
+                tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
+                result = node.__class__(  # type: ignore
+                    {key: value for key, value in tmp_items.items() if value is not NOTHING}
+                )
 
         else:
             result = copy.deepcopy(node, memo=self.memo)
@@ -156,7 +161,7 @@ class NodeModifier(NodeVisitor):
 
     The `NodeTransformer` will walk the tree and use the return value of
     the visitor methods to replace or remove the old node. If the
-    return value of the visitor method is :obj:`eve.core.NOTHING`,
+    return value of the visitor method is :obj:`eve.NOTHING`,
     the node will be removed from its location, otherwise it is replaced
     with the return value. The return value may also be the original
     node, in which case no replacement takes place.

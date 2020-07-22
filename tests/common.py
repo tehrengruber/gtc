@@ -22,7 +22,7 @@ from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set, Typ
 
 from pydantic import Field, validator  # noqa: F401
 
-from eve.concepts import Node, SourceLocation, VType
+from eve.concepts import FrozenNode, Node, SourceLocation, VType
 from eve.types import Bool, Bytes, Float, Int, IntEnum, Str, StrEnum
 
 
@@ -231,6 +231,16 @@ class CompoundNode(Node):
     other_simple_opt: Optional[SimpleNodeWithOptionals]
 
 
+class FrozenSimpleNode(FrozenNode):
+    bool_value: Bool
+    int_value: Int
+    float_value: Float
+    str_value: Str
+    bytes_value: Bytes
+    int_kind: IntKind
+    str_kind: StrKind
+
+
 # -- Maker functions --
 def make_source_location(randomize: bool = True) -> SourceLocation:
     factories = RandomFactories if randomize else Factories
@@ -332,6 +342,27 @@ def make_compound_node(randomize: bool = True) -> CompoundNode:
         simple_loc=make_simple_node_with_loc(),
         simple_opt=make_simple_node_with_optionals(),
         other_simple_opt=None,
+    )
+
+
+def make_frozen_simple_node(randomize: bool = True) -> FrozenSimpleNode:
+    factories = RandomFactories if randomize else Factories
+    bool_value = factories.make_bool()
+    int_value = factories.make_int()
+    float_value = factories.make_float()
+    str_value = factories.make_str()
+    bytes_value = factories.make_str().encode()
+    int_kind = factories.make_member([*IntKind]) if randomize else IntKind.PLUS
+    str_kind = factories.make_member([*StrKind]) if randomize else StrKind.BLA
+
+    return FrozenSimpleNode(
+        bool_value=bool_value,
+        int_value=int_value,
+        float_value=float_value,
+        str_value=str_value,
+        bytes_value=bytes_value,
+        int_kind=int_kind,
+        str_kind=str_kind,
     )
 
 

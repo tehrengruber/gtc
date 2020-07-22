@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import eve  # noqa: F401
-from eve.core import Node, NodeTranslator, NodeVisitor
+from eve import Node, NodeTranslator, NodeVisitor
 from gt_toolchain import sir
 
 

@@ -24,6 +24,7 @@ from . import common
 
 
 NODE_MAKERS = []
+FROZEN_NODE_MAKERS = []
 INVALID_NODE_MAKERS = []
 
 
@@ -46,18 +47,10 @@ def {name}({name}_maker):
         if "node" in key:
             if "invalid" in key:
                 INVALID_NODE_MAKERS.append(value)
+            elif "frozen" in key:
+                FROZEN_NODE_MAKERS.append(value)
             else:
                 NODE_MAKERS.append(value)
-
-
-@pytest.fixture
-def sample_dialect():
-    return common.TestDialect
-
-
-@pytest.fixture
-def sample_vtype():
-    return common.SimpleVType
 
 
 @pytest.fixture(params=NODE_MAKERS)
@@ -67,6 +60,16 @@ def sample_node_maker(request):
 
 @pytest.fixture(params=NODE_MAKERS)
 def sample_node(request):
+    return request.param()
+
+
+@pytest.fixture(params=FROZEN_NODE_MAKERS)
+def frozen_sample_node_maker(request):
+    return request.param
+
+
+@pytest.fixture(params=FROZEN_NODE_MAKERS)
+def frozen_sample_node(request):
     return request.param()
 
 

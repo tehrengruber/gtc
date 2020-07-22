@@ -16,26 +16,26 @@
 
 from typing import Any, Callable, Type
 
-from eve import core
+import eve
 
 
-class FindNodes(core.NodeVisitor):
+class FindNodes(eve.NodeVisitor):
     def __init__(self, **kwargs):
         self.result = []
 
-    def visit(self, node: core.Node, **kwargs) -> Any:
+    def visit(self, node: eve.Node, **kwargs) -> Any:
         if kwargs["predicate"](node):
             self.result.append(node)
         self.generic_visit(node, **kwargs)
         return self.result
 
     @classmethod
-    def by_predicate(cls, predicate: Callable[[core.Node], bool], node: core.Node, **kwargs):
+    def by_predicate(cls, predicate: Callable[[eve.Node], bool], node: eve.Node, **kwargs):
         return cls().visit(node, predicate=predicate)
 
     @classmethod
-    def by_type(cls, node_type: Type[core.Node], node: core.Node, **kwargs):
-        def type_predicate(node: core.Node):
+    def by_type(cls, node_type: Type[eve.Node], node: eve.Node, **kwargs):
+        def type_predicate(node: eve.Node):
             return isinstance(node, node_type)
 
         return cls.by_predicate(type_predicate, node)

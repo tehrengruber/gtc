@@ -52,6 +52,17 @@ class TestSourceLocation:
 
 
 class TestNode:
+    def test_validation(self, invalid_sample_node_maker):
+        with pytest.raises(pydantic.ValidationError):
+            invalid_sample_node_maker()
+
+    def test_mutability(self, sample_node):
+        sample_node.id_attr_ = None
+
+    def test_inmutability(self, frozen_sample_node):
+        with pytest.raises(TypeError):
+            frozen_sample_node.id_attr_ = None
+
     def test_unique_id(self, sample_node_maker):
         node_a = sample_node_maker()
         node_b = sample_node_maker()
@@ -61,57 +72,32 @@ class TestNode:
 
     def test_custom_id(self, source_location, sample_node_maker):
         custom_id = "my_custom_id"
-        my_node = common.LocationNode(id__=custom_id, loc=source_location)
+        my_node = common.LocationNode(id_attr_=custom_id, loc=source_location)
         other_node = sample_node_maker()
 
         assert my_node.id_attr_ == custom_id
         assert my_node.id_attr_ != other_node.id_attr_
 
         with pytest.raises(pydantic.ValidationError, match="id_attr_"):
-            common.LocationNode(id__=32, loc=source_location)
-
-    def test_dialect(self, sample_node):
-        assert sample_node._dialect_ is sample_node.__class__._dialect_
-        assert issubclass(sample_node._dialect_, eve.Dialect)
-        assert sample_node._dialect_.name in eve.registered_dialects
-
-    def test_validation(self, invalid_sample_node_maker):
-        with pytest.raises(pydantic.ValidationError):
-            invalid_sample_node_maker()
+            common.LocationNode(id_attr_=32, loc=source_location)
 
     def test_attributes(self, sample_node):
-        attribute_names = set(name for name, _ in sample_node.attributes())
+        attribute_names = set(name for name, _ in sample_node.iter_attributes())
 
-        assert all(name.endswith("__") for name in attribute_names)
+        assert all(name.endswith("_attr_") for name in attribute_names)
         assert (
-            set(name for name in sample_node.__fields__.keys() if name.endswith("__"))
+            set(name for name in sample_node.__fields__.keys() if name.endswith("_attr_"))
             == attribute_names
         )
 
     def test_children(self, sample_node):
-        attribute_names = set(name for name, _ in sample_node.attributes())
-        children_names = set(name for name, _ in sample_node.children())
+        attribute_names = set(name for name, _ in sample_node.iter_attributes())
+        children_names = set(name for name, _ in sample_node.iter_children())
         public_names = attribute_names | children_names
         field_names = set(sample_node.__fields__.keys())
 
-        assert not any(name.endswith("__") for name in children_names)
+        assert not any(name.endswith("_attr_") for name in children_names)
         assert not any(name.endswith("_") for name in children_names)
 
         assert public_names <= field_names
         assert all(name.endswith("_") for name in field_names - public_names)
-
-
-# class TestValueNode:
-#     def test_creation(self, simple_value_node):
-#         assert isinstance(simple_value_node.result, eve.VType)
-
-
-# class TestTerminatorNode:
-#     def test_creation(self, simple_value_node):
-#         assert isinstance(simple_value_node.result, eve.VType)
-
-
-class TestBlock:
-    def test_creation(self, sample_node_maker):
-        block = eve.Block(label="label", inputs=[], nodes=[])
-        assert isinstance(block, eve.Block)
