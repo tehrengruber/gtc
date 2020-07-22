@@ -265,6 +265,9 @@ class PathInfo:
     def is_root(self) -> bool:
         return len(self.items) == 0
 
+    def __iter__(self) -> Iterable[PathItem]:
+        return iter(self.items)
+
 
 class PathNodeVisitor:
     """Simple node visitor with path information based on :class:`ast.NodeVisitor`.
