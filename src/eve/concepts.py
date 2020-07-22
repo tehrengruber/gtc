@@ -274,8 +274,8 @@ class VType(Model):
     #: Unique name
     name: Str
 
-    def __init__(self, name: str):
-        super().__init__(name=name)
+    def __init__(self, name: str) -> None:  # type: ignore
+        super().__init__(name=name)  # type: ignore
 
     class Config(BaseModelConfig):
         pass

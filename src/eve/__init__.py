@@ -31,6 +31,7 @@ from .concepts import (  # noqa: F401
     field,
     in_field,
     out_field,
+    symbol_field,
     validator,
 )
 from .types import (  # noqa: F401
