@@ -19,8 +19,21 @@
 
 import collections.abc
 import copy
+import dataclasses
+import enum
 import operator
-from typing import Any, Callable, Collection, Iterable, MutableSequence, MutableSet, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Collection,
+    Iterable,
+    List,
+    MutableSequence,
+    MutableSet,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from .concepts import NOTHING, Node
 from .types import IntEnum, StrEnum
@@ -54,7 +67,7 @@ class NodeVisitor:
 
     ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
 
-    def visit(self, node: "ValidNodeType", **kwargs: Any) -> Any:
+    def visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
         visitor = self.generic_visit
         if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
@@ -68,7 +81,7 @@ class NodeVisitor:
 
         return visitor(node, **kwargs)
 
-    def generic_visit(self, node: "ValidNodeType", **kwargs: Any) -> Any:
+    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
         items: Iterable[Tuple[Any, Any]] = []
         if isinstance(node, Node):
             items = list(node.iter_children())
@@ -107,12 +120,12 @@ class NodeTranslator(NodeVisitor):
         assert memo is None or isinstance(memo, dict)
         self.memo = memo or {}
 
-    def generic_visit(self, node: "ValidNodeType", **kwargs: Any) -> Any:
+    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
         result: Any
         if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
-            tmp_items: Collection["ValidNodeType"] = []
+            tmp_items: Collection[ValidNodeType] = []
             result = node.__class__(  # type: ignore
                 **{key: value for key, value in node.iter_attributes()},
                 **{key: value for key, value in tmp_items.items() if value is not NOTHING},
@@ -157,13 +170,13 @@ class NodeModifier(NodeVisitor):
        node = YourTransformer().visit(node)
     """
 
-    def generic_visit(self, node: "ValidNodeType", **kwargs: Any) -> Any:
+    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
         result: Any = node
         if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             items: Iterable[Tuple[Any, Any]] = []
-            tmp_items: Collection["ValidNodeType"] = []
+            tmp_items: Collection[ValidNodeType] = []
             set_op: Union[Callable[[Any, str, Any], None], Callable[[Any, int, Any], None]]
             del_op: Union[Callable[[Any, str], None], Callable[[Any, int], None]]
 
@@ -175,7 +188,7 @@ class NodeModifier(NodeVisitor):
                 items = enumerate(node)
                 index_shift = 0
 
-                def set_op(container: MutableSequence, idx: int, value: "ValidNodeType") -> None:
+                def set_op(container: MutableSequence, idx: int, value: ValidNodeType) -> None:
                     container[idx - index_shift] = value
 
                 def del_op(container: MutableSequence, idx: int) -> None:
@@ -186,7 +199,7 @@ class NodeModifier(NodeVisitor):
             elif isinstance(node, collections.abc.MutableSet):
                 items = list(enumerate(node))
 
-                def set_op(container: MutableSet, idx: Any, value: "ValidNodeType") -> None:
+                def set_op(container: MutableSet, idx: Any, value: ValidNodeType) -> None:
                     container.add(value)
 
                 def del_op(container: MutableSet, idx: int) -> None:
@@ -217,3 +230,82 @@ class NodeModifier(NodeVisitor):
                 elif new_value != value:
                     set_op(result, key, new_value)
         return result
+
+
+@enum.unique
+class PathItemKind(enum.Enum):
+    CLASS = 1
+    COLLECTION = 2
+
+
+@dataclasses.dataclass(frozen=True)
+class PathItem:
+    node: ValidNodeType
+    kind: PathItemKind
+    member: Union[str, int]
+
+
+@dataclasses.dataclass(frozen=True)
+class PathInfo:
+    items: List[PathItem] = dataclasses.field(default_factory=list)
+
+    def append(self, item: PathItem) -> "PathInfo":
+        return PathInfo([*self.items, item])
+
+    @property
+    def root(self) -> Optional[PathItem]:
+        return self.items[-1] if self.items else None
+
+    @property
+    def is_root(self) -> bool:
+        return len(self.items) == 0
+
+
+class PathNodeVisitor:
+    """Simple node visitor with path information based on :class:`ast.NodeVisitor`.
+    """
+
+    # @classmethod
+    # def __init_subclass__(cls, *, path_info=False, **kwargs: Any):
+    #     if path_info:
+
+    ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
+
+    def visit(
+        self, node: ValidNodeType, *, path_info: Optional[PathInfo] = None, **kwargs: Any
+    ) -> Any:
+        if path_info is None:
+            path_info = PathInfo()
+
+        visitor = self.generic_visit
+        if isinstance(node, Node):
+            for node_class in node.__class__.__mro__:
+                method_name = "visit_" + node_class.__name__
+                if hasattr(self, method_name):
+                    visitor = getattr(self, method_name)
+                    break
+
+                if node_class is Node:
+                    break
+
+        return visitor(node, path_info=path_info, **kwargs)
+
+    def generic_visit(self, node: ValidNodeType, *, path_info: PathInfo, **kwargs: Any) -> Any:
+        items: Iterable[Tuple[Any, Any]] = []
+
+        if isinstance(node, Node):
+            items = list(node.iter_children())
+            item_kind: PathItemKind = PathItemKind.CLASS
+        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
+            node, self.ATOMIC_COLLECTION_TYPES
+        ):
+            items = enumerate(node)
+            item_kind = PathItemKind.COLLECTION
+        elif isinstance(node, collections.abc.Mapping):
+            items = node.items()
+            item_kind = PathItemKind.COLLECTION
+
+        # Process selected items (if any)
+        for name, value in items:
+            path_item = PathItem(node, item_kind, name)
+            self.visit(value, path_info=path_info.append(path_item), **kwargs)
