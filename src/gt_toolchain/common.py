@@ -77,3 +77,11 @@ class LocationType(IntEnum):
     Edge = 1
     Cell = 2
     NoLocation = 3
+
+
+@enum.unique
+class BuiltInLiteral(IntEnum):
+    MAX_VALUE = 0
+    MIN_VALUE = 1
+    ZERO = 2
+    ONE = 3

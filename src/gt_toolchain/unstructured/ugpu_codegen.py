@@ -20,6 +20,7 @@ from typing import ClassVar, Mapping
 from mako import template as mako_tpl
 
 from eve import codegen
+from gt_toolchain import common
 from gt_toolchain.unstructured.ugpu import (
     Computation,
     Kernel,
@@ -44,6 +45,24 @@ from gt_toolchain.unstructured.ugpu import (
 class UgpuCodeGenerator(codegen.TemplatedGenerator):
     LOCATION_TYPE_TO_STR: ClassVar[Mapping[LocationType, Mapping[str, str]]] = MappingProxyType(
         {LocationType.Vertex: "vertex", LocationType.Edge: "edge", LocationType.Cell: "cell"}
+    )
+
+    DATA_TYPE_TO_STR: ClassVar[Mapping[LocationType, str]] = MappingProxyType(
+        {
+            common.DataType.BOOLEAN: "bool",
+            common.DataType.INT32: "int",
+            common.DataType.UINT32: "unsigned_int",
+            common.DataType.FLOAT32: "float",
+            common.DataType.FLOAT64: "double",
+        }
+    )
+    BUILTIN_LITERAL_TO_STR: ClassVar[Mapping[common.BuiltInLiteral, str]] = MappingProxyType(
+        {
+            common.BuiltInLiteral.MAX_VALUE: "std::numeric_limits<TODO>::max()",
+            common.BuiltInLiteral.MIN_VALUE: "std::numeric_limits<TODO>::min()",
+            common.BuiltInLiteral.ZERO: "0",
+            common.BuiltInLiteral.ONE: "1",
+        }
     )
 
     def make_connectivity_name(self, chain: NeighborChain):
@@ -253,9 +272,17 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             """
         )
 
-        Literal = "{value}"
+        Literal = mako_tpl.Template(
+            """<%
+                literal= _this_node.value if isinstance(_this_node.value, str) else _this_generator.BUILTIN_LITERAL_TO_STR[_this_node.value]
+            %>(${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] })${ literal }"""
+        )
 
         VarAccess = "{name}"
+
+        VarDecl = mako_tpl.Template(
+            "${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] } ${ name } = ${ init };"
+        )
 
     @classmethod
     def apply(cls, root, **kwargs) -> str:

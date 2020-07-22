@@ -14,13 +14,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import enum
 from typing import List, Optional, Union
 
 from devtools import debug  # noqa: F401
 from pydantic import root_validator, validator
 
-from eve import IntEnum, Node, Str
+from eve import Node, Str
 from gt_toolchain import common
 
 
@@ -34,16 +33,8 @@ class Stmt(Node):
     pass
 
 
-@enum.unique
-class BuiltInLiteral(IntEnum):
-    MAX_VALUE = 0
-    MIN_VALUE = 1
-    ZERO = 2
-    ONE = 3
-
-
 class Literal(Expr):
-    value: Union[Str, BuiltInLiteral]
+    value: Union[Str, common.BuiltInLiteral]
     vtype: common.DataType
 
 
@@ -194,7 +185,7 @@ class VerticalLoop(Node):
 
 class Stencil(Node):
     vertical_loops: List[VerticalLoop]
-    declarations: Optional[List[TemporaryField]]
+    declarations: List[TemporaryField]
 
 
 class Computation(Node):

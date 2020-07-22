@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Eve toolchain
 
+import os
+
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
@@ -23,6 +25,8 @@ from gt_toolchain.unstructured.gtir import (
     VerticalLoop,
 )
 from gt_toolchain.unstructured.gtir_to_nir import GtirToNir
+from gt_toolchain.unstructured.nir_to_ugpu import NirToUgpu
+from gt_toolchain.unstructured.ugpu_codegen import UgpuCodeGenerator
 
 
 vertical_loops = []
@@ -227,4 +231,13 @@ nabla_stencil = Stencil(
 comp = Computation(name="fvm_nabla", params=fields, stencils=[nabla_stencil])
 
 nir_comp = GtirToNir().visit(comp)
-debug(nir_comp)
+# debug(nir_comp)
+ugpu_comp = NirToUgpu().visit(nir_comp)
+# debug(ugpu_comp)
+
+generated_code = UgpuCodeGenerator.apply(ugpu_comp)
+print(generated_code)
+
+output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_fvm_nabla_ugpu.hpp"
+with open(output_file, "w+") as output:
+    output.write(generated_code)

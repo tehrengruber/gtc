@@ -50,11 +50,13 @@ class FieldAccess(Expr):
 class VarDecl(Stmt):
     name: Str
     init: Expr
+    vtype: common.DataType
     # TODO type etc
 
 
 class Literal(Expr):
-    value: Str
+    value: Union[common.BuiltInLiteral, Str]
+    vtype: common.DataType
 
 
 class VarAccess(Expr):

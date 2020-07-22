@@ -26,18 +26,18 @@ from gt_toolchain.unstructured import gtir, nir
 
 class GtirToNir(NodeTranslator):
     REDUCE_OP_INIT_VAL: ClassVar[
-        Mapping[gtir.ReduceOperator, nir.BuiltInLiteral]
+        Mapping[gtir.ReduceOperator, common.BuiltInLiteral]
     ] = MappingProxyType(
         {
-            gtir.ReduceOperator.ADD: nir.BuiltInLiteral.ZERO,
-            gtir.ReduceOperator.MUL: nir.BuiltInLiteral.ONE,
-            gtir.ReduceOperator.MIN: nir.BuiltInLiteral.MIN_VALUE,
-            gtir.ReduceOperator.MAX: nir.BuiltInLiteral.MAX_VALUE,
+            gtir.ReduceOperator.ADD: common.BuiltInLiteral.ZERO,
+            gtir.ReduceOperator.MUL: common.BuiltInLiteral.ONE,
+            gtir.ReduceOperator.MIN: common.BuiltInLiteral.MIN_VALUE,
+            gtir.ReduceOperator.MAX: common.BuiltInLiteral.MAX_VALUE,
         }
     )
 
     REDUCE_OP_TO_BINOP: ClassVar[
-        Mapping[gtir.ReduceOperator, nir.BuiltInLiteral]
+        Mapping[gtir.ReduceOperator, common.BinaryOperator]
     ] = MappingProxyType(
         {
             gtir.ReduceOperator.ADD: common.BinaryOperator.ADD,
@@ -68,6 +68,11 @@ class GtirToNir(NodeTranslator):
     def visit_UField(self, node: gtir.UField, **kwargs):
         return nir.UField(name=node.name, vtype=node.vtype, dimensions=self.visit(node.dimensions))
 
+    def visit_TemporaryField(self, node: gtir.UField, **kwargs):
+        return nir.TemporaryField(
+            name=node.name, vtype=node.vtype, dimensions=self.visit(node.dimensions)
+        )
+
     def visit_FieldAccess(self, node: gtir.FieldAccess, **kwargs):
         return nir.FieldAccess(name=node.name, location_type=node.location_type)
 
@@ -76,7 +81,7 @@ class GtirToNir(NodeTranslator):
             raise ValueError("no block defined")
         last_block = kwargs["last_block"]
         body_location = node.neighbors.elements[-1]
-        reduce_var_name = "my_TODO_unique_local_var"
+        reduce_var_name = "local" + str(node.id_attr)
         last_block.declarations.append(
             nir.LocalVar(
                 name=reduce_var_name,
@@ -149,7 +154,10 @@ class GtirToNir(NodeTranslator):
         )
 
     def visit_Stencil(self, node: gtir.Stencil, **kwargs):
-        return nir.Stencil(vertical_loops=[self.visit(loop) for loop in node.vertical_loops])
+        return nir.Stencil(
+            declarations=[self.visit(decl) for decl in node.declarations],
+            vertical_loops=[self.visit(loop) for loop in node.vertical_loops],
+        )
         # TODO
 
     def visit_Computation(self, node: gtir.Stencil, **kwargs):
