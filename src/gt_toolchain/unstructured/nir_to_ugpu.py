@@ -24,6 +24,7 @@ from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
 from eve.core import Node, NodeTranslator, NodeVisitor
+from gt_toolchain import common
 from gt_toolchain.unstructured import nir, ugpu
 
 
@@ -50,7 +51,21 @@ class FindNodes(NodeVisitor):
         return cls.by_predicate(type_predicate, node)
 
 
+def location_type_from_dimensions(dimensions):
+    location_type = [dim for dim in dimensions if isinstance(dim, ugpu.LocationType)]
+    if len(location_type) == 1:
+        return location_type[0]
+    elif len(location_type) == 0:
+        return None
+    else:
+        raise ValueError("Invalid!")
+
+
 class NirToUgpu(NodeTranslator):
+    def __init__(self, *, memo: dict = None, **kwargs):
+        super().__init__(memo=memo)
+        self.fields = dict()  # poor man symbol table
+
     def convert_dimensions(self, dims: nir.Dimensions):
         dimensions = []
         if dims.horizontal:
@@ -123,12 +138,24 @@ class NirToUgpu(NodeTranslator):
         return statements
 
     def visit_HorizontalLoop(self, node: nir.HorizontalLoop, **kwargs):
-        field_accesses = FindNodes().by_type(nir.FieldAccess, node.stmt)
-        secondary_location_types = set([acc.location_type for acc in field_accesses])
+        accessed_field_names = list(
+            set(map(lambda f: f.name, FindNodes().by_type(nir.FieldAccess, node.stmt)))
+        )
+
+        field_to_primary_loc = {}
+        for name in accessed_field_names:
+            loc = location_type_from_dimensions(self.fields[name].dimensions)
+            if loc is not None:
+                field_to_primary_loc[name] = loc
+
+        secondary_location_types = set([loc for loc in field_to_primary_loc.values()])
         secondary_location_types.remove(node.location_type)
+
         primary_fields = [
-            ugpu.SidCompositeEntry(name=f.name)
-            for f in filter(lambda f: f.location_type == node.location_type, field_accesses)
+            ugpu.SidCompositeEntry(name=name)
+            for name in [
+                name for name, loc in field_to_primary_loc.items() if loc == node.location_type
+            ]
         ]
         other_connectivities = [
             ugpu.NeighborChain(chain=[node.location_type, location])
@@ -136,23 +163,26 @@ class NirToUgpu(NodeTranslator):
         ]
 
         other_sid_composites = []
-        for loc in secondary_location_types:
+        for secondary_loc in secondary_location_types:
             other_sid_composites.append(
                 ugpu.SidComposite(
-                    location_type=loc,
+                    location_type=secondary_loc,
                     entries=[
-                        ugpu.SidCompositeEntry(name=f.name)
-                        for f in filter(lambda f: f.location_type == loc, field_accesses)
+                        ugpu.SidCompositeEntry(name=name)
+                        for name in [
+                            name
+                            for name, loc in field_to_primary_loc.items()
+                            if loc == secondary_loc
+                        ]
                     ],
                 )
             )
+
         return ugpu.Kernel(
             name="kernel" + str(node.id_attr),
             primary_connectivity=node.location_type,
             primary_sid_composite=ugpu.SidComposite(
-                location_type=node.location_type,
-                entries=primary_fields
-                # secondary TODO
+                location_type=node.location_type, entries=primary_fields
             ),
             other_connectivities=other_connectivities,
             other_sid_composites=other_sid_composites,
@@ -168,7 +198,10 @@ class NirToUgpu(NodeTranslator):
             # TODO own exception type
             raise ValueError("Internal Error: field `temporaries` is missing")
         for tmp in node.declarations or []:
-            kwargs["temporaries"].append(self.visit(tmp))
+            converted_tmp = self.visit(tmp)
+            kwargs["temporaries"].append(converted_tmp)
+            self.fields[converted_tmp.name] = converted_tmp
+
         kernels = []
         for loop in node.vertical_loops:
             kernels.extend(self.visit(loop, **kwargs))
@@ -176,13 +209,16 @@ class NirToUgpu(NodeTranslator):
 
     def visit_Computation(self, node: nir.Computation, **kwargs):
         temporaries = []
+        parameters = []
+        for f in node.params:  # before visiting stencils!
+            converted_param = self.visit(f)
+            parameters.append(converted_param)
+            self.fields[converted_param.name] = converted_param
+
         kernels = []
         for s in node.stencils:
             kernels += self.visit(s, temporaries=temporaries)
 
         return ugpu.Computation(
-            name=node.name,
-            parameters=[self.visit(f) for f in node.params],
-            temporaries=temporaries,
-            kernels=kernels,
+            name=node.name, parameters=parameters, temporaries=temporaries, kernels=kernels,
         )

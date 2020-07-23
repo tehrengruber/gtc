@@ -228,7 +228,7 @@ nabla_stencil = Stencil(
     ],
 )
 
-comp = Computation(name="fvm_nabla", params=fields, stencils=[nabla_stencil])
+comp = Computation(name="nabla", params=fields, stencils=[nabla_stencil])
 
 nir_comp = GtirToNir().visit(comp)
 # debug(nir_comp)
