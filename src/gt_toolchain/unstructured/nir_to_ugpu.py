@@ -24,7 +24,6 @@ from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
 from eve.core import Node, NodeTranslator, NodeVisitor
-from gt_toolchain import common
 from gt_toolchain.unstructured import nir, ugpu
 
 
