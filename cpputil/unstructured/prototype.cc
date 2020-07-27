@@ -149,7 +149,7 @@ int main() {
     sum_vertex_to_cell(mesh, in, out);
 
     std::cout << "=== result ===" << std::endl;
-    for (int i = 0; auto &&row : out_array)
+    for (auto &&row : out_array)
         for (auto &&val : row) {
             std::cout << val << std::endl;
         }

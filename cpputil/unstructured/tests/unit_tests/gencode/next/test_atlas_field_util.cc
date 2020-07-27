@@ -26,7 +26,7 @@ namespace {
         static_assert(gridtools::has_key<strides_t, edge>{});
         static_assert(gridtools::has_key<strides_t, dim::k>{});
 
-        auto strides = gridtools::sid::get_strides(testee);
+        [[maybe_unused]] auto strides = gridtools::sid::get_strides(testee);
     }
 
     TEST(atlas_field_as_sid, invalid_location_type) {
@@ -56,7 +56,7 @@ namespace {
         static_assert(gridtools::has_key<strides_t, edge>{});
         static_assert(gridtools::has_key<strides_t, dim::k>{});
 
-        auto strides = gridtools::sid::get_strides(testee);
+        [[maybe_unused]] auto strides = gridtools::sid::get_strides(testee);
     }
 
 } // namespace

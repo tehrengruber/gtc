@@ -48,50 +48,6 @@ namespace {
         }
         return {min, max, avg / (double)first_length};
     }
-
-    std::tuple<double, double, double> min_max(atlas::Field const &field) {
-        assert(field.rank() == 2);
-
-        double min = std::numeric_limits<double>::max();
-        double max = std::numeric_limits<double>::min();
-        auto nabla = atlas::array::make_view<double, 2>(field);
-
-        auto shape = field.shape();
-
-        double avg = 0.;
-        for (std::size_t jnode = 0; jnode < field.shape()[0]; ++jnode) {
-            min = std::min(min, nabla(jnode, 0));
-            max = std::max(max, nabla(jnode, 0));
-            avg += nabla(jnode, 0);
-        }
-        return {min, max, avg / (double)field.shape()[0]};
-    }
-    void print_min_max(atlas::Field const &field) {
-        auto [min, max, avg] = min_max(field);
-        std::cout << field.name() << " min=" << min << ", max=" << max << ", avg=" << avg << std::endl;
-    }
-
-    std::tuple<double, double, double> min_max_1d(atlas::Field const &field) {
-        assert(field.rank() == 1);
-
-        double min = std::numeric_limits<double>::max();
-        double max = std::numeric_limits<double>::min();
-        auto nabla = atlas::array::make_view<double, 1>(field);
-
-        auto shape = field.shape();
-
-        double avg = 0.;
-        for (std::size_t jnode = 0; jnode < field.shape()[0]; ++jnode) {
-            min = std::min(min, nabla(jnode));
-            max = std::max(max, nabla(jnode));
-            avg += nabla(jnode);
-        }
-        return {min, max, avg / (double)field.shape()[0]};
-    }
-    void print_min_max_1d(atlas::Field const &field) {
-        auto [min, max, avg] = min_max_1d(field);
-        std::cout << field.name() << " min=" << min << ", max=" << max << ", avg=" << avg << std::endl;
-    }
 } // namespace
 
 namespace {
