@@ -21,13 +21,7 @@ from mako import template as mako_tpl
 
 from eve import codegen
 from gt_toolchain import common
-from gt_toolchain.unstructured.ugpu import (
-    Computation,
-    Kernel,
-    LocationType,
-    NeighborChain,
-    SidComposite,
-)
+from gt_toolchain.unstructured.ugpu import Computation, Kernel, NeighborChain, SidComposite
 
 
 # Ugpu Codegen convention:
@@ -43,11 +37,17 @@ from gt_toolchain.unstructured.ugpu import (
 
 
 class UgpuCodeGenerator(codegen.TemplatedGenerator):
-    LOCATION_TYPE_TO_STR: ClassVar[Mapping[LocationType, Mapping[str, str]]] = MappingProxyType(
-        {LocationType.Vertex: "vertex", LocationType.Edge: "edge", LocationType.Cell: "cell"}
+    LOCATION_TYPE_TO_STR: ClassVar[
+        Mapping[common.LocationType, Mapping[str, str]]
+    ] = MappingProxyType(
+        {
+            common.LocationType.Vertex: "vertex",
+            common.LocationType.Edge: "edge",
+            common.LocationType.Cell: "cell",
+        }
     )
 
-    DATA_TYPE_TO_STR: ClassVar[Mapping[LocationType, str]] = MappingProxyType(
+    DATA_TYPE_TO_STR: ClassVar[Mapping[common.LocationType, str]] = MappingProxyType(
         {
             common.DataType.BOOLEAN: "bool",
             common.DataType.INT32: "int",
@@ -151,7 +151,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         # ${ ''.join(other_sid_composites)}
 
     def location_type_from_dimensions(self, dimensions):
-        location_type = [dim for dim in dimensions if isinstance(dim, LocationType)]
+        location_type = [dim for dim in dimensions if isinstance(dim, common.LocationType)]
         if len(location_type) != 1:
             raise ValueError("Doesn't contain a LocationType!")
         return location_type[0]

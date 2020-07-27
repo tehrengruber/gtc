@@ -15,30 +15,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-import enum
 from typing import List, Optional, Union
 
 from pydantic import root_validator
 
-from eve import IntEnum, Node, Str
+from eve import Node, Str
 from gt_toolchain import common
 
 
-@enum.unique
-class LocationType(IntEnum):
-    Vertex = 0
-    Edge = 1
-    Cell = 2
-    NoLocation = 3
-
-
 class Expr(Node):
-    location_type: LocationType
+    location_type: common.LocationType
     pass
 
 
 class Stmt(Node):
-    location_type: LocationType
+    location_type: common.LocationType
     pass
 
 
@@ -61,6 +52,9 @@ class Literal(Expr):
 
 class VarAccess(Expr):
     name: Str  # via symbol table
+    dummy: Optional[
+        Str
+    ]  # to distinguish from FieldAccess, see https://github.com/eth-cscs/eve_toolchain/issues/34
 
 
 class AssignStmt(Stmt):
@@ -105,7 +99,7 @@ class BinaryOp(Expr):
 
 
 class NeighborLoop(Stmt):
-    body_location_type: LocationType
+    body_location_type: common.LocationType
     body: List[Stmt]
 
 
@@ -114,18 +108,18 @@ class SidCompositeEntry(Node):
 
 
 class SidComposite(Node):
-    location_type: LocationType
+    location_type: common.LocationType
     entries: List[SidCompositeEntry]
 
 
 class NeighborChain(Node):
-    chain: List[LocationType]
+    chain: List[common.LocationType]
 
 
 class Kernel(Node):
-    # location_type: LocationType
+    # location_type: common.LocationType
     name: Str  # symbol table
-    primary_connectivity: LocationType
+    primary_connectivity: common.LocationType
     other_connectivities: Optional[List[NeighborChain]]
     primary_sid_composite: SidComposite
     other_sid_composites: Optional[List[SidComposite]]
@@ -141,17 +135,17 @@ class VerticalDimension(Node):
 
 
 class SecondaryLocation(Node):
-    chain: List[LocationType]
+    chain: List[common.LocationType]
 
 
 class USid(Node):
     name: Str
-    dimensions: List[Union[LocationType, SecondaryLocation, VerticalDimension]]  # Set?
+    dimensions: List[Union[common.LocationType, SecondaryLocation, VerticalDimension]]  # Set?
 
 
 class Temporary(USid):
     name: Str
-    dimensions: List[Union[LocationType, SecondaryLocation, VerticalDimension]]  # Set?
+    dimensions: List[Union[common.LocationType, SecondaryLocation, VerticalDimension]]  # Set?
 
 
 class Computation(Node):

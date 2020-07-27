@@ -23,35 +23,35 @@ from typing import Any, Callable, Type
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from eve.core import Node, NodeTranslator, NodeVisitor
+from gt_toolchain import common
 from gt_toolchain.unstructured import nir, ugpu
 
 
 # TODO put in the right place
-class FindNodes(NodeVisitor):
+class FindNodes(eve.NodeVisitor):
     def __init__(self, **kwargs):
         self.result = []
 
-    def visit(self, node: Node, **kwargs) -> Any:
+    def visit(self, node: eve.Node, **kwargs) -> Any:
         if kwargs["predicate"](node):
             self.result.append(node)
         self.generic_visit(node, **kwargs)
         return self.result
 
     @classmethod
-    def by_predicate(cls, predicate: Callable[[Node], bool], node: Node, **kwargs):
+    def by_predicate(cls, predicate: Callable[[eve.Node], bool], node: eve.Node, **kwargs):
         return cls().visit(node, predicate=predicate)
 
     @classmethod
-    def by_type(cls, node_type: Type[Node], node: Node, **kwargs):
-        def type_predicate(node: Node):
+    def by_type(cls, node_type: Type[eve.Node], node: eve.Node, **kwargs):
+        def type_predicate(node: eve.Node):
             return isinstance(node, node_type)
 
         return cls.by_predicate(type_predicate, node)
 
 
 def location_type_from_dimensions(dimensions):
-    location_type = [dim for dim in dimensions if isinstance(dim, ugpu.LocationType)]
+    location_type = [dim for dim in dimensions if isinstance(dim, common.LocationType)]
     if len(location_type) == 1:
         return location_type[0]
     elif len(location_type) == 0:
@@ -60,7 +60,7 @@ def location_type_from_dimensions(dimensions):
         raise ValueError("Invalid!")
 
 
-class NirToUgpu(NodeTranslator):
+class NirToUgpu(eve.NodeTranslator):
     def __init__(self, *, memo: dict = None, **kwargs):
         super().__init__(memo=memo)
         self.fields = dict()  # poor man symbol table
@@ -109,7 +109,7 @@ class NirToUgpu(NodeTranslator):
     def visit_FieldAccess(self, node: nir.FieldAccess, **kwargs):
         return ugpu.FieldAccess(name=node.name, location_type=node.location_type)
 
-    def visit_VarAccess(self, node: nir.FieldAccess, **kwargs):
+    def visit_VarAccess(self, node: nir.VarAccess, **kwargs):
         return ugpu.VarAccess(name=node.name, location_type=node.location_type)
 
     def visit_AssignStmt(self, node: nir.AssignStmt, **kwargs):
@@ -178,7 +178,7 @@ class NirToUgpu(NodeTranslator):
             )
 
         return ugpu.Kernel(
-            name="kernel" + str(node.id_attr),
+            name="kernel" + str(node.id_attr_),
             primary_connectivity=node.location_type,
             primary_sid_composite=ugpu.SidComposite(
                 location_type=node.location_type, entries=primary_fields

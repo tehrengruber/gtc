@@ -7,6 +7,7 @@ from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
 from gt_toolchain import common
+from gt_toolchain.common import LocationType
 from gt_toolchain.unstructured import ugpu_codegen
 from gt_toolchain.unstructured.ugpu import (
     AssignStmt,
@@ -15,7 +16,6 @@ from gt_toolchain.unstructured.ugpu import (
     FieldAccess,
     Kernel,
     Literal,
-    LocationType,
     NeighborChain,
     NeighborLoop,
     SecondaryLocation,

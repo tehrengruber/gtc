@@ -19,12 +19,11 @@ from types import MappingProxyType
 from typing import ClassVar, Mapping
 
 import eve  # noqa: F401
-from eve.core import NodeTranslator
 from gt_toolchain import common
 from gt_toolchain.unstructured import gtir, nir
 
 
-class GtirToNir(NodeTranslator):
+class GtirToNir(eve.NodeTranslator):
     REDUCE_OP_INIT_VAL: ClassVar[
         Mapping[gtir.ReduceOperator, common.BuiltInLiteral]
     ] = MappingProxyType(
@@ -81,7 +80,7 @@ class GtirToNir(NodeTranslator):
             raise ValueError("no block defined")
         last_block = kwargs["last_block"]
         body_location = node.neighbors.elements[-1]
-        reduce_var_name = "local" + str(node.id_attr)
+        reduce_var_name = "local" + str(node.id_attr_)
         last_block.declarations.append(
             nir.LocalVar(
                 name=reduce_var_name,
