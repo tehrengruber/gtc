@@ -2,6 +2,12 @@ FROM gitpod/workspace-full
 
 USER root
 
+RUN apt-get update -qq && \
+    apt-get install -qq -y \
+    libboost-all-dev \
+    ccache && \
+    rm -rf /var/lib/apt/lists/*
+
 ARG ECBUILD_VERSION=3.3.2
 RUN cd /tmp && \
     wget -q https://github.com/ecmwf/ecbuild/archive/${ECBUILD_VERSION}.tar.gz && \
