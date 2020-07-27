@@ -20,7 +20,7 @@ from typing import List, Optional, Union
 
 from pydantic import root_validator, validator  # noqa: F401
 
-from eve.core import Node
+from eve import Node
 
 from . import common
 

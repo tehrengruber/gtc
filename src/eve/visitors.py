@@ -14,161 +14,33 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Definitions of basic infrastructure classes and functions."""
+"""Definitions of basic Eve concepts."""
 
 
 import collections.abc
 import copy
-import itertools
+import dataclasses
+import enum
 import operator
-from enum import Enum, IntEnum  # noqa: F401
 from typing import (
     Any,
     Callable,
     Collection,
-    Generator,
     Iterable,
+    List,
     MutableSequence,
     MutableSet,
     Optional,
     Tuple,
-    Type,
     Union,
 )
 
-from pydantic import (
-    BaseModel,
-    PositiveInt,
-    StrictBool,
-    StrictFloat,
-    StrictInt,
-    StrictStr,
-    validator,
-)
+from .concepts import Node
+from .types import IntEnum, StrEnum
+from .utils import NOTHING
 
 
-Bool = StrictBool  # noqa
-Bytes = bytes  # noqa
-Float = StrictFloat  # noqa
-Int = StrictInt  # noqa
-Str = StrictStr  # noqa
-
-#: Marker value used to avoid confusion with `None`
-#: (specially in contexts where `None` could be a valid value)
-NOTHING = object()
-
-
-class UIDGenerator:
-    #: Prefix for unique ids
-    prefix = ""
-
-    #: Constantly increasing counter for generation of unique ids
-    __unique_counter = itertools.count(1)
-
-    @classmethod
-    def get_unique_id(cls) -> str:
-        """Generate a new globally unique `int` for the current session."""
-        return f"{cls.prefix}_{next(cls.__unique_counter)}"
-
-    @classmethod
-    def reset(cls, start: int = 1) -> None:
-        """Reset generator."""
-        cls.__unique_counter = itertools.count(start)
-
-
-class StrEnum(str, Enum):
-    """Basic :class:`enum.Enum` subclass compatible with string operations."""
-
-    def __str__(self) -> str:
-        return self.value
-
-
-class BaseModelConfig:
-    extra = "forbid"
-
-
-class FrozenModelConfig(BaseModelConfig):
-    allow_mutation = False
-
-
-class SourceLocation(BaseModel):
-    """Source code location (line, column)."""
-
-    line: PositiveInt
-    column: PositiveInt
-    source: Str
-
-    class Config(FrozenModelConfig):
-        pass
-
-    def __str__(self):
-        return f"<{self.source}: Line {self.line}, Col {self.column}>"
-
-
-class BaseNode(BaseModel):
-    """Base node class.
-
-    Field values should be either:
-
-        * builtin types: `bool`, `bytes`, `int`, `float`, `str`
-        * other :class:`BaseNode` subclasses
-        * other :class:`pydantic.BaseModel` subclasses
-        * supported collections (:class:`List`, :class:`Dict`, :class:`Set`)
-          of any of the previous items
-
-    Field names ending with "_"  are considered hidden fields and
-    will not appear in the node iterators. Field names ending with
-    "_attr" are considered meta-attributes of the node, not children.
-    """
-
-    id_attr: Optional[Str] = None
-    kind_attr: Optional[Str] = None
-    dialect_attr: Optional[Str] = None
-
-    @validator("id_attr", pre=True, always=True)
-    def _id_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
-        return v or UIDGenerator.get_unique_id()
-
-    @validator("kind_attr", pre=True, always=True)
-    def _kind_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
-        if v and v != cls.__name__:
-            raise ValueError(f"kind_attr value '{v}' does not match cls.__name__ {cls.__name__}")
-
-        return v or cls.__name__
-
-    @validator("dialect_attr", pre=True, always=True)
-    def _dialect_attr_validator(cls: Type[BaseModel], v: Optional[str]) -> str:  # type: ignore
-        return v or cls.__module__.split(".")[-1]
-
-    def attributes(self) -> Generator[Tuple[str, Any], None, None]:
-        for name, _ in self.__fields__.items():
-            if name.endswith("_attr"):
-                yield (name, getattr(self, name))
-
-    def children(self) -> Generator[Tuple[str, Any], None, None]:
-        for name, _ in self.__fields__.items():
-            if not (name.endswith("_attr") or name.endswith("_")):
-                yield (name, getattr(self, name))
-
-    class Config(BaseModelConfig):
-        pass
-
-
-class Node(BaseNode):
-    pass
-
-
-class FrozenNode(Node):
-    """Base inmutable node class."""
-
-    class Config(FrozenModelConfig):
-        pass
-
-
-ValidLeafNodeType = Union[
-    bool, bytes, int, float, str, Bool, Bytes, Int, Float, Str, BaseNode, BaseModel, None
-]
-
+ValidLeafNodeType = Union[bool, bytes, int, float, str, IntEnum, StrEnum, Node, None]
 ValidNodeType = Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]
 
 
@@ -196,24 +68,24 @@ class NodeVisitor:
 
     ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
 
-    def visit(self, node: ValidNodeType, **kwargs) -> Any:
+    def visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
         visitor = self.generic_visit
-        if isinstance(node, BaseNode):
+        if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
                 method_name = "visit_" + node_class.__name__
                 if hasattr(self, method_name):
                     visitor = getattr(self, method_name)
                     break
 
-                if node_class is BaseNode:
+                if node_class is Node:
                     break
 
         return visitor(node, **kwargs)
 
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
         items: Iterable[Tuple[Any, Any]] = []
-        if isinstance(node, BaseNode):
-            items = node.children()
+        if isinstance(node, Node):
+            items = list(node.iter_children())
         elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
@@ -232,7 +104,7 @@ class NodeTranslator(NodeVisitor):
     The `NodeTranslator` will walk the tree and use the return value of
     the visitor methods to replace or remove the old node in a new copy
     of the tree. If the return value of the visitor method is
-    `eve.core.NOTHING`, the node will be removed from its location in the
+    `eve.NOTHING`, the node will be removed from its location in the
     result tree, otherwise it is replaced with the return value. In the
     default case, a `deepcopy` of the original node is returned.
 
@@ -245,20 +117,22 @@ class NodeTranslator(NodeVisitor):
        node = YourTranslator().visit(node)
     """
 
-    def __init__(self, *, memo: dict = None, **kwargs):
+    def __init__(self, *, memo: dict = None, **kwargs: Any):
         assert memo is None or isinstance(memo, dict)
         self.memo = memo or {}
 
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
         result: Any
         if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             tmp_items: Collection[ValidNodeType] = []
-            if isinstance(node, BaseNode):
-                tmp_items = {key: self.visit(value, **kwargs) for key, value in node.children()}
+            if isinstance(node, Node):
+                tmp_items = {
+                    key: self.visit(value, **kwargs) for key, value in node.iter_children()
+                }
                 result = node.__class__(  # type: ignore
-                    **{key: value for key, value in node.attributes()},
+                    **{key: value for key, value in node.iter_attributes()},
                     **{key: value for key, value in tmp_items.items() if value is not NOTHING},
                 )
 
@@ -266,7 +140,7 @@ class NodeTranslator(NodeVisitor):
                 # Sequence or set: create a new container instance with the new values
                 tmp_items = [self.visit(value, **kwargs) for value in node]
                 result = node.__class__(  # type: ignore
-                    [value for value in tmp_items if value is not NOTHING]
+                    value for value in tmp_items if value is not NOTHING  # type: ignore
                 )
 
             elif isinstance(node, collections.abc.Mapping):
@@ -287,7 +161,7 @@ class NodeModifier(NodeVisitor):
 
     The `NodeTransformer` will walk the tree and use the return value of
     the visitor methods to replace or remove the old node. If the
-    return value of the visitor method is :obj:`eve.core.NOTHING`,
+    return value of the visitor method is :obj:`eve.NOTHING`,
     the node will be removed from its location, otherwise it is replaced
     with the return value. The return value may also be the original
     node, in which case no replacement takes place.
@@ -301,9 +175,9 @@ class NodeModifier(NodeVisitor):
        node = YourTransformer().visit(node)
     """
 
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> Any:
+    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
         result: Any = node
-        if isinstance(node, (BaseNode, collections.abc.Collection)) and not isinstance(
+        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             items: Iterable[Tuple[Any, Any]] = []
@@ -312,7 +186,7 @@ class NodeModifier(NodeVisitor):
             del_op: Union[Callable[[Any, str], None], Callable[[Any, int], None]]
 
             if isinstance(node, Node):
-                items = node.children()
+                items = list(node.iter_children())
                 set_op = setattr
                 del_op = delattr
             elif isinstance(node, collections.abc.MutableSequence):
@@ -361,3 +235,85 @@ class NodeModifier(NodeVisitor):
                 elif new_value != value:
                     set_op(result, key, new_value)
         return result
+
+
+@enum.unique
+class PathItemKind(enum.Enum):
+    CLASS = 1
+    COLLECTION = 2
+
+
+@dataclasses.dataclass(frozen=True)
+class PathItem:
+    node: ValidNodeType
+    kind: PathItemKind
+    member: Union[str, int]
+
+
+@dataclasses.dataclass(frozen=True)
+class PathInfo:
+    items: List[PathItem] = dataclasses.field(default_factory=list)
+
+    def append(self, item: PathItem) -> "PathInfo":
+        return PathInfo([*self.items, item])
+
+    @property
+    def root(self) -> Optional[PathItem]:
+        return self.items[-1] if self.items else None
+
+    @property
+    def is_root(self) -> bool:
+        return len(self.items) == 0
+
+    def __iter__(self) -> Iterable[PathItem]:
+        return iter(self.items)
+
+
+class PathNodeVisitor:
+    """Simple node visitor with path information based on :class:`ast.NodeVisitor`.
+    """
+
+    # @classmethod
+    # def __init_subclass__(cls, *, path_info=False, **kwargs: Any):
+    #     if path_info:
+
+    ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
+
+    def visit(
+        self, node: ValidNodeType, *, path_info: Optional[PathInfo] = None, **kwargs: Any
+    ) -> Any:
+        if path_info is None:
+            path_info = PathInfo()
+
+        visitor = self.generic_visit
+        if isinstance(node, Node):
+            for node_class in node.__class__.__mro__:
+                method_name = "visit_" + node_class.__name__
+                if hasattr(self, method_name):
+                    visitor = getattr(self, method_name)
+                    break
+
+                if node_class is Node:
+                    break
+
+        return visitor(node, path_info=path_info, **kwargs)
+
+    def generic_visit(self, node: ValidNodeType, *, path_info: PathInfo, **kwargs: Any) -> Any:
+        items: Iterable[Tuple[Any, Any]] = []
+
+        if isinstance(node, Node):
+            items = list(node.iter_children())
+            item_kind: PathItemKind = PathItemKind.CLASS
+        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
+            node, self.ATOMIC_COLLECTION_TYPES
+        ):
+            items = enumerate(node)
+            item_kind = PathItemKind.COLLECTION
+        elif isinstance(node, collections.abc.Mapping):
+            items = node.items()
+            item_kind = PathItemKind.COLLECTION
+
+        # Process selected items (if any)
+        for name, value in items:
+            path_item = PathItem(node, item_kind, name)
+            self.visit(value, path_info=path_info.append(path_item), **kwargs)

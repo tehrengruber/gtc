@@ -14,28 +14,30 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import Any, Callable, Type
-
-import eve
+"""Definitions of basic Eve concepts."""
 
 
-class FindNodes(eve.NodeVisitor):
-    def __init__(self, **kwargs):
-        self.result = []
+from typing import Any, ClassVar, Dict, List, Type
 
-    def visit(self, node: eve.Node, **kwargs) -> Any:
-        if kwargs["predicate"](node):
-            self.result.append(node)
-        self.generic_visit(node, **kwargs)
-        return self.result
+import pydantic
 
-    @classmethod
-    def by_predicate(cls, predicate: Callable[[eve.Node], bool], node: eve.Node, **kwargs):
-        return cls().visit(node, predicate=predicate)
+from .concepts import _EVE_NODE_ATTR_SUFFIX, Node, Trait
+
+
+class SymbolTableTrait(Trait):
+
+    name: ClassVar[str] = "symbol_table"
 
     @classmethod
-    def by_type(cls, node_type: Type[eve.Node], node: eve.Node, **kwargs):
-        def type_predicate(node: eve.Node):
-            return isinstance(node, node_type)
+    def process_namespace(
+        cls, namespace: Dict[str, Any], trait_names: List[str], meta_kwargs: Dict[str, Any]
+    ) -> None:
+        attr_name = f"symtable{_EVE_NODE_ATTR_SUFFIX}"
+        namespace["__annotations__"][attr_name] = Dict[str, Node]
+        namespace[attr_name] = pydantic.Field(default_factory=dict)
 
-        return cls.by_predicate(type_predicate, node)
+    @classmethod
+    def process_class(
+        cls, node_class: Type[Node], trait_names: List[str], meta_kwargs: Dict[str, Any]
+    ) -> None:
+        pass

@@ -1,4 +1,30 @@
-# This file should be sourced from a compatible shell
+# This file should be sourced from a Bash-compatible shell
 
-shell_suffix=`ps -o command= -p $$ | rev | cut -d '/' -f 1 | rev`
-source "$(dirname $(readlink -e $BASH_SOURCE))/activate.$shell_suffix"
+EVE_PYTHON_CMD=${EVE_PYTHON_CMD:-python3}
+EVE_VENV_NAME=${EVE_VENV_NAME:-".eve.venv"}
+
+EVE_ROOT=$(dirname $(dirname "$(readlink -e $BASH_SOURCE)"))
+EVE_VENV_PATH=${EVE_ROOT}/${EVE_VENV_NAME}
+
+if [ "$0" = ${BASH_SOURCE} ]; then
+    echo "Error: this script needs to be sourced!"
+    echo "    $> source ${BASH_SOURCE}"
+    exit -1
+fi
+
+# If a virtual env is active, deactivate it first
+deactivate >/dev/null 2>/dev/null
+
+if [ ! -f ${EVE_VENV_PATH}/bin/activate ]; then
+    ${EVE_ROOT}/scripts/init_env.sh
+    if [ "$?" != "0" ]; then
+        echo "venv activation failed!"
+        return -1
+    fi
+fi
+source ${EVE_VENV_PATH}/bin/activate
+
+unset EVE_ROOT EVE_VENV_PATH
+
+echo -e "\nDeactivate by:"
+echo -e "    $> deactivate"

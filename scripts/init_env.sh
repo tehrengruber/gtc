@@ -1,7 +1,7 @@
 #!/bin/bash
 
 EVE_PYTHON_CMD=${EVE_PYTHON_CMD:-python3}
-EVE_ROOT="$(dirname $(dirname $(readlink -e $0)))"
+EVE_ROOT=$(dirname $(dirname "$(readlink -e $0)"))
 
 MAKE_VENV="true"
 
@@ -69,7 +69,7 @@ set -e
 
 echo -e "\nInstalling Python packages..."
 ${EVE_PYTHON_CMD} -m pip install --upgrade pip setuptools wheel
-${EVE_PYTHON_CMD} -m pip install -r ${EVE_ROOT}/requirements_dev.txt
+${EVE_PYTHON_CMD} -m pip install -r ${EVE_ROOT}/requirements_all.txt
 ${EVE_PYTHON_CMD} -m pip install -e ${EVE_ROOT}[cpp]
 echo -e "\nDone!"
 
