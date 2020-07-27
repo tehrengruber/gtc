@@ -86,13 +86,14 @@ S_MYY_acc = FieldAccess(name="S_MYY", location_type=LocationType.Edge)
 # acc_acc = VarAccess(name="acc", location_type=LocationType.Edge)
 
 edge1_assign0 = AssignStmt(
-    left=zavg_tmp_acc, right=Literal(value="0.0", location_type=LocationType.Edge),
+    left=zavg_tmp_acc,
+    right=Literal(value="0.0", location_type=LocationType.Edge, vtype=common.DataType.FLOAT64),
 )
 
 edge1_assign1 = AssignStmt(
     left=zavg_tmp_acc,
     right=BinaryOp(
-        left=Literal(value="0.5", location_type=LocationType.Edge),
+        left=Literal(value="0.5", location_type=LocationType.Edge, vtype=common.DataType.FLOAT64),
         right=zavg_tmp_acc,
         op=common.BinaryOperator.MUL,
     ),
@@ -222,12 +223,12 @@ edge_on_vertex_loop_y = NeighborLoop(
 
 vertex_2_init_to_zero_x = AssignStmt(
     left=pnabla_MXX_acc,
-    right=Literal(value="0.0", location_type=LocationType.Vertex),
+    right=Literal(value="0.0", location_type=LocationType.Vertex, vtype=common.DataType.FLOAT64),
     location_type=LocationType.Vertex,
 )
 vertex_2_init_to_zero_y = AssignStmt(
     left=pnabla_MYY_acc,
-    right=Literal(value="0.0", location_type=LocationType.Vertex),
+    right=Literal(value="0.0", location_type=LocationType.Vertex, vtype=common.DataType.FLOAT64),
     location_type=LocationType.Vertex,
 )
 
