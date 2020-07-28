@@ -73,7 +73,11 @@ class GtirToNir(eve.NodeTranslator):
         )
 
     def visit_FieldAccess(self, node: gtir.FieldAccess, **kwargs):
-        return nir.FieldAccess(name=node.name, location_type=node.location_type)
+        if "in_neighbor_loop" not in kwargs:
+            extent = False
+        else:
+            extent = kwargs["in_neighbor_loop"]
+        return nir.FieldAccess(name=node.name, location_type=node.location_type, extent=extent)
 
     def visit_NeighborReduce(self, node: gtir.NeighborReduce, **kwargs):
         if "last_block" not in kwargs:
@@ -107,7 +111,7 @@ class GtirToNir(eve.NodeTranslator):
                     right=nir.BinaryOp(
                         left=nir.VarAccess(name=reduce_var_name, location_type=body_location),
                         op=self.REDUCE_OP_TO_BINOP[node.op],
-                        right=self.visit(node.operand),
+                        right=self.visit(node.operand, in_neighbor_loop=True),
                         location_type=body_location,
                     ),
                     location_type=body_location,

@@ -19,7 +19,7 @@ from typing import List, Optional, Union
 from devtools import debug  # noqa: F401
 from pydantic import root_validator, validator
 
-from eve import Node, Str
+from eve import Bool, Node, Str
 from gt_toolchain import common
 
 
@@ -98,6 +98,7 @@ class Access(Expr):
 
 
 class FieldAccess(Access):
+    extent: Bool
     pass
 
 
