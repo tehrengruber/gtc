@@ -16,13 +16,12 @@
 
 import pytest
 
+from eve import FindNodes
 from gt_toolchain import common, sir
 from gt_toolchain.unstructured.sir_passes.infer_local_variable_location_type import (
     AnalysisException,
     InferLocalVariableLocationTypeTransformation,
 )
-
-from .util import FindNodes
 
 
 float_type = sir.BuiltinType(type_id=common.DataType.FLOAT32)

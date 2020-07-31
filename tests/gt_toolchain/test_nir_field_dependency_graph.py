@@ -15,54 +15,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from eve import Bool, Str
-from gt_toolchain import common
-from gt_toolchain.unstructured import nir
 from gt_toolchain.unstructured.nir_passes.field_dependency_graph import generate_dependency_graph
 
-
-default_vtype = common.DataType.FLOAT32
-default_location = common.LocationType.Vertex
-
-
-def make_horizontal_loop_with_init(field: Str):
-    write_access = nir.FieldAccess(name=field, extent=False, location_type=default_location)
-    return (
-        nir.HorizontalLoop(
-            stmt=nir.BlockStmt(
-                declarations=[],
-                statements=[
-                    nir.AssignStmt(
-                        left=write_access,
-                        right=nir.Literal(
-                            value=common.BuiltInLiteral.ONE,
-                            vtype=default_vtype,
-                            location_type=default_location,
-                        ),
-                    )
-                ],
-            ),
-            location_type=default_location,
-        ),
-        write_access,
-    )
-
-
-def make_horizontal_loop_with_assignment(write: Str, read: Str, read_has_extent: Bool):
-    loc_type = common.LocationType.Vertex
-    write_access = nir.FieldAccess(name=write, extent=False, location_type=loc_type)
-    read_access = nir.FieldAccess(name=read, extent=read_has_extent, location_type=loc_type)
-
-    return (
-        nir.HorizontalLoop(
-            stmt=nir.BlockStmt(
-                declarations=[], statements=[nir.AssignStmt(left=write_access, right=read_access)],
-            ),
-            location_type=loc_type,
-        ),
-        write_access,
-        read_access,
-    )
+from .nir_utils import make_horizontal_loop_with_copy, make_horizontal_loop_with_init
 
 
 class TestNIRFieldDependencyGraph:
@@ -75,7 +30,7 @@ class TestNIRFieldDependencyGraph:
         assert len(result.edges()) == 0
 
     def test_single_assignment(self):
-        loop, write, read = make_horizontal_loop_with_assignment("write0", "input", False)
+        loop, write, read = make_horizontal_loop_with_copy("write0", "input", False)
 
         result = generate_dependency_graph([loop])
 
@@ -84,7 +39,7 @@ class TestNIRFieldDependencyGraph:
 
     def test_dependent_assignment(self):
         loop0, write0 = make_horizontal_loop_with_init("write0")
-        loop1, write1, read1 = make_horizontal_loop_with_assignment("write1", "write0", False)
+        loop1, write1, read1 = make_horizontal_loop_with_copy("write1", "write0", False)
         loops = [loop0, loop1]
 
         result = generate_dependency_graph(loops)
@@ -95,7 +50,7 @@ class TestNIRFieldDependencyGraph:
 
     def test_dependent_assignment_with_extent(self):
         loop0, write0 = make_horizontal_loop_with_init("write0")
-        loop1, write1, read1 = make_horizontal_loop_with_assignment("write1", "write0", True)
+        loop1, write1, read1 = make_horizontal_loop_with_copy("write1", "write0", True)
         loops = [loop0, loop1]
 
         result = generate_dependency_graph(loops)

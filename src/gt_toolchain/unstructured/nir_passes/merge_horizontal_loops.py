@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import Any, Callable, List, Type
+from typing import List
 
 import networkx as nx
 
@@ -132,32 +132,9 @@ def merge_horizontal_loops(
     return MergeHorizontalLoops().apply(root, merge_candidates)
 
 
-# TODO put in right place
-class FindNodes(eve.NodeVisitor):
-    def __init__(self, **kwargs):
-        self.result = []
-
-    def visit(self, node: eve.Node, **kwargs) -> Any:
-        if kwargs["predicate"](node):
-            self.result.append(node)
-        self.generic_visit(node, **kwargs)
-        return self.result
-
-    @classmethod
-    def by_predicate(cls, predicate: Callable[[eve.Node], bool], node: eve.Node, **kwargs):
-        return cls().visit(node, predicate=predicate)
-
-    @classmethod
-    def by_type(cls, node_type: Type[eve.Node], node: eve.Node, **kwargs):
-        def type_predicate(node: eve.Node):
-            return isinstance(node, node_type)
-
-        return cls.by_predicate(type_predicate, node)
-
-
 def find_and_merge_horizontal_loops(root: Node):
     copy = root.copy(deep=True)
-    vertical_loops = FindNodes().by_type(nir.VerticalLoop, copy)
+    vertical_loops = eve.FindNodes().by_type(nir.VerticalLoop, copy)
     for loop in vertical_loops:
         loop = merge_horizontal_loops(loop, _find_merge_candidates(loop))
 
