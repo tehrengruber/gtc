@@ -16,13 +16,14 @@
 
 from typing import List
 
-import pytest
-from devtools import debug
-
 from eve import Bool, Str
 from gt_toolchain import common
 from gt_toolchain.unstructured import nir
-from gt_toolchain.unstructured.nir_passes.merge_horizontal_loops import _find_merge_candidates
+from gt_toolchain.unstructured.nir_passes.merge_horizontal_loops import (
+    _find_merge_candidates,
+    find_and_merge_horizontal_loops,
+    merge_horizontal_loops,
+)
 
 from .util import FindNodes
 
@@ -31,11 +32,11 @@ default_vtype = common.DataType.FLOAT32
 default_location = common.LocationType.Vertex
 
 
-def make_vertical_loop(horizontal_loops=[]):
+def make_vertical_loop(horizontal_loops):
     return nir.VerticalLoop(horizontal_loops=horizontal_loops, loop_order=common.LoopOrder.FORWARD)
 
 
-def make_block_stmt(stmts: List[nir.Stmt], declarations=[]):
+def make_block_stmt(stmts: List[nir.Stmt], declarations: List[nir.LocalVar]):
     return nir.BlockStmt(
         location_type=stmts[0].location_type if len(stmts) > 0 else common.LocationType.Vertex,
         statements=stmts,
@@ -71,6 +72,25 @@ def make_horizontal_loop_with_copy(write: Str, read: Str, read_has_extent: Bool)
         ),
         write_access,
         read_access,
+    )
+
+
+def make_local_var(name: Str):
+    return nir.LocalVar(name=name, vtype=default_vtype, location_type=default_location)
+
+
+def make_init(field: Str):
+    write_access = nir.FieldAccess(name=field, extent=False, location_type=default_location)
+    return (
+        nir.AssignStmt(
+            left=write_access,
+            right=nir.Literal(
+                value=common.BuiltInLiteral.ONE,
+                vtype=default_vtype,
+                location_type=default_location,
+            ),
+        ),
+        write_access,
     )
 
 
@@ -214,3 +234,76 @@ class TestNIRMergeHorizontalLoops_WithDependencies:
         assert len(result[0]) == 2
         assert result[0][0] == first_loop
         assert result[0][1] == second_loop
+
+
+class TestNIRMergeHorizontalLoops:
+    def test_merge_empty_loops(self):
+        first_loop = make_empty_horizontal_loop(default_location)
+        second_loop = make_empty_horizontal_loop(default_location)
+
+        stencil = make_vertical_loop([first_loop, second_loop])
+        merge_candidates = [[first_loop, second_loop]]
+
+        result = merge_horizontal_loops(stencil, merge_candidates)
+
+        assert len(result.horizontal_loops) == 1
+
+    def test_merge_loops_with_stats_and_decls(self):
+        var1 = make_local_var("var1")
+        assignment1, _ = make_init("field1")
+        first_loop = make_horizontal_loop(make_block_stmt([assignment1], [var1]))
+
+        var2 = make_local_var("var2")
+        assignment2, _ = make_init("field2")
+        second_loop = make_horizontal_loop(make_block_stmt([assignment2], [var2]))
+
+        stencil = make_vertical_loop([first_loop, second_loop])
+        merge_candidates = [[first_loop, second_loop]]
+
+        result = merge_horizontal_loops(stencil, merge_candidates)
+
+        assert len(result.horizontal_loops) == 1
+        assert len(result.horizontal_loops[0].stmt.statements) == 2
+        assert len(result.horizontal_loops[0].stmt.declarations) == 2
+        # TODO more precise checks
+
+    def test_find_and_merge(self):
+        var1 = make_local_var("var1")
+        assignment1, _ = make_init("field1")
+        first_loop = make_horizontal_loop(make_block_stmt([assignment1], [var1]))
+
+        var2 = make_local_var("var2")
+        assignment2, _ = make_init("field2")
+        second_loop = make_horizontal_loop(make_block_stmt([assignment2], [var2]))
+
+        stencil = make_vertical_loop([first_loop, second_loop])
+
+        result = find_and_merge_horizontal_loops(stencil)
+
+        assert len(result.horizontal_loops) == 1
+        assert len(result.horizontal_loops[0].stmt.statements) == 2
+        assert len(result.horizontal_loops[0].stmt.declarations) == 2
+        # TODO more precise checks
+
+    def test_find_and_merge_with_2_vertical_loops(self):
+        var1 = make_local_var("var1")
+        assignment1, _ = make_init("field1")
+        first_loop = make_horizontal_loop(make_block_stmt([assignment1], [var1]))
+
+        var2 = make_local_var("var2")
+        assignment2, _ = make_init("field2")
+        second_loop = make_horizontal_loop(make_block_stmt([assignment2], [var2]))
+
+        vertical_loop_1 = make_vertical_loop([first_loop, second_loop])
+        vertical_loop_2 = vertical_loop_1.copy(deep=True)
+
+        stencil = nir.Stencil(vertical_loops=[vertical_loop_1, vertical_loop_2], declarations=[])
+        result = find_and_merge_horizontal_loops(stencil)
+
+        vloops = FindNodes().by_type(nir.VerticalLoop, result)
+        assert len(vloops) == 2
+        for vloop in vloops:
+            # TODO more precise checks
+            assert len(vloop.horizontal_loops) == 1
+            assert len(vloop.horizontal_loops[0].stmt.statements) == 2
+            assert len(vloop.horizontal_loops[0].stmt.declarations) == 2

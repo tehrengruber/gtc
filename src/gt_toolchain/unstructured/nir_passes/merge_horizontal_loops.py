@@ -14,12 +14,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from typing import Any, Callable, List, Type
+
 import networkx as nx
-from devtools import debug
 
 import eve  # noqa: F401
 from eve import Node, NodeTranslator, NodeVisitor
-from gt_toolchain.unstructured.nir import Computation, HorizontalLoop
+from gt_toolchain.unstructured import nir
 from gt_toolchain.unstructured.nir_passes.field_dependency_graph import generate_dependency_graph
 
 
@@ -27,7 +28,7 @@ class _FindMergeCandidatesAnalysis(NodeVisitor):
     """Find horizontal loop merge candidates.
 
     Result is a List[List[HorizontalLoop]], where the inner list contains mergable loops.
-    Currently the merge sets are disjunct, see question above.
+    Currently the merge sets are ordered and disjunct, see question below.
 
     In the following examples A, B, C, ... are loops
 
@@ -52,7 +53,7 @@ class _FindMergeCandidatesAnalysis(NodeVisitor):
         self.candidate = []
 
     @classmethod
-    def find(cls, root, **kwargs) -> Node:
+    def find(cls, root, **kwargs) -> List[List[nir.HorizontalLoop]]:
         """Runs the visitor, returns merge candidates.
         """
         instance = cls()
@@ -64,7 +65,7 @@ class _FindMergeCandidatesAnalysis(NodeVisitor):
     def has_read_with_offset_after_write(self, graph: nx.DiGraph, **kwargs):
         return any(edge["extent"] for _, _, edge in graph.edges(data=True))
 
-    def visit_HorizontalLoop(self, node: HorizontalLoop, **kwargs):
+    def visit_HorizontalLoop(self, node: nir.HorizontalLoop, **kwargs):
         if len(self.candidate) == 0:
             self.candidate.append(node)
             return
@@ -81,5 +82,83 @@ class _FindMergeCandidatesAnalysis(NodeVisitor):
         self.candidate = [node]
 
 
-def _find_merge_candidates(root: Node):
+def _find_merge_candidates(root: nir.VerticalLoop):
     return _FindMergeCandidatesAnalysis().find(root)
+
+
+class MergeHorizontalLoops(NodeTranslator):
+    """
+    """
+
+    @classmethod
+    def apply(cls, root: nir.VerticalLoop, merge_candidates, **kwargs) -> nir.VerticalLoop:
+        """
+        """
+        # merge_candidates = _find_merge_candidates(root)
+        return cls().visit(root, merge_candidates=merge_candidates)
+
+    def visit_VerticalLoop(
+        self, node: nir.VerticalLoop, *, merge_candidates: List[List[nir.HorizontalLoop]], **kwargs
+    ):
+        for candidate in merge_candidates:
+            declarations = []
+            statements = []
+            location_type = candidate[0].location_type
+
+            first_index = node.horizontal_loops.index(candidate[0])
+            last_index = node.horizontal_loops.index(candidate[-1])
+
+            for loop in candidate:
+                declarations += loop.stmt.declarations
+                statements += loop.stmt.statements
+
+            node.horizontal_loops[first_index : last_index + 1] = [  # noqa: E203
+                nir.HorizontalLoop(
+                    stmt=nir.BlockStmt(
+                        declarations=declarations,
+                        statements=statements,
+                        location_type=location_type,
+                    ),
+                    location_type=location_type,
+                )
+            ]
+
+        return node
+
+
+def merge_horizontal_loops(
+    root: nir.VerticalLoop, merge_candidates: List[List[nir.HorizontalLoop]]
+):
+    return MergeHorizontalLoops().apply(root, merge_candidates)
+
+
+# TODO put in right place
+class FindNodes(eve.NodeVisitor):
+    def __init__(self, **kwargs):
+        self.result = []
+
+    def visit(self, node: eve.Node, **kwargs) -> Any:
+        if kwargs["predicate"](node):
+            self.result.append(node)
+        self.generic_visit(node, **kwargs)
+        return self.result
+
+    @classmethod
+    def by_predicate(cls, predicate: Callable[[eve.Node], bool], node: eve.Node, **kwargs):
+        return cls().visit(node, predicate=predicate)
+
+    @classmethod
+    def by_type(cls, node_type: Type[eve.Node], node: eve.Node, **kwargs):
+        def type_predicate(node: eve.Node):
+            return isinstance(node, node_type)
+
+        return cls.by_predicate(type_predicate, node)
+
+
+def find_and_merge_horizontal_loops(root: Node):
+    copy = root.copy(deep=True)
+    vertical_loops = FindNodes().by_type(nir.VerticalLoop, copy)
+    for loop in vertical_loops:
+        loop = merge_horizontal_loops(loop, _find_merge_candidates(loop))
+
+    return copy

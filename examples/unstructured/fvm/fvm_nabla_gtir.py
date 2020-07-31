@@ -25,6 +25,9 @@ from gt_toolchain.unstructured.gtir import (
     VerticalLoop,
 )
 from gt_toolchain.unstructured.gtir_to_nir import GtirToNir
+from gt_toolchain.unstructured.nir_passes.merge_horizontal_loops import (
+    find_and_merge_horizontal_loops,
+)
 from gt_toolchain.unstructured.nir_to_ugpu import NirToUgpu
 from gt_toolchain.unstructured.ugpu_codegen import UgpuCodeGenerator
 
@@ -231,7 +234,7 @@ nabla_stencil = Stencil(
 comp = Computation(name="nabla", params=fields, stencils=[nabla_stencil])
 
 nir_comp = GtirToNir().visit(comp)
-# debug(nir_comp)
+nir_comp = find_and_merge_horizontal_loops(nir_comp)
 ugpu_comp = NirToUgpu().visit(nir_comp)
 # debug(ugpu_comp)
 
