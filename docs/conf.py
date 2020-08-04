@@ -17,6 +17,8 @@
 import os
 import sys
 
+import sphinx_material
+
 import eve
 
 
@@ -37,6 +39,7 @@ sys.path.insert(0, os.path.abspath(src_dir))
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
+    "sphinx_material",
     "sphinx.ext.autodoc",
     "sphinx.ext.doctest",
     "sphinx.ext.napoleon",
@@ -131,30 +134,50 @@ napoleon_include_private_with_doc = True
 
 # -- Options for HTML output ---------------------------------------------------
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-html_theme = "sphinx_rtd_theme"
+# Add any paths that contain custom static files (such as style sheets) here,
+# relative to this directory. They are copied after the builtin static files,
+# so a file named "default.css" will overwrite the builtin "default.css".
+html_static_path = ["_static"]
 
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
+# Sphinx material theme config
+html_theme = "sphinx_material"
+html_theme_path = sphinx_material.html_theme_path()
+html_context = sphinx_material.get_html_context()
+
+# Material theme options (see theme.conf for more information)
 html_theme_options = {
-    "canonical_url": "",
-    "analytics_id": "",
-    "logo_only": False,
-    "display_version": True,
-    "prev_next_buttons_location": "bottom",
-    "style_external_links": False,
-    # Toc options
-    "collapse_navigation": True,
-    "sticky_navigation": True,
-    "navigation_depth": 4,
-    "includehidden": True,
-    "titles_only": False,
+    # Set the name of the project to appear in the navigation.
+    "nav_title": "Eve Toolchain",
+    # Set the color and the accent color
+    "color_primary": "blue",
+    "color_accent": "light-blue",
+    # Set the repo location to get a badge with stats
+    "repo_url": "https://github.com/eth-cscs/project/",
+    "repo_name": "eve_toolchain",
+    # Visible levels of the global TOC; -1 means unlimited
+    "globaltoc_depth": 3,
+    # If False, expand all TOC entries
+    "globaltoc_collapse": False,
+    # If True, show hidden TOC entries
+    "globaltoc_includehidden": False,
 }
-
-# Add any paths that contain custom themes here, relative to this directory.
-# html_theme_path = []
+# html_theme = "sphinx_rtd_theme"
+#
+# Theme-specific options for: sphinx_rtd_theme
+# html_theme_options = {
+#     "canonical_url": "",
+#     "analytics_id": "",
+#     "logo_only": False,
+#     "display_version": True,
+#     "prev_next_buttons_location": "bottom",
+#     "style_external_links": False,
+#     # Toc options
+#     "collapse_navigation": True,
+#     "sticky_navigation": True,
+#     "navigation_depth": 4,
+#     "includehidden": True,
+#     "titles_only": False,
+# }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -171,11 +194,6 @@ html_theme_options = {
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
 # html_favicon = None
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -217,6 +235,9 @@ html_static_path = ["_static"]
 
 # This is the file name suffix for HTML files (e.g. ".xhtml").
 # html_file_suffix = None
+
+
+# -- Options for HTML Help output ---------------------------------------------------
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = "evedoc"

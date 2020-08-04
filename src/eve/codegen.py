@@ -43,7 +43,10 @@ import black
 import jinja2
 from mako import template as mako_tpl
 
-from .core import BaseNode, NodeVisitor, StrEnum, ValidNodeType
+from . import utils
+from .concepts import Node
+from .types import StrEnum
+from .visitors import NodeVisitor, ValidNodeType
 
 
 try:
@@ -74,6 +77,7 @@ def format_cpp_source(
 
     p = Popen(args, stdout=PIPE, stdin=PIPE, encoding="utf8")
     formatted_code, _ = p.communicate(input=source)
+
     return formatted_code
 
 
@@ -110,75 +114,42 @@ def format_source(language: str, source: str, *, skip_errors=True, **kwargs) -> 
             )
 
 
-ValidNameDefType = Union[str, Sequence[str]]
-
-
-def make_canonical_cased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return (" ".join(words)).lower()
-
-
-def make_concatcased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return "".join(words)
-
-
-def make_camelCased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return words[0] + "".join(word.title() for word in words[1:])
-
-
-def make_CamelCased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return "".join(word.title() for word in words)
-
-
-def make_SNAKE_CASED(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return "_".join(word.upper() for word in words)
-
-
-def make_snake_cased(words: ValidNameDefType):
-    words = [words] if isinstance(words, str) else words
-    return "_".join(words)
-
-
 class Identifier:
     """Text string representing a symbol name in a programming language."""
 
     # Based on code from :https://blog.kangz.net/posts/2016/08/31/code-generation-the-easier-way/
 
-    def __init__(self, name: ValidNameDefType):
-        if isinstance(name, collections.abc.Sequence):
-            if not all(isinstance(item, str) for item in name):
+    def __init__(self, words: utils.WordSequenceType):
+        if isinstance(words, collections.abc.Sequence):
+            if not all(isinstance(item, str) for item in words):
                 raise TypeError(
-                    f"Identifier definition ('{name}') type is not 'Union[str, Sequence[str]]'"
+                    f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
                 )
-            self.words = name
-        elif isinstance(name, str):
-            self.words = [name]
+            self.words = words
+        elif isinstance(words, str):
+            self.words = [words]
         else:
             raise TypeError(
-                f"Identifier definition ('{name}') type is not 'Union[str, Sequence[str]]'"
+                f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
             )
 
     def as_canonical_cased(self):
-        return self.make_canonical_cased(self.words)
+        return utils.join_canonical_cased(self.words)
 
     def as_concatcased(self):
-        return self.make_concatcased(self.words)
+        return utils.join_concatcased(self.words)
 
     def as_camelCased(self):
-        return self.make_camelCased(self.words)
+        return utils.join_camelCased(self.words)
 
     def as_CamelCased(self):
-        return self.make_CamelCased(self.words)
+        return utils.join_CamelCased(self.words)
 
     def as_SNAKE_CASE(self):
-        return self.make_SNAKE_CASED(self.words)
+        return utils.join_SNAKE_CASED(self.words)
 
     def as_snake_cased(self):
-        return self.make_snake_cased(self.words)
+        return utils.join_snake_cased(self.words)
 
 
 TextSequenceType = Union[Sequence[str], "TextBlock"]
@@ -432,7 +403,7 @@ class TemplatedGenerator(NodeVisitor):
         """Public method to build a class instance and visit an IR node.
 
         The order followed to choose a `dump()` function for instances of
-        :class:`eve.BaseNode` is the following:
+        :class:`eve.Node` is the following:
 
             1. A `self.visit_NODE_TYPE_NAME()` method where `NODE_TYPE_NAME`
                matches `NODE_CLASS.__name__`, and `NODE_CLASS` is the
@@ -456,7 +427,7 @@ class TemplatedGenerator(NodeVisitor):
             * `_this_module`: the generator's module instance .
             * `**kwargs`: the keyword arguments received by the visiting method.
 
-        For primitive types (not :class:`eve.BaseNode` subclasses),
+        For primitive types (not :class:`eve.Node` subclasses),
         the :meth:`self.generic_dump()` method will be used.
 
         Args:
@@ -487,7 +458,7 @@ class TemplatedGenerator(NodeVisitor):
 
     def generic_visit(self, node: ValidNodeType, **kwargs) -> Union[str, Collection[str]]:
         result = ""
-        if isinstance(node, BaseNode):
+        if isinstance(node, Node):
             template, _ = self.get_template(node)
             if template:
                 result = self.render_template(
@@ -512,11 +483,11 @@ class TemplatedGenerator(NodeVisitor):
         """Get a template for a node instance (see :meth:`apply`)."""
         template: Optional[TextTemplate] = None
         template_key: Optional[str] = None
-        if isinstance(node, BaseNode):
+        if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
                 template_key = node_class.__name__
                 template = self._templates.get(template_key, None)
-                if template is not None or node_class is BaseNode:
+                if template is not None or node_class is Node:
                     break
 
         return template, None if template is None else template_key
@@ -543,7 +514,7 @@ class TemplatedGenerator(NodeVisitor):
         )
 
     def transform_children(self, node: ValidNodeType, **kwargs) -> Dict[str, Any]:
-        return {key: self.visit(value, **kwargs) for key, value in node.children()}
+        return {key: self.visit(value, **kwargs) for key, value in node.iter_children()}
 
     def transform_attrs(self, node: ValidNodeType, **kwargs) -> Dict[str, Any]:
-        return {key: self.visit(value, **kwargs) for key, value in node.attributes()}
+        return {key: self.visit(value, **kwargs) for key, value in node.iter_attributes()}
