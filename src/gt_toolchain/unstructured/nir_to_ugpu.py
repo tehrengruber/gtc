@@ -18,36 +18,11 @@
 # from types import MappingProxyType
 # from typing import ClassVar, Mapping
 
-from typing import Any, Callable, Type
-
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
 from gt_toolchain import common
 from gt_toolchain.unstructured import nir, ugpu
-
-
-# TODO put in the right place
-class FindNodes(eve.NodeVisitor):
-    def __init__(self, **kwargs):
-        self.result = []
-
-    def visit(self, node: eve.Node, **kwargs) -> Any:
-        if kwargs["predicate"](node):
-            self.result.append(node)
-        self.generic_visit(node, **kwargs)
-        return self.result
-
-    @classmethod
-    def by_predicate(cls, predicate: Callable[[eve.Node], bool], node: eve.Node, **kwargs):
-        return cls().visit(node, predicate=predicate)
-
-    @classmethod
-    def by_type(cls, node_type: Type[eve.Node], node: eve.Node, **kwargs):
-        def type_predicate(node: eve.Node):
-            return isinstance(node, node_type)
-
-        return cls.by_predicate(type_predicate, node)
 
 
 def location_type_from_dimensions(dimensions):
@@ -138,7 +113,7 @@ class NirToUgpu(eve.NodeTranslator):
 
     def visit_HorizontalLoop(self, node: nir.HorizontalLoop, **kwargs):
         accessed_field_names = list(
-            set(map(lambda f: f.name, FindNodes().by_type(nir.FieldAccess, node.stmt)))
+            set(map(lambda f: f.name, eve.FindNodes().by_type(nir.FieldAccess, node.stmt)))
         )
 
         field_to_primary_loc = {}

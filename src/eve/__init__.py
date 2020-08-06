@@ -34,6 +34,7 @@ from .concepts import (  # noqa: F401
     symbol_field,
     validator,
 )
+from .tree_utils import FindNodes  # noqa: F401
 from .types import (  # noqa: F401
     Bool,
     Bytes,
