@@ -71,8 +71,18 @@ class NeighborReduce(Expr):
         return values
 
 
+class LocationDecl(Node):
+    name: str
+    location_type: common.LocationType
+
+
+class LocationRef(Node):
+    name: str
+
+
 class FieldAccess(Expr):
     name: Str  # via symbol table
+    subscript: LocationRef
 
 
 class AssignStmt(Stmt):
