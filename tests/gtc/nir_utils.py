@@ -2,8 +2,8 @@
 from typing import List
 
 from eve import Bool, Str
-from gt_toolchain import common
-from gt_toolchain.unstructured import nir
+from gtc import common
+from gtc.unstructured import nir
 
 
 default_vtype = common.DataType.FLOAT32

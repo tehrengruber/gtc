@@ -20,9 +20,9 @@
 # ---
 
 from eve import codegen
-from gt_toolchain import common
-from gt_toolchain.unstructured import naive
-from gt_toolchain.unstructured.naive_codegen import NaiveCodeGenerator
+from gtc import common
+from gtc.unstructured import naive
+from gtc.unstructured.naive_codegen import NaiveCodeGenerator
 
 
 # How to write a test:

@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from gt_toolchain.unstructured.nir_passes.field_dependency_graph import generate_dependency_graph
+from gtc.unstructured.nir_passes.field_dependency_graph import generate_dependency_graph
 
 from .nir_utils import make_horizontal_loop_with_copy, make_horizontal_loop_with_init
 

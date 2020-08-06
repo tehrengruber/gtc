@@ -6,10 +6,10 @@ import os
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from gt_toolchain import common
-from gt_toolchain.common import LocationType
-from gt_toolchain.unstructured import ugpu_codegen
-from gt_toolchain.unstructured.ugpu import (
+from gtc import common
+from gtc.common import LocationType
+from gtc.unstructured import ugpu_codegen
+from gtc.unstructured.ugpu import (
     AssignStmt,
     BinaryOp,
     Computation,

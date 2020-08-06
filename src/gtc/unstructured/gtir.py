@@ -14,13 +14,14 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import List, Optional, Union
+import enum
+from typing import List, Optional
 
 from devtools import debug  # noqa: F401
 from pydantic import root_validator, validator
 
-from eve import Bool, Node, Str
-from gt_toolchain import common
+from eve import Node, Str, StrEnum
+from gtc import common
 
 
 class Expr(Node):
@@ -34,7 +35,7 @@ class Stmt(Node):
 
 
 class Literal(Expr):
-    value: Union[Str, common.BuiltInLiteral]
+    value: Str
     vtype: common.DataType
 
 
@@ -48,66 +49,34 @@ class NeighborChain(Node):
         return elements
 
 
-class LocalVar(Node):
-    name: Str
-    vtype: common.DataType
-    location_type: common.LocationType
+@enum.unique
+class ReduceOperator(StrEnum):
+    """Reduction operator identifier."""
+
+    ADD = "ADD"
+    MUL = "MUL"
+    MAX = "MAX"
+    MIN = "MIN"
 
 
-class BlockStmt(Stmt):
-    declarations: List[LocalVar]
-    statements: List[Stmt]
-
-    class Config:
-        validate_assignment = True
-
-    @root_validator(pre=True)
-    def check_location_type(cls, values):
-        all_locations = [s.location_type for s in values["statements"]] + [
-            d.location_type for d in values["declarations"]
-        ]
-
-        if len(all_locations) == 0:
-            return values  # nothing to validate
-
-        if any(location != all_locations[0] for location in all_locations):
-            raise ValueError(
-                "Location type mismatch: not all statements and declarations have the same location type"
-            )
-
-        if "location_type" not in values:
-            values["location_type"] = all_locations[0]
-        elif all_locations[0] != values["location_type"]:
-            raise ValueError("Location type mismatch")
-        return values
-
-
-class NeighborLoop(Stmt):
+class NeighborReduce(Expr):
+    operand: Expr
+    op: ReduceOperator
     neighbors: NeighborChain
-    body: BlockStmt
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        if values["neighbors"].elements[-1] != values["body"].location_type:
+        if values["neighbors"].elements[-1] != values["operand"].location_type:
             raise ValueError("Location type mismatch")
         return values
 
 
-class Access(Expr):
-    name: Str
-
-
-class FieldAccess(Access):
-    extent: Bool
-    pass
-
-
-class VarAccess(Access):
-    pass
+class FieldAccess(Expr):
+    name: Str  # via symbol table
 
 
 class AssignStmt(Stmt):
-    left: Access  # there are no local variables in gtir, only fields
+    left: FieldAccess  # there are no local variables in gtir, only fields
     right: Expr
 
     @root_validator(pre=True)
@@ -167,7 +136,7 @@ class TemporaryField(UField):
 
 
 class HorizontalLoop(Node):
-    stmt: BlockStmt
+    stmt: Stmt
     location_type: common.LocationType
 
     @root_validator(pre=True)
@@ -186,7 +155,7 @@ class VerticalLoop(Node):
 
 class Stencil(Node):
     vertical_loops: List[VerticalLoop]
-    declarations: List[TemporaryField]
+    declarations: Optional[List[TemporaryField]]
 
 
 class Computation(Node):

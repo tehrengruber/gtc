@@ -15,9 +15,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from eve import FindNodes
-from gt_toolchain import common
-from gt_toolchain.unstructured import nir
-from gt_toolchain.unstructured.nir_passes.merge_horizontal_loops import (
+from gtc import common
+from gtc.unstructured import nir
+from gtc.unstructured.nir_passes.merge_horizontal_loops import (
     _find_merge_candidates,
     find_and_merge_horizontal_loops,
     merge_horizontal_loops,

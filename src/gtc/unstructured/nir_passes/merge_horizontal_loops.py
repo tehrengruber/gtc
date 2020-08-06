@@ -20,8 +20,8 @@ import networkx as nx
 
 import eve  # noqa: F401
 from eve import Node, NodeTranslator, NodeVisitor
-from gt_toolchain.unstructured import nir
-from gt_toolchain.unstructured.nir_passes.field_dependency_graph import generate_dependency_graph
+from gtc.unstructured import nir
+from gtc.unstructured.nir_passes.field_dependency_graph import generate_dependency_graph
 
 
 class _FindMergeCandidatesAnalysis(NodeVisitor):

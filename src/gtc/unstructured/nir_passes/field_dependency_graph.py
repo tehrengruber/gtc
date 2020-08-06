@@ -20,7 +20,7 @@ import networkx as nx
 
 import eve  # noqa: F401
 from eve import NodeVisitor
-from gt_toolchain.unstructured.nir import AssignStmt, FieldAccess, HorizontalLoop
+from gtc.unstructured.nir import AssignStmt, FieldAccess, HorizontalLoop
 
 
 class _FieldWriteDependencyGraph(NodeVisitor):
