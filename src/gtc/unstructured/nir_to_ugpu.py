@@ -82,7 +82,9 @@ class NirToUgpu(eve.NodeTranslator):
         )
 
     def visit_FieldAccess(self, node: nir.FieldAccess, **kwargs):
-        return ugpu.FieldAccess(name=node.name, location_type=node.location_type)
+        return ugpu.FieldAccess(
+            name=node.name, chain=self.visit(node.chain), location_type=node.location_type
+        )
 
     def visit_VarAccess(self, node: nir.VarAccess, **kwargs):
         return ugpu.VarAccess(name=node.name, location_type=node.location_type)

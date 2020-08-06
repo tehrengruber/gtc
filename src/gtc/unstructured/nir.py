@@ -41,11 +41,11 @@ class Literal(Expr):
 class NeighborChain(Node):
     elements: List[common.LocationType]
 
-    @validator("elements")
-    def not_empty(cls, elements):
-        if len(elements) <= 1:
-            raise ValueError("NeighborChain must contain at least two locations")
-        return elements
+    # @validator("elements")
+    # def not_empty(cls, elements):
+    #     if len(elements) <= 1:
+    #         raise ValueError("NeighborChain must contain at least two locations")
+    #     return elements
 
 
 class LocalVar(Node):
@@ -99,7 +99,17 @@ class Access(Expr):
 
 class FieldAccess(Access):
     extent: Bool
-    pass
+    chain: NeighborChain
+
+    # TODO discuss with Enrique which pattern to use
+    # def get_extent(self):
+    #     return len(self.chain) > 1
+    # extent = property(get_extent)
+
+    @root_validator(pre=True)
+    def check_location_type(cls, values):
+        values["extent"] = len(values["chain"].elements) > 1
+        return values
 
 
 class VarAccess(Access):

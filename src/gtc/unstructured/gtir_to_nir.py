@@ -15,6 +15,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
+import copy
 from types import MappingProxyType
 from typing import ClassVar, Mapping
 
@@ -72,18 +73,27 @@ class GtirToNir(eve.NodeTranslator):
             name=node.name, vtype=node.vtype, dimensions=self.visit(node.dimensions)
         )
 
-    def visit_FieldAccess(self, node: gtir.FieldAccess, **kwargs):
-        if "in_neighbor_loop" not in kwargs:
-            extent = False
-        else:
-            extent = kwargs["in_neighbor_loop"]
-        return nir.FieldAccess(name=node.name, location_type=node.location_type, extent=extent)
+    def visit_FieldAccess(
+        self, node: gtir.FieldAccess, **kwargs
+    ):  # TODO add loc_comprehension to signature?
+        # TODO remove in_neighbor_loop
+        assert kwargs["loc_comprehension"]
+        chain = kwargs["loc_comprehension"][node.subscript.name]
+
+        return nir.FieldAccess(name=node.name, location_type=node.location_type, chain=chain)
 
     def visit_NeighborReduce(self, node: gtir.NeighborReduce, **kwargs):
+        # copy loc_comprehension
         if "last_block" not in kwargs:
             raise ValueError("no block defined")
+
+        # copy keyword args as we are modifying the loc_comprehension
+        kwargs["loc_comprehension"] = copy.deepcopy(kwargs["loc_comprehension"])
+        loc_comprehension = kwargs["loc_comprehension"]
+        assert node.neighbors.name not in loc_comprehension
+        loc_comprehension[node.neighbors.name] = node.neighbors.chain
         last_block = kwargs["last_block"]
-        body_location = node.neighbors.elements[-1]
+        body_location = node.neighbors.chain.elements[-1]
         reduce_var_name = "local" + str(node.id_attr_)
         last_block.declarations.append(
             nir.LocalVar(
@@ -111,7 +121,7 @@ class GtirToNir(eve.NodeTranslator):
                     right=nir.BinaryOp(
                         left=nir.VarAccess(name=reduce_var_name, location_type=body_location),
                         op=self.REDUCE_OP_TO_BINOP[node.op],
-                        right=self.visit(node.operand, in_neighbor_loop=True),
+                        right=self.visit(node.operand, in_neighbor_loop=True, **kwargs),
                         location_type=body_location,
                     ),
                     location_type=body_location,
@@ -121,7 +131,9 @@ class GtirToNir(eve.NodeTranslator):
         )
         last_block.statements.append(
             nir.NeighborLoop(
-                neighbors=self.visit(node.neighbors), body=body, location_type=node.location_type
+                neighbors=self.visit(node.neighbors.chain),
+                body=body,
+                location_type=node.location_type,
             )
         )
         return nir.VarAccess(name=reduce_var_name, location_type=node.location_type)  # TODO
@@ -146,15 +158,22 @@ class GtirToNir(eve.NodeTranslator):
 
     def visit_HorizontalLoop(self, node: gtir.HorizontalLoop, **kwargs):
         block = nir.BlockStmt(declarations=[], statements=[], location_type=node.stmt.location_type)
-        stmt = self.visit(node.stmt, last_block=block)
+        stmt = self.visit(
+            node.stmt, last_block=block, loc_comprehension={node.location.name: node.location.chain}
+        )
         block.statements.append(stmt)
-        return nir.HorizontalLoop(stmt=block, location_type=node.location_type,)
+        return nir.HorizontalLoop(stmt=block, location_type=node.location.chain.elements[0],)
 
     def visit_VerticalLoop(self, node: gtir.VerticalLoop, **kwargs):
         return nir.VerticalLoop(
             horizontal_loops=[self.visit(h) for h in node.horizontal_loops],
             loop_order=node.loop_order,
         )
+
+    # def visit_LocationComprehension(self, node: gtir.LocationComprehension, **kwargs):
+    #     loc_comprehension = kwargs["loc_comprehension"] or {}
+    #     loc_comprehension[node.name] = node.chain
+    #     return ""loc_comprehension""
 
     def visit_Stencil(self, node: gtir.Stencil, **kwargs):
         return nir.Stencil(

@@ -25,17 +25,20 @@ from gtc import common
 
 class Expr(Node):
     location_type: common.LocationType
-    pass
 
 
 class Stmt(Node):
     location_type: common.LocationType
-    pass
+
+
+class NeighborChain(Node):
+    chain: List[common.LocationType]
 
 
 class FieldAccess(Expr):
     name: Str
     # TODO verify that the tag exists in the location_type composite (reachable via symbol table)
+    chain: NeighborChain
 
 
 class VarDecl(Stmt):
@@ -110,10 +113,6 @@ class SidCompositeEntry(Node):
 class SidComposite(Node):
     location_type: common.LocationType
     entries: List[SidCompositeEntry]
-
-
-class NeighborChain(Node):
-    chain: List[common.LocationType]
 
 
 class Kernel(Node):
