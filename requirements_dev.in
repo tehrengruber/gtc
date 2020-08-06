@@ -26,6 +26,6 @@ sphinx-material>=0.0.23
 sphinx-rtd-theme>=0.4.3
 tox>=3.14.6
 #
-#-- gt_toolchain --
+#-- gtc --
 filecheck>=0.0.13
 lit>=0.10

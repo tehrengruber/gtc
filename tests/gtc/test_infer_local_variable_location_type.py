@@ -17,8 +17,8 @@
 import pytest
 
 from eve import FindNodes
-from gt_toolchain import common, sir
-from gt_toolchain.unstructured.sir_passes.infer_local_variable_location_type import (
+from gtc import common, sir
+from gtc.unstructured.sir_passes.infer_local_variable_location_type import (
     AnalysisException,
     InferLocalVariableLocationTypeTransformation,
 )

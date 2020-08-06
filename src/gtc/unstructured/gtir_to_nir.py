@@ -19,8 +19,8 @@ from types import MappingProxyType
 from typing import ClassVar, Mapping
 
 import eve  # noqa: F401
-from gt_toolchain import common
-from gt_toolchain.unstructured import gtir, nir
+from gtc import common
+from gtc.unstructured import gtir, nir
 
 
 class GtirToNir(eve.NodeTranslator):

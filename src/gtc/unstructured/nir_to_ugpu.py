@@ -21,8 +21,8 @@
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from gt_toolchain import common
-from gt_toolchain.unstructured import nir, ugpu
+from gtc import common
+from gtc.unstructured import nir, ugpu
 
 
 def location_type_from_dimensions(dimensions):

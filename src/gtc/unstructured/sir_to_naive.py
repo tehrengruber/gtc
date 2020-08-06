@@ -20,8 +20,8 @@ from typing import ClassVar, Mapping
 
 import eve  # noqa: F401
 from eve import Node, NodeTranslator
-from gt_toolchain import common, sir
-from gt_toolchain.unstructured import naive
+from gtc import common, sir
+from gtc.unstructured import naive
 
 
 class SirToNaive(NodeTranslator):

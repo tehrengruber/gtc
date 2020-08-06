@@ -20,8 +20,8 @@ from typing import ClassVar, Mapping
 from mako import template as mako_tpl
 
 from eve import codegen
-from gt_toolchain import common
-from gt_toolchain.unstructured.ugpu import Computation, Kernel, NeighborChain, SidComposite
+from gtc import common
+from gtc.unstructured.ugpu import Computation, Kernel, NeighborChain, SidComposite
 
 
 # Ugpu Codegen convention:

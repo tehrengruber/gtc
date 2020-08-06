@@ -4,9 +4,9 @@
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from gt_toolchain import common, sir
-from gt_toolchain.unstructured import naive_codegen, sir_to_naive
-from gt_toolchain.unstructured.sir_passes.infer_local_variable_location_type import (
+from gtc import common, sir
+from gtc.unstructured import naive_codegen, sir_to_naive
+from gtc.unstructured.sir_passes.infer_local_variable_location_type import (
     InferLocalVariableLocationTypeTransformation,
 )
 

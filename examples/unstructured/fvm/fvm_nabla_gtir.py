@@ -6,8 +6,8 @@ import os
 from devtools import debug  # noqa: F401
 
 import eve  # noqa: F401
-from gt_toolchain.common import BinaryOperator, DataType, LocationType, LoopOrder
-from gt_toolchain.unstructured.gtir import (
+from gtc.common import BinaryOperator, DataType, LocationType, LoopOrder
+from gtc.unstructured.gtir import (
     AssignStmt,
     BinaryOp,
     Computation,
@@ -24,12 +24,10 @@ from gt_toolchain.unstructured.gtir import (
     UField,
     VerticalLoop,
 )
-from gt_toolchain.unstructured.gtir_to_nir import GtirToNir
-from gt_toolchain.unstructured.nir_passes.merge_horizontal_loops import (
-    find_and_merge_horizontal_loops,
-)
-from gt_toolchain.unstructured.nir_to_ugpu import NirToUgpu
-from gt_toolchain.unstructured.ugpu_codegen import UgpuCodeGenerator
+from gtc.unstructured.gtir_to_nir import GtirToNir
+from gtc.unstructured.nir_passes.merge_horizontal_loops import find_and_merge_horizontal_loops
+from gtc.unstructured.nir_to_ugpu import NirToUgpu
+from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
 
 
 vertical_loops = []

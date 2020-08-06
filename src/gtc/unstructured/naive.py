@@ -21,7 +21,7 @@ from typing import List, Optional, Tuple
 from pydantic import root_validator
 
 from eve import Bool, Int, IntEnum, Node, Str
-from gt_toolchain import common
+from gtc import common
 
 
 @enum.unique
