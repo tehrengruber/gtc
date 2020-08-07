@@ -23,19 +23,22 @@ import os
 import string
 import sys
 import textwrap
+import typing
 from subprocess import PIPE, Popen
-from types import MappingProxyType
 from typing import (
     Any,
     ClassVar,
     Collection,
     Dict,
+    Iterator,
     List,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
     Set,
     Tuple,
+    Type,
     Union,
 )
 
@@ -45,8 +48,7 @@ from mako import template as mako_tpl
 
 from . import utils
 from .concepts import Node
-from .types import StrEnum
-from .visitors import NodeVisitor, ValidNodeType
+from .visitors import AnyTreeNode, NodeVisitor
 
 
 try:
@@ -58,27 +60,40 @@ except ImportError:
     _CLANG_FORMAT_AVAILABLE = False
 
 
-def format_cpp_source(
-    source: str,
-    *,
-    style: Optional[str] = None,
-    fallback_style: Optional[str] = None,
-    sort_includes: bool = False,
-) -> str:
-    assert _CLANG_FORMAT_AVAILABLE
+class Formatter(Protocol):
+    """Type annotation for callables formatting source code.
 
-    args = ["clang-format"]
-    if style:
-        args.append(f"--style={style}")
-    if fallback_style:
-        args.append(f"--fallback-style={style}")
-    if sort_includes:
-        args.append("--sort-includes")
+    To be reachable by the general `format_source` function, objects this protocol
+    should be defined in this module with a specific name pattern:
+        `format_{language}_source`
 
-    p = Popen(args, stdout=PIPE, stdin=PIPE, encoding="utf8")
-    formatted_code, _ = p.communicate(input=source)
+    """
 
-    return formatted_code
+    def __call__(self, source: str, **kwargs: Any) -> str:
+        ...
+
+
+if _CLANG_FORMAT_AVAILABLE:
+
+    def format_cpp_source(
+        source: str,
+        *,
+        style: Optional[str] = None,
+        fallback_style: Optional[str] = None,
+        sort_includes: bool = False,
+    ) -> str:
+        args = ["clang-format"]
+        if style:
+            args.append(f"--style={style}")
+        if fallback_style:
+            args.append(f"--fallback-style={style}")
+        if sort_includes:
+            args.append("--sort-includes")
+
+        p = Popen(args, stdout=PIPE, stdin=PIPE, encoding="utf8")
+        formatted_code, _ = p.communicate(input=source)
+
+        return formatted_code
 
 
 def format_python_source(
@@ -91,18 +106,21 @@ def format_python_source(
     target_versions = target_versions or f"{sys.version_info.major}{sys.version_info.minor}"
     target_versions = set(black.TargetVersion[f"PY{v.replace('.', '')}"] for v in target_versions)
 
-    return black.format_str(
-        source,
-        mode=black.FileMode(
-            line_length=line_length,
-            target_versions=target_versions,
-            string_normalization=string_normalization,
+    return typing.cast(
+        str,
+        black.format_str(
+            source,
+            mode=black.FileMode(
+                line_length=line_length,
+                target_versions=target_versions,
+                string_normalization=string_normalization,
+            ),
         ),
     )
 
 
-def format_source(language: str, source: str, *, skip_errors=True, **kwargs) -> str:
-    formatter = globals().get(f"format_{language.lower()}_source", None)
+def format_source(language: str, source: str, *, skip_errors: bool = True, **kwargs: Any) -> str:
+    formatter = typing.cast(Formatter, globals().get(f"format_{language.lower()}_source", None))
     try:
         return formatter(source, **kwargs)
     except Exception:
@@ -114,12 +132,15 @@ def format_source(language: str, source: str, *, skip_errors=True, **kwargs) -> 
             )
 
 
-class Identifier:
-    """Text string representing a symbol name in a programming language."""
+class Name:
+    """Text string representing a symbol name in a programming language.
 
-    # Based on code from :https://blog.kangz.net/posts/2016/08/31/code-generation-the-easier-way/
+    Partially based on code from:
+        https://blog.kangz.net/posts/2016/08/31/code-generation-the-easier-way/
 
-    def __init__(self, words: utils.WordSequenceType):
+    """
+
+    def __init__(self, words: utils.AnyWordsIterable) -> None:
         if isinstance(words, collections.abc.Sequence):
             if not all(isinstance(item, str) for item in words):
                 raise TypeError(
@@ -133,26 +154,26 @@ class Identifier:
                 f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
             )
 
-    def as_canonical_cased(self):
+    def as_canonical_cased(self) -> str:
         return utils.join_canonical_cased(self.words)
 
-    def as_concatcased(self):
+    def as_concatcased(self) -> str:
         return utils.join_concatcased(self.words)
 
-    def as_camelCased(self):
+    def as_camelCased(self) -> str:
         return utils.join_camelCased(self.words)
 
-    def as_CamelCased(self):
-        return utils.join_CamelCased(self.words)
+    def as_PascalCased(self) -> str:
+        return utils.join_PascalCased(self.words)
 
-    def as_SNAKE_CASE(self):
-        return utils.join_SNAKE_CASED(self.words)
-
-    def as_snake_cased(self):
+    def as_snake_cased(self) -> str:
         return utils.join_snake_cased(self.words)
 
+    def as_SNAKE_CASE(self) -> str:
+        return utils.join_snake_cased(self.words).upper()
 
-TextSequenceType = Union[Sequence[str], "TextBlock"]
+
+AnyTextSequence = Union[Sequence[str], "TextBlock"]
 
 
 class TextBlock:
@@ -176,7 +197,7 @@ class TextBlock:
         indent_size: int = 4,
         indent_char: str = " ",
         end_line: str = "\n",
-    ):
+    ) -> None:
         if not isinstance(indent_char, str) or len(indent_char) != 1:
             raise ValueError("'indent_char' must be a single-character string")
         if not isinstance(end_line, str):
@@ -198,7 +219,7 @@ class TextBlock:
 
         return self
 
-    def extend(self, new_lines: TextSequenceType, *, dedent: bool = False) -> "TextBlock":
+    def extend(self, new_lines: AnyTextSequence, *, dedent: bool = False) -> "TextBlock":
         assert isinstance(new_lines, (collections.abc.Sequence, TextBlock))
 
         if dedent:
@@ -229,7 +250,7 @@ class TextBlock:
         return self
 
     @contextlib.contextmanager
-    def indented(self, steps: int = 1):
+    def indented(self, steps: int = 1) -> Iterator["TextBlock"]:
         self.indent(steps)
         yield self
         self.dedent(steps)
@@ -241,157 +262,141 @@ class TextBlock:
         return self.end_line.join(lines)
 
     @property
-    def indent_str(self):
+    def indent_str(self) -> str:
         """Indentation string for new lines (in the current state)."""
         return self.indent_char * (self.indent_level * self.indent_size)
 
-    def __iadd__(self, source_line: str):
+    def __iadd__(self, source_line: str) -> "TextBlock":
         return self.append(source_line)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.lines)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.text
 
 
-class TemplateKind(StrEnum):
-    """Supported template kinds."""
+class Template:
+    """Master Template class (to be subclasssed).
 
-    FMT = "fmt"
-    JINJA = "jinja"
-    MAKO = "mako"
-    TPL = "tpl"
-
-
-ValidTemplateDefType = Union[str, jinja2.Template, mako_tpl.Template, string.Template]
-
-
-class TextTemplate:
-    """A generic text template class abstracting different template engines.
-
-    This class supports all the template types represented in the
-    :class:`TemplateKind` class.
-
-    Args:
-        definition: Template definition (actual type depends on the kind)
-        kind: Template engine. It not provided, is guessed based on the
-            type of the ``definition`` value
+    Subclassess must implement the `__init__` (with a type annotation for `definition`)
+    and `_render` methods.
 
     """
 
-    KIND_TO_TYPES_MAPPING: ClassVar[Mapping[TemplateKind, ValidTemplateDefType]] = MappingProxyType(
-        {
-            TemplateKind.FMT: str,
-            TemplateKind.JINJA: jinja2.Template,
-            TemplateKind.MAKO: mako_tpl.Template,
-            TemplateKind.TPL: string.Template,
-        }
-    )
-
-    TYPES_TO_KIND_MAPPING: ClassVar[Mapping[ValidTemplateDefType, TemplateKind]] = MappingProxyType(
-        {
-            f"{type_.__module__}.{type_.__name__}": kind
-            for kind, type_ in KIND_TO_TYPES_MAPPING.items()
-        }
-    )
+    _DEFINITION_TYPES: ClassVar[Dict[Type, Type["Template"]]] = {}
 
     @classmethod
-    def from_file(cls, file_path: Union[str, os.PathLike], kind: TemplateKind) -> "TextTemplate":
+    def __init_subclass__(cls) -> None:
+        if "__init__" not in cls.__dict__ or not callable(cls.__dict__["__init__"]):
+            raise TypeError(
+                "Template implementations must define an annotated `__init__(self, definition, **kwargs)` method"
+            )
+        if "_render" not in cls.__dict__ or not callable(cls.__dict__["_render"]):
+            raise TypeError(
+                "Template implementations must define a `_render(self, **kwargs)` method"
+            )
+        init_annotations = cls.__init__.__annotations__
+        if "definition" not in init_annotations:
+            raise TypeError(f"Missing 'definition' annotation in '{cls.__name__}'.__init__()")
+
+        definition_cls = init_annotations["definition"]
+        assert isinstance(definition_cls, type)
+        assert definition_cls not in Template._DEFINITION_TYPES
+        Template._DEFINITION_TYPES[definition_cls] = cls
+
+    def __new__(cls, definition: Any, **kwargs: Any) -> "Template":
+        template_cls = Template._DEFINITION_TYPES.get(type(definition), None)
+        if not template_cls:
+            raise TypeError(f"Invalid template definition ({type(definition)}):\n{definition}")
+
+        return typing.cast("Template", super().__new__(template_cls))
+
+    @staticmethod
+    def from_file(template_cls: Type["Template"], file_path: Union[str, os.PathLike]) -> "Template":
         with open(file_path, "r") as f:
             definition = f.read()
-        return cls(definition, kind)
+        return template_cls(definition)
 
-    @classmethod
-    def from_fmt(cls, definition: str) -> "TextTemplate":
-        return cls(definition, TemplateKind.FMT)
+    def __init__(self, definition: Any, **kwargs: Any) -> None:
+        raise NotImplementedError("__init__() must be implemented in specific Template subclasses")
 
-    @classmethod
-    def from_jinja(cls, definition: Union[str, jinja2.Template]) -> "TextTemplate":
-        if isinstance(definition, str):
-            definition = jinja2.Template(definition)
-        return cls(definition, TemplateKind.JINJA)
-
-    @classmethod
-    def from_mako(cls, definition: Union[str, mako_tpl.Template]) -> "TextTemplate":
-        if isinstance(definition, str):
-            definition = mako_tpl.Template(definition)
-        return cls(definition, TemplateKind.MAKO)
-
-    @classmethod
-    def from_tpl(cls, definition: Union[str, string.Template]) -> "TextTemplate":
-        if isinstance(definition, str):
-            definition = string.Template(definition)
-        return cls(definition, TemplateKind.TPL)
-
-    def __init__(self, definition: ValidTemplateDefType, kind: Optional[TemplateKind] = None):
-        if kind is None:
-            kind = self.TYPES_TO_KIND_MAPPING.get(
-                f"{type(definition).__module__}.{type(definition).__name__}", None
-            )
-        if not isinstance(kind, TemplateKind):
-            raise TypeError(
-                f"'kind' argument must be an instance of {TemplateKind} ({type(kind)} provided))"
-            )
-        if not isinstance(definition, self.KIND_TO_TYPES_MAPPING[kind]):
-            raise TypeError(
-                f"Invalid 'definition' type for '{kind}' template kind ({type(definition)})"
-            )
-        self.kind = kind
-        self.definition = definition
-
-    def render(self, mapping: Optional[Mapping[str, str]] = None, **kwargs) -> str:
+    def render(self, mapping: Optional[Mapping[str, str]] = None, **kwargs: Any) -> str:
         """Render the template.
 
         Args:
             mapping (optional): A `dict` whose keys match the template placeholders.
             **kwargs: placeholder values might be also provided as
-                keyword arguments, and they take precedence over ``mapping``
+                keyword arguments, and they should take precedence over ``mapping``
                 values for duplicated keys.
 
         """
-        if isinstance(mapping, dict):
-            mapping.update(kwargs)
-        elif mapping is None:
-            mapping = kwargs
-        else:
-            raise TypeError(
-                f"'mapping' argument must be an instance of 'dict' ({type(mapping)} provided))"
-            )
+        if not mapping:
+            mapping = {}
+        if kwargs:
+            mapping = {**mapping, **kwargs}
 
-        return getattr(self, f"render_{self.kind}")(**mapping)
+        return self._render(**mapping)
 
-    def render_fmt(self, **kwargs) -> str:
-        return self.definition.format(**kwargs)  # type: ignore
-
-    def render_jinja(self, **kwargs) -> str:
-        return self.definition.render(**kwargs)  # type: ignore
-
-    def render_mako(self, **kwargs) -> str:
-        return self.definition.render(**kwargs)  # type: ignore
-
-    def render_tpl(self, **kwargs) -> str:
-        return self.definition.substitute(**kwargs)  # type: ignore
+    def _render(self, **kwargs: Any) -> str:
+        raise NotImplementedError("_render() must be implemented in specific Template subclasses")
 
 
-TemplateType = Union[TextTemplate, ValidTemplateDefType]
+class StrFormatTemplate(Template):
+    definition: str
+
+    def __init__(self, definition: str, **kwargs: Any) -> None:
+        self.definition = definition
+
+    def _render(self, **kwargs: Any) -> str:
+        return self.definition.format(**kwargs)
+
+
+class StringTemplate(Template):
+    definition: string.Template
+
+    def __init__(self, definition: string.Template, **kwargs: Any) -> None:
+        self.definition = definition
+
+    def _render(self, **kwargs: Any) -> str:
+        return self.definition.substitute(**kwargs)
+
+
+class JinjaTemplate(Template):
+    definition: jinja2.Template
+
+    def __init__(self, definition: jinja2.Template, **kwargs: Any) -> None:
+        self.definition = definition
+
+    def _render(self, **kwargs: Any) -> str:
+        return self.definition.render(**kwargs)
+
+
+class MakoTemplate(Template):
+    definition: mako_tpl.Template
+
+    def __init__(self, definition: mako_tpl.Template, **kwargs: Any) -> None:
+        self.definition = definition
+
+    def _render(self, **kwargs: Any) -> str:
+        return typing.cast(str, self.definition.render(**kwargs))
 
 
 class TemplatedGenerator(NodeVisitor):
     """A code generator visitor using :class:`TextTemplate` s."""
 
-    class Templates:
-        """Class-specific template definitions.
-
-        This  class should be redefined in the subclasses with
-        actual template definitions.
-
-        """
-
-        pass
+    _TEMPLATES: ClassVar[Dict[str, Template]]
 
     @classmethod
-    def generic_dump(cls, node: ValidNodeType, **kwargs):
+    def __init_subclass__(cls) -> None:
+        cls._TEMPLATES = {
+            key[:-9]: value if isinstance(value, Template) else Template(value)
+            for key, value in cls.__dict__.items()
+            if key.endswith("_template") and key != "_template"
+        }
+
+    @classmethod
+    def generic_dump(cls, node: AnyTreeNode, **kwargs: Any) -> str:
         """Class-specific ``dump()`` function for primitive types.
 
         This class could be redefined in the subclasses.
@@ -399,7 +404,7 @@ class TemplatedGenerator(NodeVisitor):
         return str(node)
 
     @classmethod
-    def apply(cls, root: ValidNodeType, **kwargs) -> str:
+    def apply(cls, root: AnyTreeNode, **kwargs: Any) -> str:
         """Public method to build a class instance and visit an IR node.
 
         The order followed to choose a `dump()` function for instances of
@@ -443,20 +448,7 @@ class TemplatedGenerator(NodeVisitor):
         """
         return cls().visit(root, **kwargs)
 
-    def __init__(self):
-        cls = type(self)
-        if not hasattr(cls, "Templates"):
-            raise AttributeError(f"Missing required 'Templates' attribute in class {cls}")
-        if not isinstance(cls.Templates, type):
-            raise TypeError(f"Required 'Templates' attribute is not class ('{cls.Templates})")
-
-        self._templates = {
-            key: value if isinstance(value, TextTemplate) else TextTemplate(value)
-            for key, value in cls.Templates.__dict__.items()
-            if not key.startswith("__")
-        }
-
-    def generic_visit(self, node: ValidNodeType, **kwargs) -> Union[str, Collection[str]]:
+    def generic_visit(self, node: AnyTreeNode, **kwargs) -> Union[str, Collection[str]]:
         result = ""
         if isinstance(node, Node):
             template, _ = self.get_template(node)
@@ -479,14 +471,14 @@ class TemplatedGenerator(NodeVisitor):
 
         return result
 
-    def get_template(self, node: ValidNodeType) -> Tuple[Optional[TextTemplate], Optional[str]]:
+    def get_template(self, node: AnyTreeNode) -> Tuple[Optional[Template], Optional[str]]:
         """Get a template for a node instance (see :meth:`apply`)."""
-        template: Optional[TextTemplate] = None
+        template: Optional[Template] = None
         template_key: Optional[str] = None
         if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
                 template_key = node_class.__name__
-                template = self._templates.get(template_key, None)
+                template = self._TEMPLATES.get(template_key, None)
                 if template is not None or node_class is Node:
                     break
 
@@ -494,8 +486,8 @@ class TemplatedGenerator(NodeVisitor):
 
     def render_template(
         self,
-        template: TextTemplate,
-        node: ValidTemplateDefType,
+        template: Template,
+        node: Any,
         transformed_children: Mapping[str, Any],
         transformed_attrs: Mapping[str, Any],
         **kwargs,
@@ -513,8 +505,8 @@ class TemplatedGenerator(NodeVisitor):
             **kwargs,
         )
 
-    def transform_children(self, node: ValidNodeType, **kwargs) -> Dict[str, Any]:
+    def transform_children(self, node: AnyTreeNode, **kwargs) -> Dict[str, Any]:
         return {key: self.visit(value, **kwargs) for key, value in node.iter_children()}
 
-    def transform_attrs(self, node: ValidNodeType, **kwargs) -> Dict[str, Any]:
+    def transform_attrs(self, node: AnyTreeNode, **kwargs) -> Dict[str, Any]:
         return {key: self.visit(value, **kwargs) for key, value in node.iter_attributes()}

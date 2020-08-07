@@ -17,11 +17,10 @@
 """Definitions of basic Eve concepts."""
 
 
-from typing import Any, ClassVar, Dict, List, Type
-
 import pydantic
 
 from .concepts import _EVE_NODE_ATTR_SUFFIX, Node, Trait
+from .typing import Any, ClassVar, Dict, List, Type
 
 
 class SymbolTableTrait(Trait):

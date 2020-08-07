@@ -14,15 +14,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Definitions of general infrastructure."""
+"""Definitions of useful types."""
 
 
 import enum
-import sys
-from typing import Any, Callable, Generator
 
-import boltons.typeutils
-import pydantic
+from boltons.typeutils import classproperty  # noqa: F401
 from pydantic import (  # noqa: F401
     NegativeFloat,
     NegativeInt,
@@ -35,17 +32,11 @@ from pydantic import (  # noqa: F401
     validator,
 )
 
-
-if sys.version_info < (3, 8):
-    from typing_extensions import Literal, TypedDict  # noqa: F401
-else:
-    from typing import Literal, TypedDict  # noqa: F401
-
-AnyCallable = Callable[..., Any]
-NoArgAnyCallable = Callable[[], Any]
+from .typing import Any, Callable, Generator
 
 
-classproperty = boltons.typeutils.classproperty
+#: Typing definitions for `__get_validators__()` methods (defined but not exported in `pydantic.typing`)
+PydanticCallableGenerator = Generator[Callable[..., Any], None, None]
 
 
 #: :class:`bool subclass for strict field definition
@@ -58,10 +49,6 @@ Float = StrictFloat  # noqa: F401
 Int = StrictInt  # noqa: F401
 #: :class:`str` subclass for strict field definition
 Str = StrictStr  # noqa: F401
-
-
-#: Typing hint for `__get_validators__()` methods (defined but not exported in `pydantic.typing`)
-PydanticCallableGenerator = Generator[pydantic.typing.AnyCallable, None, None]
 
 
 class Enum(enum.Enum):

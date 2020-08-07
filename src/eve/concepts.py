@@ -20,32 +20,26 @@
 import abc
 import functools
 import itertools
-import typing
-from typing import (  # noqa: F401
-    Any,
-    Callable,
-    ClassVar,
-    Collection,
-    Dict,
-    Generator,
-    Iterable,
-    List,
-    Mapping,
-    MutableSequence,
-    MutableSet,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    no_type_check,
-)
 
 import pydantic
 from pydantic import BaseModel, validator
 
-from .types import NoArgAnyCallable, PositiveInt, Str, StrEnum, TypedDict
+from . import typing
+from .types import PositiveInt, Str, StrEnum
+from .typing import (
+    Any,
+    AnyNoArgCallable,
+    ClassVar,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypedDict,
+    Union,
+    no_type_check,
+)
 from .utils import NOTHING
 
 
@@ -73,7 +67,7 @@ _EVE_METADATA_KEY = "__eve_meta"
 def field(
     default: Any = NOTHING,
     *,
-    default_factory: Optional[NoArgAnyCallable] = None,
+    default_factory: Optional[AnyNoArgCallable] = None,
     kind: Optional[FieldKind] = None,
     constraints: Optional[FieldConstraintsDict] = None,
     schema_config: Dict[str, Any] = None,

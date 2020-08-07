@@ -18,8 +18,6 @@
 
 
 import collections.abc
-import typing
-from typing import Any, Callable, Iterable, Optional, Sequence, Union
 
 import xxhash
 from boltons.iterutils import flatten, flatten_iter  # noqa: F401
@@ -49,6 +47,9 @@ from boltons.strutils import (  # noqa: F401
     unwrap_text,
 )
 
+from . import typing
+from .typing import Any, Callable, Iterable, Optional, Union
+
 
 class _NOTHING_TYPE:
     pass
@@ -67,37 +68,37 @@ def call_all(funcs_iterable: Iterable[Callable]) -> Callable:
     return _caller
 
 
-WordSequenceType = Union[str, Sequence[str]]
+AnyWordsIterable = Union[str, Iterable[str]]
 
 
-def join_canonical_cased(words: WordSequenceType) -> str:
+def join_canonical_cased(words: AnyWordsIterable) -> str:
     words = [words] if isinstance(words, str) else words
     return (" ".join(words)).lower()
 
 
-def join_concatcased(words: WordSequenceType) -> str:
+def join_concatcased(words: AnyWordsIterable) -> str:
     words = [words] if isinstance(words, str) else words
-    return "".join(words)
+    return "".join(word.lower() for word in words)
 
 
-def join_camelCased(words: WordSequenceType) -> str:
-    words = [words] if isinstance(words, str) else words
-    return words[0] + "".join(word.title() for word in words[1:])
+def join_camelCased(words: AnyWordsIterable) -> str:
+    words = [words] if isinstance(words, str) else list(words)
+    return words[0].lower() + "".join(word.title() for word in words[1:])
 
 
-def join_CamelCased(words: WordSequenceType) -> str:
+def join_PascalCased(words: AnyWordsIterable) -> str:
     words = [words] if isinstance(words, str) else words
     return "".join(word.title() for word in words)
 
 
-def join_SNAKE_CASED(words: WordSequenceType) -> str:
+def join_snake_cased(words: AnyWordsIterable) -> str:
     words = [words] if isinstance(words, str) else words
-    return "_".join(word for word in words).upper()
+    return "_".join(words).lower()
 
 
-def join_snake_cased(words: WordSequenceType) -> str:
+def join_kebab_cased(words: AnyWordsIterable) -> str:
     words = [words] if isinstance(words, str) else words
-    return "_".join(words)
+    return "-".join(words).lower()
 
 
 def shash(*args: Any, hash_algorithm: Optional[Any] = None, str_encoding: str = "utf-8") -> str:
