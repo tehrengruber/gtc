@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # for c1 in cells(mesh):
 #     field1 = sum(f[c1] * f[c2] for c2 in cells(c1)) # cell2cell
 #     field2 = sum(fe[e] for e in edges(c1)) # cell2edge
@@ -34,35 +35,37 @@
 import os
 
 from devtools import debug
+
+from gtc.common import BinaryOperator, DataType, LocationType, LoopOrder
 from gtc.unstructured import gtir
 from gtc.unstructured.gtir import (
-    UField,
+    AssignStmt,
+    BinaryOp,
     Dimensions,
+    Domain,
+    FieldAccess,
+    HorizontalDimension,
     HorizontalLoop,
+    LocationComprehension,
+    LocationRef,
+    NeighborChain,
     NeighborReduce,
     ReduceOperator,
-    HorizontalDimension,
     Stencil,
+    UField,
     VerticalLoop,
-    FieldAccess,
-    NeighborChain,
-    AssignStmt,
-    LocationRef,
-    LocationComprehension,
-    Domain,
-    BinaryOp,
 )
-from gtc.common import DataType, LocationType, LoopOrder, BinaryOperator
 from gtc.unstructured.gtir_to_nir import GtirToNir
 from gtc.unstructured.nir_to_ugpu import NirToUgpu
 from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
 
-field_in = gtir.UField(
+
+field_in = UField(
     name="field_in",
     dimensions=Dimensions(horizontal=HorizontalDimension(primary=LocationType.Cell)),
     vtype=DataType.FLOAT64,
 )
-field_out = gtir.UField(
+field_out = UField(
     name="field_out",
     dimensions=Dimensions(horizontal=HorizontalDimension(primary=LocationType.Cell)),
     vtype=DataType.FLOAT64,

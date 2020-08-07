@@ -14,12 +14,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from devtools import debug  # noqa: F401
 from pydantic import root_validator, validator
 
-from eve import Bool, Node, Str
+import eve
+from eve import Node, Str
 from gtc import common
 
 
@@ -39,13 +40,23 @@ class Literal(Expr):
 
 
 class NeighborChain(Node):
-    elements: List[common.LocationType]
+    elements: Tuple[common.LocationType, ...]
 
-    # @validator("elements")
-    # def not_empty(cls, elements):
-    #     if len(elements) <= 1:
-    #         raise ValueError("NeighborChain must contain at least two locations")
-    #     return elements
+    class Config(eve.concepts.FrozenModelConfig):
+        pass
+
+    # TODO see https://github.com/eth-cscs/eve_toolchain/issues/40
+    def __hash__(self):
+        return hash(self.elements)
+
+    def __eq__(self, other):
+        return self.elements == other.elements
+
+    @validator("elements")
+    def not_empty(cls, elements):
+        if len(elements) < 1:
+            raise ValueError("NeighborChain must contain at least one locations")
+        return elements
 
 
 class LocalVar(Node):
@@ -98,18 +109,11 @@ class Access(Expr):
 
 
 class FieldAccess(Access):
-    extent: Bool
     chain: NeighborChain
 
-    # TODO discuss with Enrique which pattern to use
-    # def get_extent(self):
-    #     return len(self.chain) > 1
-    # extent = property(get_extent)
-
-    @root_validator(pre=True)
-    def check_location_type(cls, values):
-        values["extent"] = len(values["chain"].elements) > 1
-        return values
+    @property
+    def extent(self):
+        return len(self.chain.elements) > 1
 
 
 class VarAccess(Access):

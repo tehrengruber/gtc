@@ -15,10 +15,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from typing import List, Optional, Union
+from typing import List, Optional, Set, Tuple, Union
 
 from pydantic import root_validator
 
+import eve
 from eve import Node, Str
 from gtc import common
 
@@ -32,13 +33,13 @@ class Stmt(Node):
 
 
 class NeighborChain(Node):
-    chain: List[common.LocationType]
+    chain: Tuple[common.LocationType, ...]
 
 
 class FieldAccess(Expr):
     name: Str
     # TODO verify that the tag exists in the location_type composite (reachable via symbol table)
-    chain: NeighborChain
+    chain: NeighborChain  # e.g. [Vertex] -> center access, [Vertex, Vertex] -> neighbor access
 
 
 class VarDecl(Stmt):
@@ -109,10 +110,20 @@ class NeighborLoop(Stmt):
 class SidCompositeEntry(Node):
     name: Str  # ensure field exists via symbol table
 
+    class Config(eve.concepts.FrozenModelConfig):
+        pass
+
+    # TODO see https://github.com/eth-cscs/eve_toolchain/issues/40
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, other):
+        return self.name == other.name
+
 
 class SidComposite(Node):
-    location_type: common.LocationType
-    entries: List[SidCompositeEntry]
+    chain: NeighborChain
+    entries: Set[SidCompositeEntry]
 
 
 class Kernel(Node):

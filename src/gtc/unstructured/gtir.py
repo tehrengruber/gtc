@@ -42,11 +42,11 @@ class Literal(Expr):
 class NeighborChain(Node):
     elements: List[common.LocationType]
 
-    # @validator("elements")
-    # def not_empty(cls, elements):
-    #     if len(elements) <= 1:
-    #         raise ValueError("NeighborChain must contain at least two locations")
-    #     return elements
+    @validator("elements")
+    def not_empty(cls, elements):
+        if len(elements) < 1:
+            raise ValueError("NeighborChain must contain at least one locations")
+        return elements
 
 
 @enum.unique
