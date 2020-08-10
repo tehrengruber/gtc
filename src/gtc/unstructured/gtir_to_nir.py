@@ -78,9 +78,19 @@ class GtirToNir(eve.NodeTranslator):
     ):  # TODO add loc_comprehension to signature?
         # TODO remove in_neighbor_loop
         assert kwargs["loc_comprehension"]
-        chain = kwargs["loc_comprehension"][node.subscript.name]
+        primary_chain = kwargs["loc_comprehension"][
+            node.subscript[0].name
+        ]  # TODO here we assume that the order of arguments matter (alternatively we can (probably) check the field declaration and map correctly)
+        secondary_chain = (
+            kwargs["loc_comprehension"][node.subscript[1].name] if len(node.subscript) > 1 else None
+        )
 
-        return nir.FieldAccess(name=node.name, location_type=node.location_type, chain=chain)
+        return nir.FieldAccess(
+            name=node.name,
+            location_type=node.location_type,
+            primary=primary_chain,
+            secondary=secondary_chain,
+        )
 
     def visit_NeighborReduce(self, node: gtir.NeighborReduce, **kwargs):
         # copy loc_comprehension

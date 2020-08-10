@@ -39,7 +39,8 @@ class NeighborChain(Node):
 class FieldAccess(Expr):
     name: Str
     # TODO verify that the tag exists in the location_type composite (reachable via symbol table)
-    chain: NeighborChain  # e.g. [Vertex] -> center access, [Vertex, Vertex] -> neighbor access
+    primary: NeighborChain  # e.g. [Vertex] -> center access, [Vertex, Vertex] -> neighbor access
+    secondary: Optional[NeighborChain]  # sparse index
 
 
 class VarDecl(Stmt):

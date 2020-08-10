@@ -87,7 +87,7 @@ class NeighborReduce(Expr):
 
 class FieldAccess(Expr):
     name: Str  # via symbol table
-    subscript: LocationRef
+    subscript: List[LocationRef]  # maybe remove the separate LocationRef
 
 
 class AssignStmt(Stmt):

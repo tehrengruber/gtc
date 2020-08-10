@@ -193,7 +193,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             usid = [p for p in computation_fields if p.name == _this_node.name]
             if len(usid) != 1:
                 raise ValueError("Symbol not found or not unique!")
-            location_str = "_".join([_this_generator.LOCATION_TYPE_TO_STR[loc] for loc in _this_node.chain.chain])
+            location_str = "_".join([_this_generator.LOCATION_TYPE_TO_STR[loc] for loc in _this_node.primary.chain])
         %>*gridtools::device::at_key<${ name }_tag>(${ location_str }_ptrs)"""
         )
 

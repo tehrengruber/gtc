@@ -106,7 +106,7 @@ fields.append(sign)
 zavg_red = NeighborReduce(
     op=ReduceOperator.ADD,
     operand=FieldAccess(
-        name="pp", location_type=LocationType.Vertex, subscript=LocationRef(name="v_of_e")
+        name="pp", location_type=LocationType.Vertex, subscript=[LocationRef(name="v_of_e")]
     ),
     neighbors=LocationComprehension(
         name="v_of_e",
@@ -122,37 +122,37 @@ zavg_mul = BinaryOp(
 )
 zavg_assign = AssignStmt(
     left=FieldAccess(
-        name="zavg_tmp", location_type=LocationType.Edge, subscript=LocationRef(name="e")
+        name="zavg_tmp", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
     ),
     right=zavg_mul,
 )
 
 assign_zavgS_MXX = AssignStmt(
     left=FieldAccess(
-        name="zavgS_MXX", location_type=LocationType.Edge, subscript=LocationRef(name="e")
+        name="zavgS_MXX", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
     ),
     right=BinaryOp(
         left=FieldAccess(
-            name="zavg_tmp", location_type=LocationType.Edge, subscript=LocationRef(name="e")
+            name="zavg_tmp", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
         ),
         op=BinaryOperator.MUL,
         right=FieldAccess(
-            name="S_MXX", location_type=LocationType.Edge, subscript=LocationRef(name="e")
+            name="S_MXX", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
         ),
     ),
 )
 
 assign_zavgS_MYY = AssignStmt(
     left=FieldAccess(
-        name="zavgS_MYY", location_type=LocationType.Edge, subscript=LocationRef(name="e")
+        name="zavgS_MYY", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
     ),
     right=BinaryOp(
         left=FieldAccess(
-            name="zavg_tmp", location_type=LocationType.Edge, subscript=LocationRef(name="e")
+            name="zavg_tmp", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
         ),
         op=BinaryOperator.MUL,
         right=FieldAccess(
-            name="S_MYY", location_type=LocationType.Edge, subscript=LocationRef(name="e")
+            name="S_MYY", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
         ),
     ),
 )
@@ -188,18 +188,20 @@ vertical_loops.append(
 
 assign_pnabla_MXX = AssignStmt(
     left=FieldAccess(
-        name="pnabla_MXX", location_type=LocationType.Vertex, subscript=LocationRef(name="v")
+        name="pnabla_MXX", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
     ),
     right=NeighborReduce(
         operand=BinaryOp(
             left=FieldAccess(
                 name="zavgS_MXX",
                 location_type=LocationType.Edge,
-                subscript=LocationRef(name="e_of_v"),
+                subscript=[LocationRef(name="e_of_v")],
             ),
             op=BinaryOperator.MUL,
             right=FieldAccess(
-                name="sign", location_type=LocationType.Edge, subscript=LocationRef(name="e_of_v")
+                name="sign",
+                location_type=LocationType.Edge,
+                subscript=[LocationRef(name="v"), LocationRef(name="e_of_v")],
             ),
         ),
         op=ReduceOperator.ADD,
@@ -214,18 +216,20 @@ assign_pnabla_MXX = AssignStmt(
 )
 assign_pnabla_MYY = AssignStmt(
     left=FieldAccess(
-        name="pnabla_MYY", location_type=LocationType.Vertex, subscript=LocationRef(name="v")
+        name="pnabla_MYY", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
     ),
     right=NeighborReduce(
         operand=BinaryOp(
             left=FieldAccess(
                 name="zavgS_MYY",
                 location_type=LocationType.Edge,
-                subscript=LocationRef(name="e_of_v"),
+                subscript=[LocationRef(name="e_of_v")],
             ),
             op=BinaryOperator.MUL,
             right=FieldAccess(
-                name="sign", location_type=LocationType.Edge, subscript=LocationRef(name="e_of_v")
+                name="sign",
+                location_type=LocationType.Edge,
+                subscript=[LocationRef(name="v"), LocationRef(name="e_of_v")],
             ),
         ),
         op=ReduceOperator.ADD,
@@ -266,29 +270,29 @@ vertical_loops.append(
 
 assign_pnabla_MXX_vol = AssignStmt(
     left=FieldAccess(
-        name="pnabla_MXX", location_type=LocationType.Vertex, subscript=LocationRef(name="v")
+        name="pnabla_MXX", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
     ),
     right=BinaryOp(
         left=FieldAccess(
-            name="pnabla_MXX", location_type=LocationType.Vertex, subscript=LocationRef(name="v")
+            name="pnabla_MXX", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
         ),
         op=BinaryOperator.DIV,
         right=FieldAccess(
-            name="vol", location_type=LocationType.Vertex, subscript=LocationRef(name="v")
+            name="vol", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
         ),
     ),
 )
 assign_pnabla_MYY_vol = AssignStmt(
     left=FieldAccess(
-        name="pnabla_MYY", location_type=LocationType.Vertex, subscript=LocationRef(name="v")
+        name="pnabla_MYY", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
     ),
     right=BinaryOp(
         left=FieldAccess(
-            name="pnabla_MYY", location_type=LocationType.Vertex, subscript=LocationRef(name="v")
+            name="pnabla_MYY", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
         ),
         op=BinaryOperator.DIV,
         right=FieldAccess(
-            name="vol", location_type=LocationType.Vertex, subscript=LocationRef(name="v")
+            name="vol", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
         ),
     ),
 )
@@ -329,7 +333,7 @@ comp = Computation(name="nabla", params=fields, stencils=[nabla_stencil])
 nir_comp = GtirToNir().visit(comp)
 nir_comp = find_and_merge_horizontal_loops(nir_comp)
 ugpu_comp = NirToUgpu().visit(nir_comp)
-# debug(ugpu_comp)
+debug(ugpu_comp)
 
 generated_code = UgpuCodeGenerator.apply(ugpu_comp)
 print(generated_code)

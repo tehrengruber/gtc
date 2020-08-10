@@ -83,7 +83,10 @@ class NirToUgpu(eve.NodeTranslator):
 
     def visit_FieldAccess(self, node: nir.FieldAccess, **kwargs):
         return ugpu.FieldAccess(
-            name=node.name, chain=self.visit(node.chain), location_type=node.location_type
+            name=node.name,
+            primary=self.visit(node.primary),
+            secondary=self.visit(node.secondary),
+            location_type=node.location_type,
         )
 
     def visit_VarAccess(self, node: nir.VarAccess, **kwargs):
@@ -123,15 +126,15 @@ class NirToUgpu(eve.NodeTranslator):
         secondary_neighbor_chains = set()
         other_sids = {}
         for acc in field_accesses:
-            if len(acc.chain.elements) == 1:
-                assert acc.chain.elements[0] == node.location_type
+            if len(acc.primary.elements) == 1:
+                assert acc.primary.elements[0] == node.location_type
                 primary_sid_composite.entries.add(ugpu.SidCompositeEntry(name=acc.name))
             else:
                 assert (
-                    len(acc.chain.elements) == 2
+                    len(acc.primary.elements) == 2
                 )  # TODO cannot deal with more than one level of nesting
-                secondary_neighbor_chains.add(acc.chain)
-                secondary_loc = acc.chain.elements[
+                secondary_neighbor_chains.add(acc.primary)
+                secondary_loc = acc.primary.elements[
                     -1
                 ]  # TODO change if we have more than one level of nesting
                 if secondary_loc not in other_sids:

@@ -109,11 +109,12 @@ class Access(Expr):
 
 
 class FieldAccess(Access):
-    chain: NeighborChain
+    primary: NeighborChain
+    secondary: Optional[NeighborChain]
 
     @property
     def extent(self):
-        return len(self.chain.elements) > 1
+        return len(self.primary.elements) > 1
 
 
 class VarAccess(Access):
