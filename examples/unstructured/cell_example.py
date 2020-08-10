@@ -154,6 +154,6 @@ debug(ugpu_comp)
 generated_code = UgpuCodeGenerator.apply(ugpu_comp)
 print(generated_code)
 
-output_file = os.path.dirname(os.path.realpath(__file__)) + "/cell_example_generated.hpp"
+output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell_example.hpp"
 with open(output_file, "w+") as output:
     output.write(generated_code)
