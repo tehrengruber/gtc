@@ -16,8 +16,8 @@
 # class FieldAccess:
 #     subscript: LocationRef
 
-# access1 = FieldAccess(subscript=LocationRef(c1))
-# access2 = FieldAccess(subscript=LocationRef(c2))
+# access1 = FieldAccess(subscript=[LocationRef(c1))]
+# access2 = FieldAccess(subscript=[LocationRef(c2))]
 
 # # NIR
 
@@ -100,10 +100,10 @@ red_operand = BinaryOp(
     op=BinaryOperator.ADD,
     location_type=LocationType.Cell,
     left=FieldAccess(
-        name="field_in", location_type=LocationType.Cell, subscript=LocationRef(name="c1")
+        name="field_in", location_type=LocationType.Cell, subscript=[LocationRef(name="c1")]
     ),
     right=FieldAccess(
-        name="field_in", location_type=LocationType.Cell, subscript=LocationRef(name="c2")
+        name="field_in", location_type=LocationType.Cell, subscript=[LocationRef(name="c2")]
     ),
 )
 
@@ -120,7 +120,7 @@ red_c2c = NeighborReduce(
 
 assign_c2c_red = AssignStmt(
     left=FieldAccess(
-        name="field_out", subscript=LocationRef(name="c1"), location_type=LocationType.Cell
+        name="field_out", subscript=[LocationRef(name="c1")], location_type=LocationType.Cell
     ),
     right=red_c2c,
 )
