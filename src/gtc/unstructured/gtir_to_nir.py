@@ -17,7 +17,7 @@
 
 import copy
 from types import MappingProxyType
-from typing import ClassVar, Mapping
+from typing import ClassVar, Dict, List, Mapping
 
 import eve  # noqa: F401
 from gtc import common
@@ -73,16 +73,40 @@ class GtirToNir(eve.NodeTranslator):
             name=node.name, vtype=node.vtype, dimensions=self.visit(node.dimensions)
         )
 
-    def visit_FieldAccess(
-        self, node: gtir.FieldAccess, **kwargs
-    ):  # TODO add loc_comprehension to signature?
-        # TODO remove in_neighbor_loop
-        assert kwargs["loc_comprehension"]
-        primary_chain = kwargs["loc_comprehension"][
-            node.subscript[0].name
-        ]  # TODO here we assume that the order of arguments matter (alternatively we can (probably) check the field declaration and map correctly)
+    # TODO test
+    # TODO discuss if this actually works: can we uniquely identify which ref in the field references which dimension or do we need other techniques (e.g. refer to primary and secondary dimension by name)
+    @staticmethod
+    def order_location_refs(
+        location_refs: List[gtir.LocationRef],
+        location_comprehensions: Dict[str, gtir.LocationComprehension],
+    ):
+        """
+        Returns a dict with primary, secondary and vertical (TODO)
+        """
+        result = {}
+
+        decls = [location_comprehensions[ref.name] for ref in location_refs]
+
+        # If there is a secondary dimension (sparse), then one of the LocationComprehensions references the other.
+        for decl in decls:
+            if not isinstance(decl.of, gtir.Domain) and decl.of.name in [
+                ref.name for ref in location_refs
+            ]:
+                assert "secondary" not in result
+                result["secondary"] = decl.name
+            else:
+                assert "primary" not in result
+                result["primary"] = decl.name
+
+        return result
+
+    def visit_FieldAccess(self, node: gtir.FieldAccess, *, location_comprehensions, **kwargs):
+        ordered_location_refs = self.order_location_refs(node.subscript, location_comprehensions)
+        primary_chain = location_comprehensions[ordered_location_refs["primary"]].chain
         secondary_chain = (
-            kwargs["loc_comprehension"][node.subscript[1].name] if len(node.subscript) > 1 else None
+            location_comprehensions[ordered_location_refs["secondary"]].chain
+            if "secondary" in ordered_location_refs
+            else None
         )
 
         return nir.FieldAccess(
@@ -92,17 +116,12 @@ class GtirToNir(eve.NodeTranslator):
             secondary=secondary_chain,
         )
 
-    def visit_NeighborReduce(self, node: gtir.NeighborReduce, **kwargs):
-        # copy loc_comprehension
-        if "last_block" not in kwargs:
-            raise ValueError("no block defined")
-
-        # copy keyword args as we are modifying the loc_comprehension
-        kwargs["loc_comprehension"] = copy.deepcopy(kwargs["loc_comprehension"])
-        loc_comprehension = kwargs["loc_comprehension"]
+    def visit_NeighborReduce(self, node: gtir.NeighborReduce, *, last_block, **kwargs):
+        loc_comprehension = copy.deepcopy(kwargs["location_comprehensions"])
         assert node.neighbors.name not in loc_comprehension
-        loc_comprehension[node.neighbors.name] = node.neighbors.chain
-        last_block = kwargs["last_block"]
+        loc_comprehension[node.neighbors.name] = node.neighbors
+        kwargs["location_comprehensions"] = loc_comprehension
+
         body_location = node.neighbors.chain.elements[-1]
         reduce_var_name = "local" + str(node.id_attr_)
         last_block.declarations.append(
@@ -169,7 +188,7 @@ class GtirToNir(eve.NodeTranslator):
     def visit_HorizontalLoop(self, node: gtir.HorizontalLoop, **kwargs):
         block = nir.BlockStmt(declarations=[], statements=[], location_type=node.stmt.location_type)
         stmt = self.visit(
-            node.stmt, last_block=block, loc_comprehension={node.location.name: node.location.chain}
+            node.stmt, last_block=block, location_comprehensions={node.location.name: node.location}
         )
         block.statements.append(stmt)
         return nir.HorizontalLoop(stmt=block, location_type=node.location.chain.elements[0],)
@@ -179,11 +198,6 @@ class GtirToNir(eve.NodeTranslator):
             horizontal_loops=[self.visit(h) for h in node.horizontal_loops],
             loop_order=node.loop_order,
         )
-
-    # def visit_LocationComprehension(self, node: gtir.LocationComprehension, **kwargs):
-    #     loc_comprehension = kwargs["loc_comprehension"] or {}
-    #     loc_comprehension[node.name] = node.chain
-    #     return ""loc_comprehension""
 
     def visit_Stencil(self, node: gtir.Stencil, **kwargs):
         return nir.Stencil(

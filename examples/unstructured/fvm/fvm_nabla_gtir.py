@@ -229,7 +229,7 @@ assign_pnabla_MYY = AssignStmt(
             right=FieldAccess(
                 name="sign",
                 location_type=LocationType.Edge,
-                subscript=[LocationRef(name="v"), LocationRef(name="e_of_v")],
+                subscript=[LocationRef(name="e_of_v"), LocationRef(name="v")],
             ),
         ),
         op=ReduceOperator.ADD,
