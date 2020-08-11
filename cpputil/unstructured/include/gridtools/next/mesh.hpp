@@ -31,7 +31,7 @@ namespace gridtools {
 
         namespace mesh {
             template <typename Key, typename Mesh>
-            decltype(auto) mesh_connectivity(const Mesh &mesh);
+            decltype(auto) mesh_connectivity(Mesh const &mesh);
 
             template <class Key, class Mesh>
             decltype(auto) connectivity(Mesh const &mesh) {

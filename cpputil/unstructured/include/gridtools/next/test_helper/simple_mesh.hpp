@@ -22,7 +22,9 @@
 #include "../mesh.hpp"
 #include "../unstructured.hpp"
 #include <cstddef>
+#include <gridtools/sid/rename_dimensions.hpp>
 #include <gridtools/storage/builder.hpp>
+#include <gridtools/storage/sid.hpp>
 #include <type_traits>
 
 #ifdef __CUDACC__ // TODO proper handling
@@ -46,32 +48,91 @@ namespace gridtools {
                     }
                 };
 
-                template <class LocationType, std::size_t Size, std::size_t Neighbors>
+                template <class LocationType, std::size_t MaxNeighbors>
                 struct regular_connectivity {
                     struct builder {
-                        auto operator()() {
+                        auto operator()(std::size_t size) {
                             return gridtools::storage::builder<storage_trait>.template type<int>().template layout<0, 1>().template dimensions(
-                    Size, std::integral_constant<std::size_t, Neighbors>{});
+                    size, std::integral_constant<std::size_t, MaxNeighbors>{});
                         }
                     };
 
-                    decltype(builder{}()()) tbl_;
+                    decltype(builder{}(0)()) tbl_;
+                    std::size_t size_;
                     static constexpr gridtools::int_t missing_value_ = -1;
 
-                    regular_connectivity(std::array<std::array<int, Neighbors>, Size>) {}
+                    regular_connectivity(std::vector<std::array<int, MaxNeighbors>> tbl)
+                        : tbl_{builder{}(tbl.size()).initializer([&tbl](std::size_t primary, std::size_t neigh) {
+                              return tbl[primary][neigh];
+                          })()},
+                          size_{tbl.size()} {}
+
+                    GT_FUNCTION friend std::size_t connectivity_size(regular_connectivity const &conn) {
+                        return conn.size_;
+                    }
+
+                    GT_FUNCTION friend std::integral_constant<std::size_t, MaxNeighbors> connectivity_max_neighbors(
+                        regular_connectivity const &) {
+                        return {};
+                    }
+
+                    GT_FUNCTION friend int connectivity_skip_value(regular_connectivity const &conn) {
+                        return conn.missing_value_;
+                    }
+
+                    friend auto connectivity_neighbor_table(regular_connectivity const &conn) {
+                        return gridtools::sid::rename_numbered_dimensions<LocationType, neighbor>(conn.tbl_);
+                    }
                 };
 
                 template <class Key, std::enable_if_t<std::is_same_v<Key, vertex>, int> = 0>
-                decltype(auto) mesh_connectivity(const simple_mesh &mesh) {
+                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
                     return primary_connectivity<vertex>{9};
                 }
                 template <class Key, std::enable_if_t<std::is_same_v<Key, edge>, int> = 0>
-                decltype(auto) mesh_connectivity(const simple_mesh &mesh) {
+                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
                     return primary_connectivity<edge>{18};
                 }
                 template <class Key, std::enable_if_t<std::is_same_v<Key, cell>, int> = 0>
-                decltype(auto) mesh_connectivity(const simple_mesh &mesh) {
+                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
                     return primary_connectivity<cell>{9};
+                }
+                template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<cell, cell>>, int> = 0>
+                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                    return regular_connectivity<cell, 4>{{
+                        {6, 1, 3, 2}, // 0
+                        {7, 2, 4, 0}, // 1
+                        {8, 0, 5, 1}, // 2
+                        {0, 4, 6, 5}, // 3
+                        {1, 5, 7, 3}, // 4
+                        {2, 3, 8, 4}, // 5
+                        {3, 7, 0, 8}, // 6
+                        {4, 8, 1, 6}, // 7
+                        {5, 6, 2, 7}  // 8
+                    }};
+                }
+                template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<edge, vertex>>, int> = 0>
+                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                    return regular_connectivity<cell, 2>{{
+                        {0, 1}, // 0
+                        {1, 2},
+                        {2, 0},
+                        {3, 4},
+                        {3, 5},
+                        {5, 3},
+                        {6, 7},
+                        {7, 8},
+                        {8, 6},
+                        {0, 3}, // 9
+                        {1, 4},
+                        {2, 5},
+                        {3, 6},
+                        {4, 7},
+                        {5, 8},
+                        {6, 0},
+                        {7, 1},
+                        {8, 2},
+                    }};
                 }
             };
         } // namespace test_helper
@@ -79,7 +140,7 @@ namespace gridtools {
 } // namespace gridtools
 
 /**
- * TODO maybe later: Simple 2x2 Cartesian hand-made mesh with one halo line.
+ * TODO maybe later: Simple 2x2 Cartesian hand-made mesh, non periodic, one halo line.
  *
  *     0e    1e    2e    3e
  *   | --- | --- | --- | --- |

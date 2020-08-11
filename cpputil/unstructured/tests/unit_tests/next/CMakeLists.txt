@@ -12,7 +12,7 @@ function(add_gtnext_test)
     add_executable(${ARG_NAME} ${ARG_SOURCES})
     target_link_libraries(${ARG_NAME} gencode)
     target_link_libraries(${ARG_NAME} test_util)
-    target_link_libraries(${ARG_NAME} GridTools::gridtools gtest gtest_main ${ARG_LIBRARIES})
+    target_link_libraries(${ARG_NAME} GridTools::gridtools gtest gtest_main gmock ${ARG_LIBRARIES})
 
     add_test(NAME ${ARG_NAME} COMMAND $<TARGET_FILE:${ARG_NAME}>)
 endfunction()
