@@ -1,1 +1,2 @@
-add_gtnext_test(NAME test_simple_mesh SOURCES test_simple_mesh.cc)
+add_gtnext_test(NAME test_simple_mesh)
+add_gtnext_test(NAME test_field_builder)
