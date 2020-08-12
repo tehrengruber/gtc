@@ -1,36 +1,12 @@
 # -*- coding: utf-8 -*-
+#
+# Cell to cell reduction.
+# Note that the reduction refers to a LocationRef from outside!
+#
+# ```python
 # for c1 in cells(mesh):
-#     field1 = sum(f[c1] * f[c2] for c2 in cells(c1)) # cell2cell
-#     field2 = sum(fe[e] for e in edges(c1)) # cell2edge
-
-
-# with location(cell) as c1:
-#     field = sum(f[c1] * f[c2] for c2 in cells(c1))
-#     field = sum(f[c1] * f[c3] for c3 in cells(c1))
-
-# c2 and c3 have the same neighbor chain, but refer to different locations
-# field = sum(f[c2] * sum(f[c3] for c3 in cells(c1)) for c2 in cells(c1))
-
-# # GTIR:
-
-# class FieldAccess:
-#     subscript: LocationRef
-
-# access1 = FieldAccess(subscript=[LocationRef(c1))]
-# access2 = FieldAccess(subscript=[LocationRef(c2))]
-
-# # NIR
-
-# class FieldAccess:
-#     offset: NeighborChain
-
-# access1 = FieldAccess(offset=[cell])
-# access2 = FieldAccess(offset=[cell,cell])
-
-
-# for  in cells(outer_c):
-#     field +=
-#     field +=
+#     field1 = sum(f[c1] * f[c2] for c2 in cells(c1))
+# ```
 
 import os
 
@@ -70,31 +46,6 @@ field_out = UField(
     dimensions=Dimensions(horizontal=HorizontalDimension(primary=LocationType.Cell)),
     vtype=DataType.FLOAT64,
 )
-
-# with location(cell) as c1:
-#     field1 = sum(f[c1] * f[c2] for c2 in neighbors(c1, Cell, Cell)) # cell2cell
-
-# neighbor_sel = NeighborSelector(
-#     neighbor_chain=NeighborChain(elements=[LocationType.Cell, LocationType.Cell])
-#     of=LocationRef(name="c1")
-# )
-
-# neighbors = NeighborComprehension(
-#     location=LocationDecl(name="c2", location_type=LocationType.Cell),
-#     neighbors=neighbor_sel
-# )
-# neighbor_sel = NeighborComprehension(
-#     location=LocationDecl(name="c2", location_type=LocationType.Cell),
-#     chain=NeighborChain(elements=[LocationType.Cell, LocationType.Cell]),
-# )
-
-# neighbor_sel = NeighborSelector(
-#      location=LocationDecl(name="c2", chain=NeighborChain(elements=[LocationType.Cell, LocationType.Cell])),
-#      of=LocationRef(name="c1")
-#  )
-
-# class LocationDecl:
-
 
 red_operand = BinaryOp(
     op=BinaryOperator.ADD,
@@ -154,6 +105,6 @@ debug(ugpu_comp)
 generated_code = UgpuCodeGenerator.apply(ugpu_comp)
 print(generated_code)
 
-output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell_example.hpp"
+output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell2cell.hpp"
 with open(output_file, "w+") as output:
     output.write(generated_code)

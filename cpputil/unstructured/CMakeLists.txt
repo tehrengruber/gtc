@@ -5,7 +5,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/private")
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_compile_options(-Wall -Wextra -pedantic -Wno-sign-compare)
+add_compile_options(-Wall)
+#add_compile_options(-Wall -Wextra -pedantic -Wno-sign-compare)
+
 
 include(CheckLanguage)
 check_language(CUDA)
@@ -22,8 +24,8 @@ FetchContent_Declare(GridTools
 )
 FetchContent_MakeAvailable(GridTools)
 
-add_library(gencode INTERFACE)
-target_include_directories(gencode INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_library(gtnext INTERFACE)
+target_include_directories(gtnext INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_executable(prototype prototype.cc)
 target_link_libraries(prototype GridTools::gridtools)

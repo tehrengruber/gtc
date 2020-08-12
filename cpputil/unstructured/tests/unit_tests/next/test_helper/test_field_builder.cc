@@ -14,11 +14,11 @@ namespace {
 
     TEST(field_builder, cell_field) {
         gridtools::next::test_helper::simple_mesh mesh;
-        auto c2c = gridtools::next::mesh::connectivity<std::tuple<cell, cell>>(mesh);
 
-        auto field = gridtools::next::test_helper::make_field<double>(c2c);
+        auto field = gridtools::next::test_helper::make_field<double, cell>(mesh);
 
         static_assert(std::is_same<double *, gridtools::sid::ptr_type<decltype(field)>>{});
+        auto c2c = gridtools::next::mesh::connectivity<std::tuple<cell, cell>>(mesh);
         ASSERT_EQ(
             gridtools::next::connectivity::size(c2c), gridtools::at_key<cell>(gridtools::sid::get_upper_bounds(field)));
     }
@@ -47,8 +47,8 @@ namespace {
         test_helper::simple_mesh mesh;
         auto c2c = mesh::connectivity<std::tuple<cell, cell>>(mesh);
 
-        auto in = test_helper::make_field<double>(c2c);
-        auto out = gridtools::next::test_helper::make_field<double>(c2c);
+        auto in = test_helper::make_field<double, cell>(mesh);
+        auto out = gridtools::next::test_helper::make_field<double, cell>(mesh);
 
         make_full_loop<cell>(in, [](auto ptr, auto const &) { *ptr = 1; });
 
@@ -101,5 +101,5 @@ namespace {
         // make_full_loop<cell>(primary_fields, loop_body);
 
         make_full_loop<cell>(out, [](auto ptr, auto const &) { ASSERT_EQ(4, *ptr); });
-    } // namespace
+    }
 } // namespace

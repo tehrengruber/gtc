@@ -113,12 +113,12 @@ namespace gridtools {
                 }
                 template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<edge, vertex>>, int> = 0>
                 friend decltype(auto) mesh_connectivity(const simple_mesh &) {
-                    return regular_connectivity<cell, 2>{{
+                    return regular_connectivity<edge, 2>{{
                         {0, 1}, // 0
                         {1, 2},
                         {2, 0},
                         {3, 4},
-                        {3, 5},
+                        {4, 5},
                         {5, 3},
                         {6, 7},
                         {7, 8},

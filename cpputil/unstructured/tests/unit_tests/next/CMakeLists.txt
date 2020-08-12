@@ -10,7 +10,7 @@ function(add_gtnext_test)
     endif()
 
     add_executable(${ARG_NAME} ${ARG_SOURCES})
-    target_link_libraries(${ARG_NAME} gencode)
+    target_link_libraries(${ARG_NAME} gtnext)
     target_link_libraries(${ARG_NAME} test_util)
     target_link_libraries(${ARG_NAME} GridTools::gridtools gtest gtest_main gmock ${ARG_LIBRARIES})
 
@@ -32,4 +32,3 @@ add_subdirectory(test_helper)
 
 add_gtnext_atlas_test(NAME test_atlas_array_view_adapter)
 add_gtnext_atlas_test(NAME test_atlas_field_util SOURCES test_atlas_field_util.cc)
-
