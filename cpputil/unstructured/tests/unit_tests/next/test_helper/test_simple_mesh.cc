@@ -35,9 +35,6 @@ TEST(simple_mesh, cell2cell) {
     ASSERT_EQ(4, gridtools::next::connectivity::max_neighbors(c2c));
     ASSERT_EQ(-1, gridtools::next::connectivity::skip_value(c2c));
 
-    // auto bla = get_neighbors<std::tuple<cell, cell>>(mesh, 0);
-
-    // ASSERT_THAT(bla, testing::UnorderedElementsAre(1, 3, 2, 6));
     ASSERT_THAT((get_neighbors<std::tuple<cell, cell>>(mesh, 0)), testing::UnorderedElementsAre(1, 3, 2, 6));
     ASSERT_THAT((get_neighbors<std::tuple<cell, cell>>(mesh, 1)), testing::UnorderedElementsAre(0, 7, 2, 4));
     // etc
