@@ -11,11 +11,10 @@ import os
 
 from devtools import debug
 
-from gtc.common import BinaryOperator, DataType, LocationType, LoopOrder
+from gtc.common import DataType, LocationType, LoopOrder
 from gtc.unstructured import gtir
 from gtc.unstructured.gtir import (
     AssignStmt,
-    BinaryOp,
     Dimensions,
     Domain,
     FieldAccess,
