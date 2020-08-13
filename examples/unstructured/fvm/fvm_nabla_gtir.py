@@ -12,10 +12,13 @@ from gtc.unstructured.gtir import (
     BinaryOp,
     Computation,
     Dimensions,
+    Domain,
     FieldAccess,
     HorizontalDimension,
     HorizontalLoop,
     Literal,
+    LocationComprehension,
+    LocationRef,
     NeighborChain,
     NeighborReduce,
     ReduceOperator,
@@ -102,8 +105,14 @@ fields.append(sign)
 
 zavg_red = NeighborReduce(
     op=ReduceOperator.ADD,
-    operand=FieldAccess(name="pp", location_type=LocationType.Vertex),
-    neighbors=NeighborChain(elements=[LocationType.Edge, LocationType.Vertex]),
+    operand=FieldAccess(
+        name="pp", location_type=LocationType.Vertex, subscript=[LocationRef(name="v_of_e")]
+    ),
+    neighbors=LocationComprehension(
+        name="v_of_e",
+        chain=NeighborChain(elements=[LocationType.Edge, LocationType.Vertex]),
+        of=LocationRef(name="e"),
+    ),
     location_type=LocationType.Edge,
 )
 zavg_mul = BinaryOp(
@@ -112,24 +121,39 @@ zavg_mul = BinaryOp(
     right=zavg_red,
 )
 zavg_assign = AssignStmt(
-    left=FieldAccess(name="zavg_tmp", location_type=LocationType.Edge), right=zavg_mul
+    left=FieldAccess(
+        name="zavg_tmp", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
+    ),
+    right=zavg_mul,
 )
 
 assign_zavgS_MXX = AssignStmt(
-    left=FieldAccess(name="zavgS_MXX", location_type=LocationType.Edge),
+    left=FieldAccess(
+        name="zavgS_MXX", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
+    ),
     right=BinaryOp(
-        left=FieldAccess(name="zavg_tmp", location_type=LocationType.Edge),
+        left=FieldAccess(
+            name="zavg_tmp", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
+        ),
         op=BinaryOperator.MUL,
-        right=FieldAccess(name="S_MXX", location_type=LocationType.Edge),
+        right=FieldAccess(
+            name="S_MXX", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
+        ),
     ),
 )
 
 assign_zavgS_MYY = AssignStmt(
-    left=FieldAccess(name="zavgS_MYY", location_type=LocationType.Edge),
+    left=FieldAccess(
+        name="zavgS_MYY", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
+    ),
     right=BinaryOp(
-        left=FieldAccess(name="zavg_tmp", location_type=LocationType.Edge),
+        left=FieldAccess(
+            name="zavg_tmp", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
+        ),
         op=BinaryOperator.MUL,
-        right=FieldAccess(name="S_MYY", location_type=LocationType.Edge),
+        right=FieldAccess(
+            name="S_MYY", location_type=LocationType.Edge, subscript=[LocationRef(name="e")]
+        ),
     ),
 )
 
@@ -137,9 +161,24 @@ vertical_loops.append(
     VerticalLoop(
         loop_order=LoopOrder.FORWARD,
         horizontal_loops=[
-            HorizontalLoop(location_type=LocationType.Edge, stmt=zavg_assign),
-            HorizontalLoop(location_type=LocationType.Edge, stmt=assign_zavgS_MXX),
-            HorizontalLoop(location_type=LocationType.Edge, stmt=assign_zavgS_MYY),
+            HorizontalLoop(
+                location=LocationComprehension(
+                    name="e", chain=NeighborChain(elements=[LocationType.Edge]), of=Domain()
+                ),
+                stmt=zavg_assign,
+            ),
+            HorizontalLoop(
+                location=LocationComprehension(
+                    name="e", chain=NeighborChain(elements=[LocationType.Edge]), of=Domain()
+                ),
+                stmt=assign_zavgS_MXX,
+            ),
+            HorizontalLoop(
+                location=LocationComprehension(
+                    name="e", chain=NeighborChain(elements=[LocationType.Edge]), of=Domain()
+                ),
+                stmt=assign_zavgS_MYY,
+            ),
         ],
     )
 )
@@ -148,30 +187,58 @@ vertical_loops.append(
 
 
 assign_pnabla_MXX = AssignStmt(
-    left=FieldAccess(name="pnabla_MXX", location_type=LocationType.Vertex),
+    left=FieldAccess(
+        name="pnabla_MXX", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
+    ),
     right=NeighborReduce(
         operand=BinaryOp(
-            left=FieldAccess(name="zavgS_MXX", location_type=LocationType.Edge),
+            left=FieldAccess(
+                name="zavgS_MXX",
+                location_type=LocationType.Edge,
+                subscript=[LocationRef(name="e_of_v")],
+            ),
             op=BinaryOperator.MUL,
-            right=FieldAccess(name="sign", location_type=LocationType.Edge),
+            right=FieldAccess(
+                name="sign",
+                location_type=LocationType.Edge,
+                subscript=[LocationRef(name="v"), LocationRef(name="e_of_v")],
+            ),
         ),
         op=ReduceOperator.ADD,
         location_type=LocationType.Vertex,
-        neighbors=NeighborChain(elements=[LocationType.Vertex, LocationType.Edge]),
+        neighbors=LocationComprehension(
+            name="e_of_v",
+            chain=NeighborChain(elements=[LocationType.Vertex, LocationType.Edge]),
+            of=LocationRef(name="v"),
+        ),
     ),
     location_type=LocationType.Vertex,
 )
 assign_pnabla_MYY = AssignStmt(
-    left=FieldAccess(name="pnabla_MYY", location_type=LocationType.Vertex),
+    left=FieldAccess(
+        name="pnabla_MYY", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
+    ),
     right=NeighborReduce(
         operand=BinaryOp(
-            left=FieldAccess(name="zavgS_MYY", location_type=LocationType.Edge),
+            left=FieldAccess(
+                name="zavgS_MYY",
+                location_type=LocationType.Edge,
+                subscript=[LocationRef(name="e_of_v")],
+            ),
             op=BinaryOperator.MUL,
-            right=FieldAccess(name="sign", location_type=LocationType.Edge),
+            right=FieldAccess(
+                name="sign",
+                location_type=LocationType.Edge,
+                subscript=[LocationRef(name="e_of_v"), LocationRef(name="v")],
+            ),
         ),
         op=ReduceOperator.ADD,
         location_type=LocationType.Vertex,
-        neighbors=NeighborChain(elements=[LocationType.Vertex, LocationType.Edge]),
+        neighbors=LocationComprehension(
+            name="e_of_v",
+            chain=NeighborChain(elements=[LocationType.Vertex, LocationType.Edge]),
+            of=LocationRef(name="v"),
+        ),
     ),
     location_type=LocationType.Vertex,
 )
@@ -181,30 +248,52 @@ vertical_loops.append(
     VerticalLoop(
         loop_order=LoopOrder.FORWARD,
         horizontal_loops=[
-            HorizontalLoop(location_type=LocationType.Vertex, stmt=assign_pnabla_MXX),
-            HorizontalLoop(location_type=LocationType.Vertex, stmt=assign_pnabla_MYY),
+            HorizontalLoop(
+                location=LocationComprehension(
+                    name="v", chain=NeighborChain(elements=[LocationType.Vertex]), of=Domain()
+                ),
+                stmt=assign_pnabla_MXX,
+            ),
+            HorizontalLoop(
+                location=LocationComprehension(
+                    name="v", chain=NeighborChain(elements=[LocationType.Vertex]), of=Domain()
+                ),
+                stmt=assign_pnabla_MYY,
+            ),
         ],
     )
 )
 
-# ===========================
-# TODO pole correction for pnabla_MYY
-# ===========================
+# # ===========================
+# # TODO pole correction for pnabla_MYY
+# # ===========================
 
 assign_pnabla_MXX_vol = AssignStmt(
-    left=FieldAccess(name="pnabla_MXX", location_type=LocationType.Vertex),
+    left=FieldAccess(
+        name="pnabla_MXX", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
+    ),
     right=BinaryOp(
-        left=FieldAccess(name="pnabla_MXX", location_type=LocationType.Vertex),
+        left=FieldAccess(
+            name="pnabla_MXX", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
+        ),
         op=BinaryOperator.DIV,
-        right=FieldAccess(name="vol", location_type=LocationType.Vertex),
+        right=FieldAccess(
+            name="vol", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
+        ),
     ),
 )
 assign_pnabla_MYY_vol = AssignStmt(
-    left=FieldAccess(name="pnabla_MYY", location_type=LocationType.Vertex),
+    left=FieldAccess(
+        name="pnabla_MYY", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
+    ),
     right=BinaryOp(
-        left=FieldAccess(name="pnabla_MYY", location_type=LocationType.Vertex),
+        left=FieldAccess(
+            name="pnabla_MYY", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
+        ),
         op=BinaryOperator.DIV,
-        right=FieldAccess(name="vol", location_type=LocationType.Vertex),
+        right=FieldAccess(
+            name="vol", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
+        ),
     ),
 )
 
@@ -212,8 +301,18 @@ vertical_loops.append(
     VerticalLoop(
         loop_order=LoopOrder.FORWARD,
         horizontal_loops=[
-            HorizontalLoop(location_type=LocationType.Vertex, stmt=assign_pnabla_MXX_vol),
-            HorizontalLoop(location_type=LocationType.Vertex, stmt=assign_pnabla_MYY_vol),
+            HorizontalLoop(
+                location=LocationComprehension(
+                    name="v", chain=NeighborChain(elements=[LocationType.Vertex]), of=Domain()
+                ),
+                stmt=assign_pnabla_MXX_vol,
+            ),
+            HorizontalLoop(
+                location=LocationComprehension(
+                    name="v", chain=NeighborChain(elements=[LocationType.Vertex]), of=Domain()
+                ),
+                stmt=assign_pnabla_MYY_vol,
+            ),
         ],
     )
 )
@@ -234,7 +333,7 @@ comp = Computation(name="nabla", params=fields, stencils=[nabla_stencil])
 nir_comp = GtirToNir().visit(comp)
 nir_comp = find_and_merge_horizontal_loops(nir_comp)
 ugpu_comp = NirToUgpu().visit(nir_comp)
-# debug(ugpu_comp)
+debug(ugpu_comp)
 
 generated_code = UgpuCodeGenerator.apply(ugpu_comp)
 print(generated_code)

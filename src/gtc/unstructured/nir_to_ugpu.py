@@ -82,7 +82,12 @@ class NirToUgpu(eve.NodeTranslator):
         )
 
     def visit_FieldAccess(self, node: nir.FieldAccess, **kwargs):
-        return ugpu.FieldAccess(name=node.name, location_type=node.location_type)
+        return ugpu.FieldAccess(
+            name=node.name,
+            primary=self.visit(node.primary),
+            secondary=self.visit(node.secondary),
+            location_type=node.location_type,
+        )
 
     def visit_VarAccess(self, node: nir.VarAccess, **kwargs):
         return ugpu.VarAccess(name=node.name, location_type=node.location_type)
@@ -112,52 +117,42 @@ class NirToUgpu(eve.NodeTranslator):
         return statements
 
     def visit_HorizontalLoop(self, node: nir.HorizontalLoop, **kwargs):
-        accessed_field_names = list(
-            set(map(lambda f: f.name, eve.FindNodes().by_type(nir.FieldAccess, node.stmt)))
+        field_accesses = eve.FindNodes().by_type(nir.FieldAccess, node.stmt)
+
+        primary_sid_composite = ugpu.SidComposite(
+            chain=ugpu.NeighborChain(chain=[node.location_type]), entries=[]
         )
 
-        field_to_primary_loc = {}
-        for name in accessed_field_names:
-            loc = location_type_from_dimensions(self.fields[name].dimensions)
-            if loc is not None:
-                field_to_primary_loc[name] = loc
+        secondary_neighbor_chains = set()
+        other_sids = {}
+        for acc in field_accesses:
+            if len(acc.primary.elements) == 1:
+                assert acc.primary.elements[0] == node.location_type
+                primary_sid_composite.entries.add(ugpu.SidCompositeEntry(name=acc.name))
+            else:
+                assert (
+                    len(acc.primary.elements) == 2
+                )  # TODO cannot deal with more than one level of nesting
+                secondary_neighbor_chains.add(acc.primary)
+                secondary_loc = acc.primary.elements[
+                    -1
+                ]  # TODO change if we have more than one level of nesting
+                if secondary_loc not in other_sids:
+                    other_sids[secondary_loc] = ugpu.SidComposite(
+                        chain=ugpu.NeighborChain(chain=[node.location_type, secondary_loc]),
+                        entries=[],
+                    )
+                other_sids[secondary_loc].entries.add(ugpu.SidCompositeEntry(name=acc.name))
 
-        secondary_location_types = set([loc for loc in field_to_primary_loc.values()])
-        secondary_location_types.remove(node.location_type)
+        other_connectivities = [self.visit(chain) for chain in secondary_neighbor_chains]
+        debug(other_connectivities)
 
-        primary_fields = [
-            ugpu.SidCompositeEntry(name=name)
-            for name in [
-                name for name, loc in field_to_primary_loc.items() if loc == node.location_type
-            ]
-        ]
-        other_connectivities = [
-            ugpu.NeighborChain(chain=[node.location_type, location])
-            for location in secondary_location_types
-        ]
-
-        other_sid_composites = []
-        for secondary_loc in secondary_location_types:
-            other_sid_composites.append(
-                ugpu.SidComposite(
-                    location_type=secondary_loc,
-                    entries=[
-                        ugpu.SidCompositeEntry(name=name)
-                        for name in [
-                            name
-                            for name, loc in field_to_primary_loc.items()
-                            if loc == secondary_loc
-                        ]
-                    ],
-                )
-            )
+        other_sid_composites = list(other_sids.values())
 
         return ugpu.Kernel(
             name="kernel" + str(node.id_attr_),
             primary_connectivity=node.location_type,
-            primary_sid_composite=ugpu.SidComposite(
-                location_type=node.location_type, entries=primary_fields
-            ),
+            primary_sid_composite=primary_sid_composite,
             other_connectivities=other_connectivities,
             other_sid_composites=other_sid_composites,
             ast=self.visit(node.stmt),

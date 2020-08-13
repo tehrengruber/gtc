@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from devtools import debug  # noqa: F401
 from pydantic import root_validator, validator
@@ -44,8 +44,8 @@ class NeighborChain(Node):
 
     @validator("elements")
     def not_empty(cls, elements):
-        if len(elements) <= 1:
-            raise ValueError("NeighborChain must contain at least two locations")
+        if len(elements) < 1:
+            raise ValueError("NeighborChain must contain at least one locations")
         return elements
 
 
@@ -59,20 +59,35 @@ class ReduceOperator(StrEnum):
     MIN = "MIN"
 
 
+class Domain(Node):
+    pass
+
+
+class LocationRef(Node):
+    name: str
+
+
+class LocationComprehension(Node):
+    name: str
+    chain: NeighborChain
+    of: Union[LocationRef, Domain]
+
+
 class NeighborReduce(Expr):
     operand: Expr
     op: ReduceOperator
-    neighbors: NeighborChain
+    neighbors: LocationComprehension
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        if values["neighbors"].elements[-1] != values["operand"].location_type:
+        if values["neighbors"].chain.elements[-1] != values["operand"].location_type:
             raise ValueError("Location type mismatch")
         return values
 
 
 class FieldAccess(Expr):
     name: Str  # via symbol table
+    subscript: List[LocationRef]  # maybe remove the separate LocationRef
 
 
 class AssignStmt(Stmt):
@@ -137,12 +152,16 @@ class TemporaryField(UField):
 
 class HorizontalLoop(Node):
     stmt: Stmt
-    location_type: common.LocationType
+    location: LocationComprehension
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
         # Don't infer here! The location type of the loop should always come from the frontend!
-        if values["stmt"].location_type != values["location_type"]:
+        if len(values["location"].chain.elements) != 1:
+            raise ValueError(
+                "LocationComprehension on HorizontalLoop must have NeighborChain of length 1"
+            )
+        if values["stmt"].location_type != values["location"].chain.elements[0]:
             raise ValueError("Location type mismatch")
         return values
 

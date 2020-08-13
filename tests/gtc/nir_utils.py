@@ -8,6 +8,8 @@ from gtc.unstructured import nir
 
 default_vtype = common.DataType.FLOAT32
 default_location = common.LocationType.Vertex
+no_extent = nir.NeighborChain(elements=[default_location])
+with_extent = nir.NeighborChain(elements=[default_location, default_location])
 
 
 def make_vertical_loop(horizontal_loops):
@@ -34,19 +36,21 @@ def make_empty_horizontal_loop(location_type: common.LocationType):
     return make_horizontal_loop(make_empty_block_stmt(location_type))
 
 
-# TODO share with dependency graph
 # write = read
 def make_horizontal_loop_with_copy(write: Str, read: Str, read_has_extent: Bool):
-    loc_type = common.LocationType.Vertex
-    write_access = nir.FieldAccess(name=write, extent=False, location_type=loc_type)
-    read_access = nir.FieldAccess(name=read, extent=read_has_extent, location_type=loc_type)
+    write_access = nir.FieldAccess(name=write, primary=no_extent, location_type=default_location,)
+    read_access = nir.FieldAccess(
+        name=read,
+        primary=with_extent if read_has_extent else no_extent,
+        location_type=default_location,
+    )
 
     return (
         nir.HorizontalLoop(
             stmt=nir.BlockStmt(
                 declarations=[], statements=[nir.AssignStmt(left=write_access, right=read_access)],
             ),
-            location_type=loc_type,
+            location_type=default_location,
         ),
         write_access,
         read_access,
@@ -58,7 +62,7 @@ def make_local_var(name: Str):
 
 
 def make_init(field: Str):
-    write_access = nir.FieldAccess(name=field, extent=False, location_type=default_location)
+    write_access = nir.FieldAccess(name=field, primary=no_extent, location_type=default_location)
     return (
         nir.AssignStmt(
             left=write_access,
@@ -73,7 +77,7 @@ def make_init(field: Str):
 
 
 def make_horizontal_loop_with_init(field: Str):
-    write_access = nir.FieldAccess(name=field, extent=False, location_type=default_location)
+    write_access = nir.FieldAccess(name=field, primary=no_extent, location_type=default_location,)
     return (
         nir.HorizontalLoop(
             stmt=nir.BlockStmt(

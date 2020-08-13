@@ -83,7 +83,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                     )
                 )
 
-            sid_name = self.LOCATION_TYPE_TO_STR[composite.location_type]
+            sid_name = "_".join([self.LOCATION_TYPE_TO_STR[loc] for loc in composite.chain.chain])
             return mako_tpl.Template(
                 """
                 auto ${ sid_name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(tags) }>::values>(
@@ -93,7 +93,8 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             ).render(tags=tags, fields=fields, sid_name=sid_name)
 
         def make_composite_args(composite: SidComposite):
-            sid_name = self.LOCATION_TYPE_TO_STR[composite.location_type]
+            sid_name = "_".join([self.LOCATION_TYPE_TO_STR[loc] for loc in composite.chain.chain])
+            # sid_name = self.LOCATION_TYPE_TO_STR[composite.location_type]
             return mako_tpl.Template(
                 "gridtools::sid::get_origin(${ sid_name }_fields), gridtools::sid::get_strides(${ sid_name }_fields)"
             ).render(sid_name=sid_name)
@@ -166,8 +167,8 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             connectivities = [_this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_connectivity] + "_connectivity" ]
             connectivities.extend(map(_this_generator.make_connectivity_name, _this_node.other_connectivities or []))
             all_sids = [_this_node.primary_sid_composite] + (_this_node.other_sid_composites or [])
-            all_sid_names = list(map(lambda s: _this_generator.LOCATION_TYPE_TO_STR[s.location_type], all_sids))
-            primary_sid_name =_this_generator.LOCATION_TYPE_TO_STR[_this_node.primary_sid_composite.location_type]
+            all_sid_names = list(map(lambda s: '_'.join([_this_generator.LOCATION_TYPE_TO_STR[loc] for loc in s.chain.chain]), all_sids))
+            primary_sid_name = all_sid_names[0]
             primary_origins = primary_sid_name + "_origins"
             primary_strides = primary_sid_name + "_strides"
             primary_ptrs = primary_sid_name + "_ptrs"
@@ -192,8 +193,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             usid = [p for p in computation_fields if p.name == _this_node.name]
             if len(usid) != 1:
                 raise ValueError("Symbol not found or not unique!")
-            location_type = _this_generator.location_type_from_dimensions(usid[0].dimensions)
-            location_str = _this_generator.LOCATION_TYPE_TO_STR[location_type]
+            location_str = "_".join([_this_generator.LOCATION_TYPE_TO_STR[loc] for loc in _this_node.primary.chain])
         %>*gridtools::device::at_key<${ name }_tag>(${ location_str }_ptrs)"""
         )
 
@@ -251,15 +251,16 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
         NeighborLoop = mako_tpl.Template(
             """<%
-            body_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.body_location_type]
             parent_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]
+            body_location = _this_generator.LOCATION_TYPE_TO_STR[_this_node.body_location_type]
+            chain = parent_location + "_" + body_location
             %>for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ parent_location }2${ body_location }_connectivity); ++neigh) {
                 // body
                 auto absolute_neigh_index = *gridtools::device::at_key<connectivity_tag>(${ parent_location }_ptrs);
                 if (absolute_neigh_index != gridtools::next::connectivity::skip_value(${ parent_location }2${ body_location }_connectivity)) {
-                    auto ${ body_location }_ptrs = ${ body_location }_origins();
+                    auto ${ chain }_ptrs = ${ chain }_origins();
                     gridtools::sid::shift(
-                        ${ body_location }_ptrs, gridtools::device::at_key<${ body_location }>(${ body_location }_strides), absolute_neigh_index);
+                        ${ chain }_ptrs, gridtools::device::at_key<${ body_location }>(${ chain }_strides), absolute_neigh_index);
 
                     ${ ''.join(body) }
                     // body end
