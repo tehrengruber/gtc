@@ -61,20 +61,37 @@ class CallCanonicalizer(eve.NodeModifier):
         return self.generic_visit(node)
 
 
+# Types
+#  - BuiltInType
+#  - LocationType
+#  - DataType
+
 class GTScriptToGTIR(eve.NodeTranslator):
-    def __init__(self, symbol_table, externals, *args, **kwargs):
+    def __init__(self, symbol_table, constants, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # new scope so copy everything
         # todo: externals should be read-only to avoid potentially costly copy
         self.symbol_table = copy.deepcopy(symbol_table)
-        self.externals = copy.deepcopy(externals)
+        self.constants = copy.deepcopy(constants)
 
-    def _resolve_symbol(self, name, expected_type=None):
-        if not name in self.externals:
-            raise ValueError()
-        val = self.externals[name]
+    def _materialize_constant(self, name, expected_type=None):
+        """
+        Materialize constant symbol with name `name`, i.e. return the value of that symbol. Currently the only constants
+        are types.
+
+        Example:
+        ```
+        self._materialize_constant("Vertex") == LocationType.Vertex
+        ```
+        """
+        if not name in self.symbol_table:
+            raise ValueError("Symbol {} not found".format(name))
+        if not name in self.constants:
+            raise ValueError("Symbol {} : {} is not a constant".format(name, self.symbol_table[name]))
+        val = self.constants[name]
         if expected_type != None and not isinstance(val, expected_type):
-            raise ValueError()
+            raise ValueError(
+                "Expected a symbol {} of type {}, but got {}".format(name, expected_type, self.symbol_table[name]))
         return val
 
     def visit_IterationOrder(self, node: IterationOrder) -> gtir.common.LoopOrder:
@@ -84,7 +101,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
         return None
 
     def visit_LocationSpecification(self, node: LocationSpecification, **kwargs):
-        loc_type = self._resolve_symbol(node.location_type, expected_type=common.LocationType)
+        loc_type = self._materialize_constant(node.location_type, expected_type=common.LocationType)
         return gtir.LocationComprehension(
             name=node.name.id, chain=gtir.NeighborChain(elements=[loc_type]), of=gtir.Domain()
         )
@@ -98,7 +115,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
         assert src_comprehension.name == of.name
 
         elements = [src_comprehension.chain.elements[-1]] + [
-            self._resolve_symbol(loc_type.id, expected_type=gtir.common.LocationType)
+            self._materialize_constant(loc_type.id, expected_type=gtir.common.LocationType)
             for loc_type in node.iter.args[1:]
         ]
 
@@ -118,16 +135,20 @@ class GTScriptToGTIR(eve.NodeTranslator):
             "max": gtir.ReduceOperator.MAX,
         }
         if node.func in reduction_mapping:
-            assert len(node.args) == 1
-            assert len(node.args[0].generators) == 1
+            if not len(node.args):
+                raise ValueError(
+                    "Invalid number of arguments specified for function {}. Expected 1, but {} were given.".format(
+                        node.func, len(node.args)))
+            if not isinstance(node.args[0], Generator) or len(node.args[0].generators) != 1:
+                raise ValueError("Invalid argument to {}".format(node.func))
+
             op = reduction_mapping[node.func]
             neighbors = self.visit(node.args[0].generators[0], **kwargs)
 
             # operand gets new location stack
-            kwargs["location_stack"] = copy.deepcopy(kwargs["location_stack"])
-            kwargs["location_stack"].append(neighbors)
+            new_location_stack = location_stack + [neighbors]
 
-            operand = self.visit(node.args[0].elt, **kwargs)
+            operand = self.visit(node.args[0].elt, **{**kwargs, "location_stack": new_location_stack})
 
             return gtir.NeighborReduce(
                 op=op,
@@ -209,10 +230,8 @@ class GTScriptToGTIR(eve.NodeTranslator):
         for arg in node.arguments[1:]:
             arg_type = self.symbol_table[arg.name]
             assert issubclass(arg_type, Field)
-            (
-                primary_location_type,
-                vtype,
-            ) = arg_type.args  # todo: sparse fields: location_types*, vtype
+            # todo: sparse fields: location_types*, vtype
+            primary_location_type, vtype, = arg_type.args
 
             assert isinstance(primary_location_type, common.LocationType)
             assert isinstance(vtype, common.DataType)
