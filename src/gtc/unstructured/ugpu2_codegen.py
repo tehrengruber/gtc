@@ -17,15 +17,17 @@
 from types import MappingProxyType
 from typing import ClassVar, Mapping
 
+from devtools import debug
 from mako import template as mako_tpl
 
 from eve import codegen
 from gtc import common
 from gtc.unstructured.ugpu2 import (
     Computation,
+    Connectivity,
     Kernel,
-    NeighborChain,
     KernelCall,
+    NeighborChain,
     SidComposite,
     Temporary,
 )
@@ -154,23 +156,43 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
     class Templates:
         # Node = mako_tpl.Template("${_this_node.__class__.__name__.upper()}")  # only for testing
+        Connectivity = "auto {name} = gridtools::next::mesh::connectivity<{chain}>(mesh);"
+
+        NeighborChain = mako_tpl.Template(
+            """<%
+                loc_strs = [_this_generator.LOCATION_TYPE_TO_STR[e] for e in _this_node.elements]
+            %>
+            % if len(loc_strs) == 1:
+                ${ loc_strs[0] }
+            % else:
+                std::tuple<${ ','.join(loc_strs) }>
+            % endif
+            """
+        )
+
+        SidComposite = mako_tpl.Template(
+            """
+            auto ${ _this_node.field_name } = tu::make<gridtools::sid::composite::keys<${ ','.join([t.tag_name for t in _this_node.entries]) }>::values>(
+            ${ ','.join([e.name for e in _this_node.entries])});
+            """
+        )
+        # static_assert(gridtools::is_sid<decltype(${ sid_name }_fields)>{});
 
         # return mako_tpl.Template(
         #     """{
-        #     auto primary_connectivity = gridtools::next::mesh::connectivity<${ location }>(mesh);
-        #     ${ ''.join(connectivities) }
-
-        #     ${ ''.join(composed_sids) }
-
-        #     auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(primary_connectivity));
-        #     ${ kernel.name }<<<blocks, threads_per_block>>>(${','.join(connectivity_args)}, ${ ','.join(composed_sids_arguments) });
-        #     GT_CUDA_CHECK(cudaDeviceSynchronize());
         # }"""
+
         KernelCall = mako_tpl.Template(
             """
             <%
            %>
-            {}
+            ${ ''.join(connectivities) }
+
+            ${ ''.join(sids) }
+
+            auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(${ primary_connectivity.name }));
+            ${ name }<<<blocks, threads_per_block>>>(${','.join(args)});
+            GT_CUDA_CHECK(cudaDeviceSynchronize());
             """
         )
 
@@ -278,8 +300,6 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             "${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] } ${ name } = ${ init };"
         )
 
-        Connectivites = "{name}"
-
     @classmethod
     def apply(cls, root, **kwargs) -> str:
         generated_code = super().apply(root, **kwargs)
@@ -292,17 +312,35 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         return self.generic_visit(node, loctype=loctype, cvtype=cvtype, **kwargs)
 
     def visit_KernelCall(self, node: KernelCall, **kwargs):
-        kernel = kwargs["symbol_tbl_kernel"][node.name]
+        kernel: Kernel = kwargs["symbol_tbl_kernel"][node.name]
         connectivities = [self.generic_visit(conn, **kwargs) for conn in kernel.connectivities]
-        return self.generic_visit(node, connectivities=connectivities, **kwargs)
+        primary_connectivity: Connectivity = kernel.symbol_tbl[kernel.primary_connectivity]
+        # primary_connectivity = kwargs["symbol_tbl_conn"][kernel.primary_connectivity] # TODO can I be sure that Kernel was already visited
+        sids = [self.generic_visit(s, **kwargs) for s in kernel.sids]
+
+        # TODO I don't like that I render here and that I somehow have the same pattern for the parameters
+        args = [c.name for c in kernel.connectivities]
+        args += [
+            "gridtools::sid::get_origin({0}), gridtools::sid::get_strides({0})".format(s.field_name)
+            for s in kernel.sids
+        ]
+        # connectivity_args = [c.name for c in kernel.connectivities]
+        return self.generic_visit(
+            node,
+            connectivities=connectivities,
+            sids=sids,
+            primary_connectivity=primary_connectivity,
+            args=args,
+            **kwargs,
+        )
 
     def visit_Kernel(self, node: Kernel, **kwargs):
         symbol_tbl_conn = {c.name: c for c in node.connectivities}
         symbol_tbl_sids = {s.name: s for s in node.sids}
 
         parameters = [c.name for c in node.connectivities]
-        parameters += [s.origin_name for s in node.sids]
-        parameters += [s.strides_name for s in node.sids]
+        parameters += [s.origin_name + ", " + s.strides_name for s in node.sids]
+        # parameters += [s.strides_name for s in node.sids]
 
         return self.generic_visit(
             node,
@@ -313,6 +351,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         )
 
     def visit_Computation(self, node: Computation, **kwargs):
+        symbol_tbl_kernel = {k.name: k for k in node.kernels}
         sid_tags = set()
         sid_tags.add("struct connectivity_tag;")
         for k in node.kernels:
@@ -326,5 +365,6 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             computation_fields=node.parameters + node.temporaries,
             cache_allocator=cache_allocator,
             sid_tags=sid_tags,
+            symbol_tbl_kernel=symbol_tbl_kernel,
             **kwargs,
         )

@@ -145,6 +145,10 @@ class SidComposite(Node):
         return {e.name: e for e in self.entries}
 
     @property
+    def field_name(self):
+        return self.name + "_fields"
+
+    @property
     def ptr_name(self):
         return self.name + "_ptrs"
 
@@ -182,6 +186,11 @@ class Kernel(Node):
     primary_sid: Str  # symbol ref to the above
     ast: List[Stmt]
 
+    # private symbol table
+    @property
+    def symbol_tbl(self):
+        return {**{s.name: s for s in self.sids}, **{c.name: c for c in self.connectivities}}
+
 
 class KernelCall(Node):
     name: Str  # symbol ref
@@ -207,5 +216,5 @@ class Computation(Node):
     name: Str
     parameters: List[UField]
     temporaries: List[Temporary]
+    kernels: List[Kernel]
     ctrlflow_ast: List[KernelCall]
-    kernels: List[Kernel]  # probably replace by ctrlflow ast (where Kernel is one CtrlFlowStmt)
