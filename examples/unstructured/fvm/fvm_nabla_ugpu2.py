@@ -105,6 +105,7 @@ nabla_edge_1 = Kernel(
         Connectivity(
             name="edge_to_vertex_conn",
             chain=NeighborChain(elements=[LocationType.Edge, LocationType.Vertex]),
+            neighbor_tbl="edge2vertex_tbl",
         ),
     ],
     sids=[nabla_edge_1_primary_composite, nabla_vertex_composite],
@@ -121,6 +122,7 @@ nabla_vertex_2_primary_composite = SidComposite(
         SidCompositeEntry(name="pnabla_MXX"),
         SidCompositeEntry(name="pnabla_MYY"),
         SidCompositeEntry(name="sign"),
+        SidCompositeNeighborTableEntry(name="vertex_2_edge_tbl", connectivity="v2e_conn"),
     ],
 )
 
@@ -147,7 +149,9 @@ prim_vertex_conn = Connectivity(
     name="prim_vertex_conn", chain=NeighborChain(elements=[LocationType.Vertex])
 )
 v2e_conn = Connectivity(
-    name="v2e_conn", chain=NeighborChain(elements=[LocationType.Vertex, LocationType.Edge])
+    name="v2e_conn",
+    chain=NeighborChain(elements=[LocationType.Vertex, LocationType.Edge]),
+    neighbor_tbl="vertex_2_edge_tbl",
 )
 
 edge_on_vertex_loop_x = NeighborLoop(

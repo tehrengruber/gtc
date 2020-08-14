@@ -111,7 +111,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 prim_sid = symbol_tbl_sids[_this_node.primary_sid]
             %>
             template<${ ','.join("class {}_t".format(p) for p in parameters)}>
-            __global__ void function ${ name }( ${','.join("{0}_t {0}".format(p) for p in parameters) }) {
+            __global__ void ${ name }( ${','.join("{0}_t {0}".format(p) for p in parameters) }) {
                 auto idx = blockIdx.x * blockDim.x + threadIdx.x;
                 if (idx >= gridtools::next::connectivity::size(${ prim_conn.name }))
                     return;
@@ -149,18 +149,19 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 ${ ''.join(sid_tags) }
 
                 ${ ''.join(kernels) }
+            }
 
-                template<class mesh_t, ${ ','.join('class ' + p.name + '_t' for p in _this_node.parameters) }>
-                void ${ name }(mesh_t&& mesh, ${ ','.join(p.name + '_t&& ' + p.name for p in _this_node.parameters) }){
-                    namespace tu = gridtools::tuple_util;
-                    using namespace ${ name }_impl_;
+            template<class mesh_t, ${ ','.join('class ' + p.name + '_t' for p in _this_node.parameters) }>
+            void ${ name }(mesh_t&& mesh, ${ ','.join(p.name + '_t&& ' + p.name for p in _this_node.parameters) }){
+                namespace tu = gridtools::tuple_util;
+                using namespace ${ name }_impl_;
 
-                    ${ cache_allocator if len(temporaries) > 0 else '' }
-                    ${ ''.join(temporaries) }
+                ${ cache_allocator if len(temporaries) > 0 else '' }
+                ${ ''.join(temporaries) }
 
-                    ${ ''.join(ctrlflow_ast) }
-                }
-            }"""
+                ${ ''.join(ctrlflow_ast) }
+            }
+            """
         )
 
         Temporary = mako_tpl.Template(
@@ -175,9 +176,12 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 sid_deref = symbol_tbl_sids[_this_node.sid] if _this_node.sid else None
                 conn_deref = symbol_tbl_conn[_this_node.connectivity]
                 body_location = _this_generator.LOCATION_TYPE_TO_STR[sid_deref.location.elements[-1]] if sid_deref else None
+
+                assert conn_deref.neighbor_tbl
+                tbl_tag = conn_deref.neighbor_tbl + "_tag" #TODO this is a hack, we need to lookup the entry and read the tag_name
             %>
             for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ conn_deref.name }); ++neigh) {
-                auto absolute_neigh_index = *gridtools::device::at_key<connectivity_tag>(${ outer_sid_deref.ptr_name});
+                auto absolute_neigh_index = *gridtools::device::at_key<${ tbl_tag }>(${ outer_sid_deref.ptr_name});
                 if (absolute_neigh_index != gridtools::next::connectivity::skip_value(${ conn_deref.name })) {
                     % if sid_deref:
                         auto ${ sid_deref.ptr_name } = ${ sid_deref.origin_name }();
@@ -185,7 +189,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                             ${ sid_deref.ptr_name }, gridtools::device::at_key<${ body_location }>(${ sid_deref.strides_name }), absolute_neigh_index);
                     % endif
 
-                    // body
+                    // bodyparameters
                     ${ ''.join(body) }
                     // end body
                 }
@@ -248,8 +252,9 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         symbol_tbl_sids = {s.name: s for s in node.sids}
 
         parameters = [c.name for c in node.connectivities]
-        parameters += [s.origin_name + ", " + s.strides_name for s in node.sids]
-        # parameters += [s.strides_name for s in node.sids]
+        for s in node.sids:
+            parameters.append(s.origin_name)
+            parameters.append(s.strides_name)
 
         return self.generic_visit(
             node,
@@ -262,7 +267,6 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
     def visit_Computation(self, node: Computation, **kwargs):
         symbol_tbl_kernel = {k.name: k for k in node.kernels}
         sid_tags = set()
-        sid_tags.add("struct connectivity_tag;")
         for k in node.kernels:
             for s in k.sids:
                 for e in s.entries:

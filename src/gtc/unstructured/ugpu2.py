@@ -136,7 +136,7 @@ class SidCompositeEntry(Node):
 
 class SidCompositeNeighborTableEntry(Node):
     name: Str  # symbol decl
-    connectivity: Str  # symbol ref
+    connectivity: Str  # symbol ref #TODO fix circular dependency
 
     @property
     def tag_name(self):
@@ -186,6 +186,7 @@ class NeighborLoop(Stmt):
 class Connectivity(Node):
     name: Str  # symbol name
     chain: NeighborChain
+    neighbor_tbl: Optional[Str]  # symbol ref to SidCompositeEntry TODO fix circular dependency
 
 
 class Kernel(Node):
