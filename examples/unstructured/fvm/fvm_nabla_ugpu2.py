@@ -21,6 +21,7 @@ from gtc.unstructured.ugpu2 import (
     NeighborLoop,
     SidComposite,
     SidCompositeEntry,
+    SidCompositeNeighborTableEntry,
     Temporary,
     UField,
     KernelCall,
@@ -37,6 +38,7 @@ nabla_edge_1_primary_composite = SidComposite(
         SidCompositeEntry(name="zavgS_MYY"),
         SidCompositeEntry(name="S_MXX"),
         SidCompositeEntry(name="S_MYY"),
+        SidCompositeNeighborTableEntry(name="edge2vertex_tbl", connectivity="edge_to_vertex_conn"),
     ],
 )
 nabla_vertex_composite = SidComposite(

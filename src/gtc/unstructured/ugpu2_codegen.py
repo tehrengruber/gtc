@@ -27,8 +27,6 @@ from gtc.unstructured.ugpu2 import (
     Connectivity,
     Kernel,
     KernelCall,
-    NeighborChain,
-    SidComposite,
     Temporary,
 )
 
@@ -62,92 +60,6 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         }
     )
 
-    def make_connectivity_name(self, chain: NeighborChain):
-        return "2".join(self.LOCATION_TYPE_TO_STR[e] for e in chain.chain) + "_connectivity"
-
-    def make_kernel_call(self, kernel: Kernel):
-        def compose_sid_composite(composite: SidComposite, **kwargs):
-            tags = [e.name + "_tag" for e in composite.entries]
-            # tags = ",".join(e.name + "_tag" for e in composite.entries)
-            fields = [e.name for e in composite.entries]
-
-            connectivity = kwargs.get("connectivity", None)
-            if connectivity:
-                tags.append("connectivity_tag")
-                fields.append(
-                    "gridtools::next::connectivity::neighbor_table({})".format(
-                        self.make_connectivity_name(connectivity)
-                    )
-                )
-
-            sid_name = "_".join([self.LOCATION_TYPE_TO_STR[loc] for loc in composite.chain.chain])
-            return mako_tpl.Template(
-                """
-                auto ${ sid_name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(tags) }>::values>(
-                    ${ ','.join(fields)});
-                static_assert(gridtools::is_sid<decltype(${ sid_name }_fields)>{});
-                """
-            ).render(tags=tags, fields=fields, sid_name=sid_name)
-
-        def make_composite_args(composite: SidComposite):
-            sid_name = "_".join([self.LOCATION_TYPE_TO_STR[loc] for loc in composite.chain.chain])
-            # sid_name = self.LOCATION_TYPE_TO_STR[composite.location_type]
-            return mako_tpl.Template(
-                "gridtools::sid::get_origin(${ sid_name }_fields), gridtools::sid::get_strides(${ sid_name }_fields)"
-            ).render(sid_name=sid_name)
-
-        def make_connectivities(chain: NeighborChain):
-            return mako_tpl.Template(
-                "auto ${ make_connectivity_name(chain) } = gridtools::next::mesh::connectivity<std::tuple<${ ','.join(loc2str[e] for e in chain.chain) }>>(mesh);"
-            ).render(
-                chain=chain,
-                loc2str=self.LOCATION_TYPE_TO_STR,
-                make_connectivity_name=self.make_connectivity_name,
-            )
-
-        location = self.LOCATION_TYPE_TO_STR[kernel.primary_connectivity]
-
-        # FIXME we need to be able to pass more than one
-        first_other_connectivity = None
-        if kernel.other_connectivities and len(kernel.other_connectivities) == 1:
-            first_other_connectivity = kernel.other_connectivities[0]
-
-        all_composites = [kernel.primary_sid_composite] + (kernel.other_sid_composites or [])
-        composed_sids = [
-            compose_sid_composite(
-                kernel.primary_sid_composite, connectivity=first_other_connectivity
-            )
-        ]
-        composed_sids.extend(map(compose_sid_composite, kernel.other_sid_composites or []))
-        composed_sids_arguments = map(make_composite_args, all_composites)
-        connectivities = map(make_connectivities, kernel.other_connectivities or [])
-        connectivity_args = ["primary_connectivity"]
-        connectivity_args.extend(
-            map(self.make_connectivity_name, kernel.other_connectivities or [])
-        )
-        return mako_tpl.Template(
-            """{
-            auto primary_connectivity = gridtools::next::mesh::connectivity<${ location }>(mesh);
-            ${ ''.join(connectivities) }
-
-            ${ ''.join(composed_sids) }
-
-            auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(primary_connectivity));
-            ${ kernel.name }<<<blocks, threads_per_block>>>(${','.join(connectivity_args)}, ${ ','.join(composed_sids_arguments) });
-            GT_CUDA_CHECK(cudaDeviceSynchronize());
-        }"""
-        ).render(
-            kernel=kernel,
-            location=location,
-            composed_sids=composed_sids,
-            composed_sids_arguments=composed_sids_arguments,
-            connectivities=connectivities,
-            connectivity_args=connectivity_args,
-        )
-        # auto ${ primary_sid_name }_fields = tu::make<gridtools::sid::composite::keys<${ ','.join(e.name + '_tag' for e in kernel.primary_sid_composite.entries) }>::values>(
-        #     ${ ','.join(e.name for e in kernel.primary_sid_composite.entries) });
-        # ${ ''.join(other_sid_composites)}
-
     def location_type_from_dimensions(self, dimensions):
         location_type = [dim for dim in dimensions if isinstance(dim, common.LocationType)]
         if len(location_type) != 1:
@@ -170,17 +82,20 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             """
         )
 
+        SidCompositeNeighborTableEntry = (
+            # TODO using the connectivity without lookup is a hack
+            "gridtools::next::connectivity::neighbor_table({connectivity})"
+        )
+
+        SidCompositeEntry = "{name}"
+
         SidComposite = mako_tpl.Template(
             """
             auto ${ _this_node.field_name } = tu::make<gridtools::sid::composite::keys<${ ','.join([t.tag_name for t in _this_node.entries]) }>::values>(
-            ${ ','.join([e.name for e in _this_node.entries])});
+            ${ ','.join(entries)});
+            static_assert(gridtools::is_sid<decltype(${ _this_node.field_name })>{});
             """
         )
-        # static_assert(gridtools::is_sid<decltype(${ sid_name }_fields)>{});
-
-        # return mako_tpl.Template(
-        #     """{
-        # }"""
 
         KernelCall = mako_tpl.Template(
             """

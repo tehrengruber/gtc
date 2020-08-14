@@ -17,7 +17,7 @@
 
 from typing import List, Optional, Set, Tuple, Union
 
-from devtools import debug
+from devtools import debug  # noqa: F401
 from pydantic import root_validator, validator
 
 import eve
@@ -134,10 +134,22 @@ class SidCompositeEntry(Node):
         return self.name == other.name
 
 
+class SidCompositeNeighborTableEntry(Node):
+    name: Str  # symbol decl
+    connectivity: Str  # symbol ref
+
+    @property
+    def tag_name(self):
+        return self.name + "_tag"
+
+
 class SidComposite(Node):
     name: Str  # symbol
     location: NeighborChain
-    entries: Set[SidCompositeEntry]
+    entries: List[
+        Union[SidCompositeEntry, SidCompositeNeighborTableEntry]
+    ]  # TODO ensure tags are unique
+    with_connectivity: bool = False  # TODO maybe there is a better pattern?
 
     # node private symbol table to entries
     @property
