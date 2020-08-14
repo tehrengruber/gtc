@@ -19,7 +19,7 @@ class GTScriptCompilationTask:
             "Cell": common.LocationType
         }
 
-        self.externals = {
+        self.constants = {
             "dtype": common.DataType.FLOAT64,
             "Vertex": common.LocationType.Vertex,
             "Edge": common.LocationType.Edge,
@@ -35,10 +35,10 @@ class GTScriptCompilationTask:
         self.python_ast = ast.parse(inspect.getsource(self.definition)).body[0]
         self.gt4py_ast = gtscript.transform_py_ast_into_gt4py_ast(self.python_ast)
 
-        VarDeclExtractor(self.symbol_table, self.externals).visit(self.gt4py_ast)
+        VarDeclExtractor(self.symbol_table, self.constants).visit(self.gt4py_ast)
         CallCanonicalizer().visit(self.gt4py_ast)
 
-        gtir = GTScriptToGTIR(self.symbol_table, self.externals).visit(self.gt4py_ast)
+        gtir = GTScriptToGTIR(self.symbol_table, self.constants).visit(self.gt4py_ast)
 
         nir_comp = GtirToNir().visit(gtir)
         nir_comp = find_and_merge_horizontal_loops(nir_comp)
@@ -47,8 +47,6 @@ class GTScriptCompilationTask:
 
         generated_code = UgpuCodeGenerator.apply(ugpu_comp)
         print(generated_code)
-
-        dump(gtir)
 
     def _annotate_args(self):
         """

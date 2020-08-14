@@ -141,11 +141,6 @@ class Generator(Expr):
         return ast.GeneratorExp(generators=Capture("generators"), elt=Capture("elt"))
 
 
-#class SubscriptRef(Subscript):
-#    pass
-#    # todo: validate target is ref
-
-
 class Assign(Statement):
     target: Name  # todo: allow subscript
     value: Expr
