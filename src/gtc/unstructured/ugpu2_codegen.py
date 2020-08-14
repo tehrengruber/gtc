@@ -17,18 +17,12 @@
 from types import MappingProxyType
 from typing import ClassVar, Mapping
 
-from devtools import debug
+from devtools import debug  # noqa: F401
 from mako import template as mako_tpl
 
 from eve import codegen
 from gtc import common
-from gtc.unstructured.ugpu2 import (
-    Computation,
-    Connectivity,
-    Kernel,
-    KernelCall,
-    Temporary,
-)
+from gtc.unstructured.ugpu2 import Computation, Connectivity, Kernel, KernelCall, Temporary
 
 
 class UgpuCodeGenerator(codegen.TemplatedGenerator):
@@ -99,15 +93,15 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
         KernelCall = mako_tpl.Template(
             """
-            <%
-           %>
-            ${ ''.join(connectivities) }
+            {
+                ${ ''.join(connectivities) }
 
-            ${ ''.join(sids) }
+                ${ ''.join(sids) }
 
-            auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(${ primary_connectivity.name }));
-            ${ name }<<<blocks, threads_per_block>>>(${','.join(args)});
-            GT_CUDA_CHECK(cudaDeviceSynchronize());
+                auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(${ primary_connectivity.name }));
+                ${ name }<<<blocks, threads_per_block>>>(${','.join(args)});
+                GT_CUDA_CHECK(cudaDeviceSynchronize());
+            }
             """
         )
 
