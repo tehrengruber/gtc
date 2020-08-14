@@ -173,13 +173,17 @@ class GTScriptToGTIR(eve.NodeTranslator):
         raise ValueError()
 
     def visit_SubscriptSingle(self, node: SubscriptSingle, location_stack):
+        # todo: do cannonicalization properly
+        return self.visit(SubscriptMultiple(name=node.value, indices=Name(id=node.index)), location_stack)
+
+    def visit_SubscriptMultiple(self, node: SubscriptMultiple, location_stack):
         assert node.value.id in self.symbol_table
         if issubclass(self.symbol_table[node.value.id], Field):
-            assert issubclass(self.symbol_table[node.index], Location)
+            assert all(issubclass(self.symbol_table[index.id], Location) for index in node.indices)
             # todo: just visit the index symbol
             return gtir.FieldAccess(
                 name=node.value.id,
-                subscript=[gtir.LocationRef(name=node.index)],
+                subscript=[gtir.LocationRef(name=index.id) for index in node.indices],
                 location_type=location_stack[-1].chain.elements[-1],
             )
 
@@ -230,18 +234,25 @@ class GTScriptToGTIR(eve.NodeTranslator):
         for arg in node.arguments[1:]:
             arg_type = self.symbol_table[arg.name]
             assert issubclass(arg_type, Field)
-            # todo: sparse fields: location_types*, vtype
-            primary_location_type, vtype, = arg_type.args
+            *location_types, vtype, = arg_type.args
 
-            assert isinstance(primary_location_type, common.LocationType)
+            assert all(isinstance(loc_type, common.LocationType) for loc_type in location_types)
             assert isinstance(vtype, common.DataType)
+
+            if len(location_types) == 1:
+                horizontal_dim = gtir.HorizontalDimension(primary=location_types[0])
+            elif len(location_types) == 2:
+                horizontal_dim = gtir.HorizontalDimension(primary=location_types[0],
+                                                          secondary=gtir.NeighborChain(elements=[location_types[1]]))
+            else:
+                raise ValueError()
 
             field_args.append(
                 gtir.UField(
                     name=arg.name,
                     vtype=vtype,
                     dimensions=gtir.Dimensions(
-                        horizontal=gtir.HorizontalDimension(primary=primary_location_type)
+                        horizontal=horizontal_dim
                     ),
                 )
             )
