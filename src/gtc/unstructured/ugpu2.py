@@ -54,7 +54,7 @@ class NeighborChain(Node):
 
 
 class FieldAccess(Expr):
-    name: Str  # symbol ref
+    name: Str  # symbol ref to SidCompositeEntry
     sid: Str  # symbol ref
 
 
@@ -117,7 +117,11 @@ class BinaryOp(Expr):
 
 
 class SidCompositeEntry(Node):
-    name: Str  # ensure field exists via symbol table
+    name: Str  # symbol decl (TODO ensure field exists via symbol table)
+
+    @property
+    def tag_name(self):
+        return self.name + "_tag"
 
     class Config(eve.concepts.FrozenModelConfig):
         pass
@@ -135,11 +139,32 @@ class SidComposite(Node):
     location: NeighborChain
     entries: Set[SidCompositeEntry]
 
+    # node private symbol table to entries
+    @property
+    def symbol_tbl(self):
+        return {e.name: e for e in self.entries}
+
+    @property
+    def ptr_name(self):
+        return self.name + "_ptrs"
+
+    @property
+    def origin_name(self):
+        return self.name + "_origins"
+
+    @property
+    def strides_name(self):
+        return self.name + "_strides"
+
 
 class NeighborLoop(Stmt):
     body_location_type: common.LocationType
     body: List[Stmt]
-    sid: Str  # symbol ref to SidComposite
+    connectivity: Str  # symbol ref to Connectivity
+    outer_sid: Str  # symbol ref to SidComposite where the neighbor tables lives (and sparse fields)
+    sid: Optional[
+        Str
+    ]  # symbol ref to SidComposite where the fields of the loop body live (None if only sparse fields are accessed)
 
 
 class Connectivity(Node):
@@ -149,13 +174,17 @@ class Connectivity(Node):
 
 class Kernel(Node):
     # location_type: common.LocationType
-    name: Str  # symbol table
+    name: Str  # symbol decl table
     connectivities: List[Connectivity]
     sids: List[SidComposite]
 
     primary_connectivity: Str  # symbol ref to the above
     primary_sid: Str  # symbol ref to the above
     ast: List[Stmt]
+
+
+class KernelCall(Node):
+    name: Str  # symbol ref
 
 
 class VerticalDimension(Node):
@@ -178,4 +207,5 @@ class Computation(Node):
     name: Str
     parameters: List[UField]
     temporaries: List[Temporary]
+    ctrlflow_ast: List[KernelCall]
     kernels: List[Kernel]  # probably replace by ctrlflow ast (where Kernel is one CtrlFlowStmt)

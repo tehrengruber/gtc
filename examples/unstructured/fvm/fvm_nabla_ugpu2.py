@@ -23,6 +23,7 @@ from gtc.unstructured.ugpu2 import (
     SidCompositeEntry,
     Temporary,
     UField,
+    KernelCall,
     VerticalDimension,
 )
 
@@ -78,7 +79,9 @@ edge1_assign3 = AssignStmt(
 vertex_on_edge_loop = NeighborLoop(
     body_location_type=LocationType.Vertex,
     location_type=LocationType.Edge,
-    sid="edge_to_vertex",
+    outer_sid="e",
+    sid="v_on_e",
+    connectivity="edge_to_vertex_conn",
     body=[
         AssignStmt(
             location_type=LocationType.Vertex,
@@ -104,7 +107,7 @@ nabla_edge_1 = Kernel(
     ],
     sids=[nabla_edge_1_primary_composite, nabla_vertex_composite],
     primary_connectivity="edge_conn",
-    primary_sid="v_on_e",
+    primary_sid="e",
     ast=[edge1_assign0, vertex_on_edge_loop, edge1_assign1, edge1_assign2, edge1_assign3],
 )
 
@@ -278,6 +281,7 @@ comp = Computation(
     parameters=[S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, pp, pnabla_MXX, pnabla_MYY, vol, sign],
     temporaries=[zavg_tmp],
     kernels=[nabla_edge_1],  # , nabla_vertex_2, nabla_vertex_4
+    ctrlflow_ast=[KernelCall(name="nabla_edge_1")],
 )
 
 
