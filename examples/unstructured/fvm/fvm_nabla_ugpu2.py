@@ -38,7 +38,7 @@ nabla_edge_1_primary_composite = SidComposite(
         SidCompositeEntry(name="zavgS_MYY"),
         SidCompositeEntry(name="S_MXX"),
         SidCompositeEntry(name="S_MYY"),
-        SidCompositeNeighborTableEntry(name="edge2vertex_tbl", connectivity="edge_to_vertex_conn"),
+        SidCompositeNeighborTableEntry(connectivity="edge_to_vertex_conn"),
     ],
 )
 nabla_vertex_composite = SidComposite(
@@ -82,8 +82,8 @@ vertex_on_edge_loop = NeighborLoop(
     body_location_type=LocationType.Vertex,
     location_type=LocationType.Edge,
     outer_sid="e",
-    sid="v_on_e",
     connectivity="edge_to_vertex_conn",
+    sid="v_on_e",
     body=[
         AssignStmt(
             location_type=LocationType.Vertex,
@@ -105,7 +105,6 @@ nabla_edge_1 = Kernel(
         Connectivity(
             name="edge_to_vertex_conn",
             chain=NeighborChain(elements=[LocationType.Edge, LocationType.Vertex]),
-            neighbor_tbl="edge2vertex_tbl",
         ),
     ],
     sids=[nabla_edge_1_primary_composite, nabla_vertex_composite],
@@ -122,7 +121,7 @@ nabla_vertex_2_primary_composite = SidComposite(
         SidCompositeEntry(name="pnabla_MXX"),
         SidCompositeEntry(name="pnabla_MYY"),
         SidCompositeEntry(name="sign"),
-        SidCompositeNeighborTableEntry(name="vertex_2_edge_tbl", connectivity="v2e_conn"),
+        SidCompositeNeighborTableEntry(connectivity="v2e_conn"),
     ],
 )
 
@@ -149,9 +148,7 @@ prim_vertex_conn = Connectivity(
     name="prim_vertex_conn", chain=NeighborChain(elements=[LocationType.Vertex])
 )
 v2e_conn = Connectivity(
-    name="v2e_conn",
-    chain=NeighborChain(elements=[LocationType.Vertex, LocationType.Edge]),
-    neighbor_tbl="vertex_2_edge_tbl",
+    name="v2e_conn", chain=NeighborChain(elements=[LocationType.Vertex, LocationType.Edge]),
 )
 
 edge_on_vertex_loop_x = NeighborLoop(
@@ -317,7 +314,7 @@ comp = Computation(
     name="nabla",
     parameters=[S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, pp, pnabla_MXX, pnabla_MYY, vol, sign],
     temporaries=[zavg_tmp],
-    kernels=[nabla_edge_1, nabla_vertex_2, nabla_vertex_4],  # , nabla_vertex_2, nabla_vertex_4
+    kernels=[nabla_edge_1, nabla_vertex_2, nabla_vertex_4],
     ctrlflow_ast=[
         KernelCall(name="nabla_edge_1"),
         KernelCall(name="nabla_vertex_2"),

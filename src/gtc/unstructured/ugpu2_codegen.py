@@ -20,9 +20,33 @@ from typing import ClassVar, Mapping
 from devtools import debug  # noqa: F401
 from mako import template as mako_tpl
 
-from eve import codegen
+from eve import codegen, NodeTranslator
 from gtc import common
-from gtc.unstructured.ugpu2 import Computation, Connectivity, Kernel, KernelCall, Temporary
+from gtc.unstructured.ugpu2 import (
+    Computation,
+    Connectivity,
+    Kernel,
+    KernelCall,
+    SidCompositeNeighborTableEntry,
+    Temporary,
+)
+
+
+class SymbolTblHelper(NodeTranslator):
+    # TODO
+    # - temporary helper which resolves symbol refs with the symbol it's pointing to
+    # - the code generator relies on the possibility to look up a symbol ref outside of a visitor
+
+    def visit_SidCompositeNeighborTableEntry(self, node: SidCompositeNeighborTableEntry, **kwargs):
+        node.connectivity_deref_ = kwargs["symbol_tbl_conn"][node.connectivity]
+        return node
+
+    def visit_Kernel(self, node: Kernel, **kwargs):
+        symbol_tbl_conn = {c.name: c for c in node.connectivities}
+        symbol_tbl_sids = {s.name: s for s in node.sids}
+        return self.generic_visit(
+            node, symbol_tbl_conn=symbol_tbl_conn, symbol_tbl_sids=symbol_tbl_sids, **kwargs
+        )
 
 
 class UgpuCodeGenerator(codegen.TemplatedGenerator):
@@ -77,8 +101,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         )
 
         SidCompositeNeighborTableEntry = (
-            # TODO using the connectivity without lookup is a hack
-            "gridtools::next::connectivity::neighbor_table({connectivity})"
+            "gridtools::next::connectivity::neighbor_table({_this_node.connectivity_deref_.name})"
         )
 
         SidCompositeEntry = "{name}"
@@ -166,7 +189,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
         Temporary = mako_tpl.Template(
             """<%
-            %>auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<${ loctype }, ${ cvtype }>(
+            %>auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
                 (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<${ loctype }>(mesh)), 1 /* TODO ksize */, cuda_alloc);"""
         )
 
@@ -176,12 +199,9 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 sid_deref = symbol_tbl_sids[_this_node.sid] if _this_node.sid else None
                 conn_deref = symbol_tbl_conn[_this_node.connectivity]
                 body_location = _this_generator.LOCATION_TYPE_TO_STR[sid_deref.location.elements[-1]] if sid_deref else None
-
-                assert conn_deref.neighbor_tbl
-                tbl_tag = conn_deref.neighbor_tbl + "_tag" #TODO this is a hack, we need to lookup the entry and read the tag_name
             %>
             for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ conn_deref.name }); ++neigh) {
-                auto absolute_neigh_index = *gridtools::device::at_key<${ tbl_tag }>(${ outer_sid_deref.ptr_name});
+                auto absolute_neigh_index = *gridtools::device::at_key<${ conn_deref.neighbor_tbl_tag }>(${ outer_sid_deref.ptr_name});
                 if (absolute_neigh_index != gridtools::next::connectivity::skip_value(${ conn_deref.name })) {
                     % if sid_deref:
                         auto ${ sid_deref.ptr_name } = ${ sid_deref.origin_name }();
@@ -215,20 +235,20 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
     @classmethod
     def apply(cls, root, **kwargs) -> str:
-        generated_code = super().apply(root, **kwargs)
+        symbol_tbl_resolved = SymbolTblHelper().visit(root)
+        generated_code = super().apply(symbol_tbl_resolved, **kwargs)
         formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
         return formatted_code
 
     def visit_Temporary(self, node: Temporary, **kwargs):
-        cvtype = self.DATA_TYPE_TO_STR[node.vtype]
+        c_vtype = self.DATA_TYPE_TO_STR[node.vtype]
         loctype = self.LOCATION_TYPE_TO_STR[self.location_type_from_dimensions(node.dimensions)]
-        return self.generic_visit(node, loctype=loctype, cvtype=cvtype, **kwargs)
+        return self.generic_visit(node, loctype=loctype, c_vtype=c_vtype, **kwargs)
 
     def visit_KernelCall(self, node: KernelCall, **kwargs):
         kernel: Kernel = kwargs["symbol_tbl_kernel"][node.name]
         connectivities = [self.generic_visit(conn, **kwargs) for conn in kernel.connectivities]
         primary_connectivity: Connectivity = kernel.symbol_tbl[kernel.primary_connectivity]
-        # primary_connectivity = kwargs["symbol_tbl_conn"][kernel.primary_connectivity] # TODO can I be sure that Kernel was already visited
         sids = [self.generic_visit(s, **kwargs) for s in kernel.sids]
 
         # TODO I don't like that I render here and that I somehow have the same pattern for the parameters

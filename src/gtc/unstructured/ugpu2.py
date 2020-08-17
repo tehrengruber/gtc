@@ -82,13 +82,13 @@ class AssignStmt(Stmt):
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        # if values["left"].location_type != values["right"].location_type:
-        #     raise ValueError("Location type mismatch")
+        if values["left"].location_type != values["right"].location_type:
+            raise ValueError("Location type mismatch")
 
-        # if "location_type" not in values:
-        #     values["location_type"] = values["left"].location_type
-        # elif values["left"] != values["location_type"]:
-        #     raise ValueError("Location type mismatch")
+        if "location_type" not in values:
+            values["location_type"] = values["left"].location_type
+        elif values["left"].location_type != values["location_type"]:
+            raise ValueError("Location type mismatch")
         if values["left"].location_type == values["right"].location_type:
             values["location_type"] = values["left"].location_type
 
@@ -116,6 +116,15 @@ class BinaryOp(Expr):
         return values
 
 
+class Connectivity(Node):
+    name: Str  # symbol name
+    chain: NeighborChain
+
+    @property
+    def neighbor_tbl_tag(self):
+        return self.name + "_neighbor_tbl_tag"
+
+
 class SidCompositeEntry(Node):
     name: Str  # symbol decl (TODO ensure field exists via symbol table)
 
@@ -135,12 +144,14 @@ class SidCompositeEntry(Node):
 
 
 class SidCompositeNeighborTableEntry(Node):
-    name: Str  # symbol decl
-    connectivity: Str  # symbol ref #TODO fix circular dependency
+    connectivity: Str
+    connectivity_deref_: Optional[
+        Connectivity
+    ]  # TODO temporary workaround for symbol tbl reference
 
     @property
     def tag_name(self):
-        return self.name + "_tag"
+        return self.connectivity_deref_.neighbor_tbl_tag
 
 
 class SidComposite(Node):
@@ -154,7 +165,7 @@ class SidComposite(Node):
     # node private symbol table to entries
     @property
     def symbol_tbl(self):
-        return {e.name: e for e in self.entries}
+        return {e.name: e for e in self.entries if isinstance(e, SidCompositeEntry)}
 
     @property
     def field_name(self):
@@ -181,12 +192,6 @@ class NeighborLoop(Stmt):
     sid: Optional[
         Str
     ]  # symbol ref to SidComposite where the fields of the loop body live (None if only sparse fields are accessed)
-
-
-class Connectivity(Node):
-    name: Str  # symbol name
-    chain: NeighborChain
-    neighbor_tbl: Optional[Str]  # symbol ref to SidCompositeEntry TODO fix circular dependency
 
 
 class Kernel(Node):
@@ -221,8 +226,6 @@ class UField(Node):
 
 class Temporary(UField):
     pass
-    # name: Str
-    # dimensions: List[Union[common.LocationType, NeighborChain, VerticalDimension]]  # Set?
 
 
 class Computation(Node):
