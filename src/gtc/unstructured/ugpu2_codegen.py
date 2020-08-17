@@ -20,7 +20,7 @@ from typing import ClassVar, Mapping
 from devtools import debug  # noqa: F401
 from mako import template as mako_tpl
 
-from eve import codegen, NodeTranslator
+from eve import NodeTranslator, codegen
 from gtc import common
 from gtc.unstructured.ugpu2 import (
     Computation,
