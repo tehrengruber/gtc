@@ -30,7 +30,7 @@ from gtc.unstructured.gtir import (
     VerticalLoop,
 )
 from gtc.unstructured.gtir_to_nir import GtirToNir
-from gtc.unstructured.nir_to_ugpu import NirToUgpu
+from gtc.unstructured.nir_to_ugpu2 import NirToUgpu
 from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
 
 
