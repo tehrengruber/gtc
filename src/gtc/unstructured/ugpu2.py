@@ -149,9 +149,9 @@ class SidCompositeNeighborTableEntry(Node):
         Connectivity
     ]  # TODO temporary workaround for symbol tbl reference
 
-    @property
-    def tag_name(self):
-        return self.connectivity_deref_.neighbor_tbl_tag
+    # @property
+    # def tag_name(self):
+    #     return self.connectivity_deref_.neighbor_tbl_tag
 
 
 class SidComposite(Node):

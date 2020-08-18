@@ -20,7 +20,7 @@ from typing import ClassVar, Mapping
 from devtools import debug  # noqa: F401
 from mako import template as mako_tpl
 
-from eve import NodeTranslator, codegen
+from eve import NodeTranslator, codegen, NodeVisitor
 from gtc import common
 from gtc.unstructured.ugpu2 import (
     Computation,
@@ -28,25 +28,26 @@ from gtc.unstructured.ugpu2 import (
     Kernel,
     KernelCall,
     SidCompositeNeighborTableEntry,
+    SidCompositeEntry,
     Temporary,
 )
 
 
-class SymbolTblHelper(NodeTranslator):
-    # TODO
-    # - temporary helper which resolves symbol refs with the symbol it's pointing to
-    # - the code generator relies on the possibility to look up a symbol ref outside of a visitor
+# class SymbolTblHelper(NodeTranslator):
+#     # TODO
+#     # - temporary helper which resolves symbol refs with the symbol it's pointing to
+#     # - the code generator relies on the possibility to look up a symbol ref outside of a visitor
 
-    def visit_SidCompositeNeighborTableEntry(self, node: SidCompositeNeighborTableEntry, **kwargs):
-        node.connectivity_deref_ = kwargs["symbol_tbl_conn"][node.connectivity]
-        return node
+#     def visit_SidCompositeNeighborTableEntry(self, node: SidCompositeNeighborTableEntry, **kwargs):
+#         node.connectivity_deref_ = kwargs["symbol_tbl_conn"][node.connectivity]
+#         return node
 
-    def visit_Kernel(self, node: Kernel, **kwargs):
-        symbol_tbl_conn = {c.name: c for c in node.connectivities}
-        symbol_tbl_sids = {s.name: s for s in node.sids}
-        return self.generic_visit(
-            node, symbol_tbl_conn=symbol_tbl_conn, symbol_tbl_sids=symbol_tbl_sids, **kwargs
-        )
+#     def visit_Kernel(self, node: Kernel, **kwargs):
+#         symbol_tbl_conn = {c.name: c for c in node.connectivities}
+#         symbol_tbl_sids = {s.name: s for s in node.sids}
+#         return self.generic_visit(
+#             node, symbol_tbl_conn=symbol_tbl_conn, symbol_tbl_sids=symbol_tbl_sids, **kwargs
+#         )
 
 
 class UgpuCodeGenerator(codegen.TemplatedGenerator):
@@ -100,13 +101,16 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             """
         )
 
-        SidCompositeNeighborTableEntry = (
-            "gridtools::next::connectivity::neighbor_table({_this_node.connectivity_deref_.name})"
+        SidCompositeNeighborTableEntry = mako_tpl.Template(
+            """<%
+            connectivity_deref = symbol_tbl_conn[_this_node.connectivity]
+            %>gridtools::next::connectivity::neighbor_table(${ connectivity_deref.name })"""
         )
 
         SidCompositeEntry = "{name}"
 
         SidComposite = mako_tpl.Template(
+            # TODO the remaining change would be here: tag_name is now not available
             """
             auto ${ _this_node.field_name } = tu::make<gridtools::sid::composite::keys<${ ','.join([t.tag_name for t in _this_node.entries]) }>::values>(
             ${ ','.join(entries)});
@@ -235,7 +239,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
     @classmethod
     def apply(cls, root, **kwargs) -> str:
-        symbol_tbl_resolved = SymbolTblHelper().visit(root)
+        symbol_tbl_resolved = root  # SymbolTblHelper().visit(root)
         generated_code = super().apply(symbol_tbl_resolved, **kwargs)
         formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
         return formatted_code
@@ -285,12 +289,42 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         )
 
     def visit_Computation(self, node: Computation, **kwargs):
+        class GetTagName(NodeVisitor):
+            def __init__(self, **kwargs):
+                super().__init__()
+                self.result = set()
+                self.symbol_tbl = dict()
+
+            @classmethod
+            def apply(cls, root, **kwargs):
+                instance = cls()
+                instance.visit(root)
+                return instance.result
+
+            def visit_SidCompositeNeighborTableEntry(
+                self, node: SidCompositeNeighborTableEntry, **kwargs
+            ):
+                self.result.add(kwargs["symbol_tbl"][node.connectivity].neighbor_tbl_tag)
+
+            def visit_SidCompositeEntry(self, node: SidCompositeEntry, **kwargs):
+                self.result.add(node.tag_name)
+
+            def visit_Kernel(self, node: Kernel, **kwargs):
+                symbol_tbl = {conn.name: conn for conn in node.connectivities}
+                self.visit(node.sids, symbol_tbl=symbol_tbl, **kwargs)
+
+        print("----------------")
+        print(GetTagName.apply(node))
+        print("----------------")
+
         symbol_tbl_kernel = {k.name: k for k in node.kernels}
-        sid_tags = set()
-        for k in node.kernels:
-            for s in k.sids:
-                for e in s.entries:
-                    sid_tags.add("struct " + e.tag_name + ";")
+
+        sid_tags = GetTagName.apply(node)
+        # sid_tags = set()
+        # for k in node.kernels:
+        #     for s in k.sids:
+        #         for e in s.entries:
+        #             sid_tags.add("struct " + e.tag_name + ";")
         cache_allocator = "auto cuda_alloc = gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>);"
 
         return self.generic_visit(
