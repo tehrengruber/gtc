@@ -52,6 +52,9 @@ class NeighborChain(Node):
             raise ValueError("NeighborChain must contain at least one locations")
         return elements
 
+    def __str__(self):
+        return "_".join([common.LocationType(loc).name.lower() for loc in self.elements])
+
 
 class FieldAccess(Expr):
     name: Str  # symbol ref to SidCompositeEntry
@@ -124,6 +127,16 @@ class Connectivity(Node):
     def neighbor_tbl_tag(self):
         return self.name + "_neighbor_tbl_tag"
 
+    class Config(eve.concepts.FrozenModelConfig):
+        pass
+
+    # TODO see https://github.com/eth-cscs/eve_toolchain/issues/40
+    def __hash__(self):
+        return hash((self.name, self.chain))
+
+    def __eq__(self, other):
+        return self.name == other.name and self.chain == other.chain
+
 
 class SidCompositeEntry(Node):
     name: Str  # symbol decl (TODO ensure field exists via symbol table)
@@ -153,6 +166,16 @@ class SidCompositeNeighborTableEntry(Node):
     def tag_name(self):
         return self.connectivity_deref_.neighbor_tbl_tag
 
+    class Config(eve.concepts.FrozenModelConfig):
+        pass
+
+    # TODO see https://github.com/eth-cscs/eve_toolchain/issues/40
+    def __hash__(self):
+        return hash(self.connectivity)
+
+    def __eq__(self, other):
+        return self.connectivity == other.connectivity
+
 
 class SidComposite(Node):
     name: Str  # symbol
@@ -160,7 +183,13 @@ class SidComposite(Node):
     entries: List[
         Union[SidCompositeEntry, SidCompositeNeighborTableEntry]
     ]  # TODO ensure tags are unique
-    with_connectivity: bool = False  # TODO maybe there is a better pattern?
+
+    @property
+    def with_connectivity(self) -> bool:
+        for e in self.entries:
+            if isinstance(e, SidCompositeNeighborTableEntry):
+                return True
+        return False
 
     # node private symbol table to entries
     @property
@@ -182,6 +211,12 @@ class SidComposite(Node):
     @property
     def strides_name(self):
         return self.name + "_strides"
+
+    @validator("entries")
+    def not_empty(cls, entries):
+        if len(entries) < 1:
+            raise ValueError("SidComposite must contain at least one entry")
+        return entries
 
 
 class NeighborLoop(Stmt):

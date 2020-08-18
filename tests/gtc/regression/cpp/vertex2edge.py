@@ -31,7 +31,7 @@ from gtc.unstructured.gtir import (
 )
 from gtc.unstructured.gtir_to_nir import GtirToNir
 from gtc.unstructured.nir_to_ugpu2 import NirToUgpu
-from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
+from gtc.unstructured.ugpu2_codegen import UgpuCodeGenerator
 
 
 field_in = UField(

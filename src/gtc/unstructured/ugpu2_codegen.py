@@ -38,8 +38,10 @@ class SymbolTblHelper(NodeTranslator):
     # - the code generator relies on the possibility to look up a symbol ref outside of a visitor
 
     def visit_SidCompositeNeighborTableEntry(self, node: SidCompositeNeighborTableEntry, **kwargs):
-        node.connectivity_deref_ = kwargs["symbol_tbl_conn"][node.connectivity]
-        return node
+        connectivity_deref = kwargs["symbol_tbl_conn"][node.connectivity]
+        return SidCompositeNeighborTableEntry(
+            connectivity=node.connectivity, connectivity_deref_=connectivity_deref
+        )
 
     def visit_Kernel(self, node: Kernel, **kwargs):
         symbol_tbl_conn = {c.name: c for c in node.connectivities}
@@ -138,11 +140,12 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 auto idx = blockIdx.x * blockDim.x + threadIdx.x;
                 if (idx >= gridtools::next::connectivity::size(${ prim_conn.name }))
                     return;
+                % if len(prim_sid.entries) > 0:
                 auto ${ prim_sid.ptr_name } = ${ prim_sid.origin_name }();
                 gridtools::sid::shift(${ prim_sid.ptr_name }, gridtools::device::at_key<
                     ${ _this_generator.LOCATION_TYPE_TO_STR[prim_sid.location.elements[-1]] }
                     >(${ prim_sid.strides_name }), idx);
-
+                % endif
                 ${ "".join(ast) }
             }
             """
@@ -249,13 +252,14 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         kernel: Kernel = kwargs["symbol_tbl_kernel"][node.name]
         connectivities = [self.generic_visit(conn, **kwargs) for conn in kernel.connectivities]
         primary_connectivity: Connectivity = kernel.symbol_tbl[kernel.primary_connectivity]
-        sids = [self.generic_visit(s, **kwargs) for s in kernel.sids]
+        sids = [self.generic_visit(s, **kwargs) for s in kernel.sids if len(s.entries) > 0]
 
         # TODO I don't like that I render here and that I somehow have the same pattern for the parameters
         args = [c.name for c in kernel.connectivities]
         args += [
             "gridtools::sid::get_origin({0}), gridtools::sid::get_strides({0})".format(s.field_name)
             for s in kernel.sids
+            if len(s.entries) > 0
         ]
         # connectivity_args = [c.name for c in kernel.connectivities]
         return self.generic_visit(
@@ -273,8 +277,9 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
         parameters = [c.name for c in node.connectivities]
         for s in node.sids:
-            parameters.append(s.origin_name)
-            parameters.append(s.strides_name)
+            if len(s.entries) > 0:
+                parameters.append(s.origin_name)
+                parameters.append(s.strides_name)
 
         return self.generic_visit(
             node,
