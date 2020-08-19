@@ -15,9 +15,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-from typing import List, Optional, Set, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
-from pydantic import root_validator
+from devtools import debug  # noqa: F401
+from pydantic import root_validator, validator
 
 import eve
 from eve import Node, Str
@@ -33,21 +34,37 @@ class Stmt(Node):
 
 
 class NeighborChain(Node):
-    chain: Tuple[common.LocationType, ...]
+    elements: Tuple[common.LocationType, ...]
+
+    class Config(eve.concepts.FrozenModelConfig):
+        pass
+
+    # TODO see https://github.com/eth-cscs/eve_toolchain/issues/40
+    def __hash__(self):
+        return hash(self.elements)
+
+    def __eq__(self, other):
+        return self.elements == other.elements
+
+    @validator("elements")
+    def not_empty(cls, elements):
+        if len(elements) < 1:
+            raise ValueError("NeighborChain must contain at least one locations")
+        return elements
+
+    def __str__(self):
+        return "_".join([common.LocationType(loc).name.lower() for loc in self.elements])
 
 
 class FieldAccess(Expr):
-    name: Str
-    # TODO verify that the tag exists in the location_type composite (reachable via symbol table)
-    primary: NeighborChain  # e.g. [Vertex] -> center access, [Vertex, Vertex] -> neighbor access
-    secondary: Optional[NeighborChain]  # sparse index
+    name: Str  # symbol ref to SidCompositeEntry
+    sid: Str  # symbol ref
 
 
 class VarDecl(Stmt):
     name: Str
     init: Expr
     vtype: common.DataType
-    # TODO type etc
 
 
 class Literal(Expr):
@@ -68,13 +85,13 @@ class AssignStmt(Stmt):
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        # if values["left"].location_type != values["right"].location_type:
-        #     raise ValueError("Location type mismatch")
+        if values["left"].location_type != values["right"].location_type:
+            raise ValueError("Location type mismatch")
 
-        # if "location_type" not in values:
-        #     values["location_type"] = values["left"].location_type
-        # elif values["left"] != values["location_type"]:
-        #     raise ValueError("Location type mismatch")
+        if "location_type" not in values:
+            values["location_type"] = values["left"].location_type
+        elif values["left"].location_type != values["location_type"]:
+            raise ValueError("Location type mismatch")
         if values["left"].location_type == values["right"].location_type:
             values["location_type"] = values["left"].location_type
 
@@ -88,28 +105,45 @@ class BinaryOp(Expr):
 
     @root_validator(pre=True)
     def check_location_type(cls, values):
-        # if values["left"].location_type != values["right"].location_type:
-        #     raise ValueError("Location type mismatch")
+        if values["left"].location_type != values["right"].location_type:
+            raise ValueError("Location type mismatch")
 
-        # if "location_type" not in values:
-        #     values["location_type"] = values["left"].location_type
-        # elif values["left"] != values["location_type"]:
-        #     raise ValueError("Location type mismatch")
+        if "location_type" not in values:
+            values["location_type"] = values["left"].location_type
+        elif values["left"].location_type != values["location_type"]:
+            raise ValueError("Location type mismatch")
 
-        # TODO we need to protect (but above protection doesn't work in neighbor loop for accessing a variable from the parent location)
         if values["left"].location_type == values["right"].location_type:
             values["location_type"] = values["left"].location_type
 
         return values
 
 
-class NeighborLoop(Stmt):
-    body_location_type: common.LocationType
-    body: List[Stmt]
+class Connectivity(Node):
+    name: Str  # symbol name
+    chain: NeighborChain
+
+    @property
+    def neighbor_tbl_tag(self):
+        return self.name + "_neighbor_tbl_tag"
+
+    class Config(eve.concepts.FrozenModelConfig):
+        pass
+
+    # TODO see https://github.com/eth-cscs/eve_toolchain/issues/40
+    def __hash__(self):
+        return hash((self.name, self.chain))
+
+    def __eq__(self, other):
+        return self.name == other.name and self.chain == other.chain
 
 
 class SidCompositeEntry(Node):
-    name: Str  # ensure field exists via symbol table
+    name: Str  # symbol decl (TODO ensure field exists via symbol table)
+
+    @property
+    def tag_name(self):
+        return self.name + "_tag"
 
     class Config(eve.concepts.FrozenModelConfig):
         pass
@@ -122,45 +156,116 @@ class SidCompositeEntry(Node):
         return self.name == other.name
 
 
+class SidCompositeNeighborTableEntry(Node):
+    connectivity: Str
+    connectivity_deref_: Optional[
+        Connectivity
+    ]  # TODO temporary workaround for symbol tbl reference
+
+    @property
+    def tag_name(self):
+        return self.connectivity_deref_.neighbor_tbl_tag
+
+    class Config(eve.concepts.FrozenModelConfig):
+        pass
+
+    # TODO see https://github.com/eth-cscs/eve_toolchain/issues/40
+    def __hash__(self):
+        return hash(self.connectivity)
+
+    def __eq__(self, other):
+        return self.connectivity == other.connectivity
+
+
 class SidComposite(Node):
-    chain: NeighborChain
-    entries: Set[SidCompositeEntry]
+    name: Str  # symbol
+    location: NeighborChain
+    entries: List[
+        Union[SidCompositeEntry, SidCompositeNeighborTableEntry]
+    ]  # TODO ensure tags are unique
+
+    @property
+    def with_connectivity(self) -> bool:
+        for e in self.entries:
+            if isinstance(e, SidCompositeNeighborTableEntry):
+                return True
+        return False
+
+    # node private symbol table to entries
+    @property
+    def symbol_tbl(self):
+        return {e.name: e for e in self.entries if isinstance(e, SidCompositeEntry)}
+
+    @property
+    def field_name(self):
+        return self.name + "_fields"
+
+    @property
+    def ptr_name(self):
+        return self.name + "_ptrs"
+
+    @property
+    def origin_name(self):
+        return self.name + "_origins"
+
+    @property
+    def strides_name(self):
+        return self.name + "_strides"
+
+    @validator("entries")
+    def not_empty(cls, entries):
+        if len(entries) < 1:
+            raise ValueError("SidComposite must contain at least one entry")
+        return entries
+
+
+class NeighborLoop(Stmt):
+    body_location_type: common.LocationType
+    body: List[Stmt]
+    connectivity: Str  # symbol ref to Connectivity
+    outer_sid: Str  # symbol ref to SidComposite where the neighbor tables lives (and sparse fields)
+    sid: Optional[
+        Str
+    ]  # symbol ref to SidComposite where the fields of the loop body live (None if only sparse fields are accessed)
 
 
 class Kernel(Node):
     # location_type: common.LocationType
-    name: Str  # symbol table
-    primary_connectivity: common.LocationType
-    other_connectivities: Optional[List[NeighborChain]]
-    primary_sid_composite: SidComposite
-    other_sid_composites: Optional[List[SidComposite]]
+    name: Str  # symbol decl table
+    connectivities: List[Connectivity]
+    sids: List[SidComposite]
+
+    primary_connectivity: Str  # symbol ref to the above
+    primary_sid: Str  # symbol ref to the above
     ast: List[Stmt]
 
+    # private symbol table
+    @property
+    def symbol_tbl(self):
+        return {**{s.name: s for s in self.sids}, **{c.name: c for c in self.connectivities}}
 
-class SidTag(Node):
-    name: Str
+
+class KernelCall(Node):
+    name: Str  # symbol ref
 
 
 class VerticalDimension(Node):
     pass
 
 
-class SecondaryLocation(Node):
-    chain: List[common.LocationType]
-
-
-class USid(Node):
+class UField(Node):
     name: Str
-    dimensions: List[Union[common.LocationType, SecondaryLocation, VerticalDimension]]  # Set?
+    vtype: common.DataType
+    dimensions: List[Union[common.LocationType, NeighborChain, VerticalDimension]]  # Set?
 
 
-class Temporary(USid):
-    name: Str
-    dimensions: List[Union[common.LocationType, SecondaryLocation, VerticalDimension]]  # Set?
+class Temporary(UField):
+    pass
 
 
 class Computation(Node):
     name: Str
-    parameters: List[USid]
+    parameters: List[UField]
     temporaries: List[Temporary]
-    kernels: List[Kernel]  # probably replace by ctrlflow ast (where Kernel is one CtrlFlowStmt)
+    kernels: List[Kernel]
+    ctrlflow_ast: List[KernelCall]

@@ -52,21 +52,25 @@ class NirToUgpu(eve.NodeTranslator):
         return dimensions
 
     def visit_NeighborChain(self, node: nir.NeighborChain, **kwargs):
-        return ugpu.SecondaryLocation(chain=[location for location in node.elements])
+        return ugpu.NeighborChain(elements=[location for location in node.elements])
 
     def visit_VerticalDimension(self, node: nir.VerticalDimension, **kwargs):
         return ugpu.VerticalDimension()
 
     def visit_UField(self, node: nir.UField, **kwargs):
-        return ugpu.USid(name=node.name, dimensions=self.convert_dimensions(node.dimensions))
+        return ugpu.UField(
+            name=node.name, vtype=node.vtype, dimensions=self.convert_dimensions(node.dimensions)
+        )
 
     def visit_TemporaryField(self, node: nir.TemporaryField, **kwargs):
-        return ugpu.Temporary(name=node.name, dimensions=self.convert_dimensions(node.dimensions))
+        return ugpu.Temporary(
+            name=node.name, vtype=node.vtype, dimensions=self.convert_dimensions(node.dimensions)
+        )
 
     def visit_BinaryOp(self, node: nir.BinaryOp, **kwargs):
         return ugpu.BinaryOp(
-            left=self.visit(node.left),
-            right=self.visit(node.right),
+            left=self.visit(node.left, **kwargs),
+            right=self.visit(node.right, **kwargs),
             op=node.op,
             location_type=node.location_type,
         )
@@ -76,6 +80,11 @@ class NirToUgpu(eve.NodeTranslator):
 
     def visit_NeighborLoop(self, node: nir.NeighborLoop, **kwargs):
         return ugpu.NeighborLoop(
+            outer_sid=kwargs["sids_tbl"][ugpu.NeighborChain(elements=[node.location_type])].name,
+            connectivity=kwargs["conn_tbl"][node.neighbors].name,
+            sid=kwargs["sids_tbl"][node.neighbors].name
+            if node.neighbors in kwargs["sids_tbl"]
+            else None,
             location_type=node.location_type,
             body_location_type=node.neighbors.elements[-1],
             body=self.visit(node.body, **kwargs),
@@ -84,8 +93,7 @@ class NirToUgpu(eve.NodeTranslator):
     def visit_FieldAccess(self, node: nir.FieldAccess, **kwargs):
         return ugpu.FieldAccess(
             name=node.name,
-            primary=self.visit(node.primary),
-            secondary=self.visit(node.secondary),
+            sid=kwargs["sids_tbl"][self.visit(node.primary, **kwargs)].name,
             location_type=node.location_type,
         )
 
@@ -94,8 +102,8 @@ class NirToUgpu(eve.NodeTranslator):
 
     def visit_AssignStmt(self, node: nir.AssignStmt, **kwargs):
         return ugpu.AssignStmt(
-            left=self.visit(node.left),
-            right=self.visit(node.right),
+            left=self.visit(node.left, **kwargs),
+            right=self.visit(node.right, **kwargs),
             location_type=node.location_type,
         )
 
@@ -117,50 +125,86 @@ class NirToUgpu(eve.NodeTranslator):
         return statements
 
     def visit_HorizontalLoop(self, node: nir.HorizontalLoop, **kwargs):
-        field_accesses = eve.FindNodes().by_type(nir.FieldAccess, node.stmt)
-
-        primary_sid_composite = ugpu.SidComposite(
-            chain=ugpu.NeighborChain(chain=[node.location_type]), entries=[]
+        location_type_str = str(common.LocationType(node.location_type).name).lower()
+        primary_connectivity = location_type_str + "_conn"
+        connectivities = set()
+        connectivities.add(
+            ugpu.Connectivity(
+                name=primary_connectivity, chain=ugpu.NeighborChain(elements=[node.location_type])
+            )
         )
 
-        secondary_neighbor_chains = set()
-        other_sids = {}
+        field_accesses = eve.FindNodes().by_type(nir.FieldAccess, node.stmt)
+
+        other_sids_entries = {}
+        primary_sid_entries = set()
         for acc in field_accesses:
             if len(acc.primary.elements) == 1:
                 assert acc.primary.elements[0] == node.location_type
-                primary_sid_composite.entries.add(ugpu.SidCompositeEntry(name=acc.name))
+                primary_sid_entries.add(ugpu.SidCompositeEntry(name=acc.name))
             else:
                 assert (
                     len(acc.primary.elements) == 2
                 )  # TODO cannot deal with more than one level of nesting
-                secondary_neighbor_chains.add(acc.primary)
                 secondary_loc = acc.primary.elements[
                     -1
                 ]  # TODO change if we have more than one level of nesting
-                if secondary_loc not in other_sids:
-                    other_sids[secondary_loc] = ugpu.SidComposite(
-                        chain=ugpu.NeighborChain(chain=[node.location_type, secondary_loc]),
-                        entries=[],
-                    )
-                other_sids[secondary_loc].entries.add(ugpu.SidCompositeEntry(name=acc.name))
+                if secondary_loc not in other_sids_entries:
+                    other_sids_entries[secondary_loc] = set()
+                other_sids_entries[secondary_loc].add(ugpu.SidCompositeEntry(name=acc.name))
 
-        other_connectivities = [self.visit(chain) for chain in secondary_neighbor_chains]
-        debug(other_connectivities)
+        neighloops = eve.FindNodes().by_type(nir.NeighborLoop, node.stmt)
+        for loop in neighloops:
+            transformed_neighbors = self.visit(loop.neighbors, **kwargs)
+            connectivity_name = str(transformed_neighbors) + "_conn"
+            connectivities.add(
+                ugpu.Connectivity(name=connectivity_name, chain=transformed_neighbors)
+            )
+            primary_sid_entries.add(
+                ugpu.SidCompositeNeighborTableEntry(connectivity=connectivity_name)
+            )
 
-        other_sid_composites = list(other_sids.values())
-
-        return ugpu.Kernel(
-            name="kernel" + str(node.id_attr_),
-            primary_connectivity=node.location_type,
-            primary_sid_composite=primary_sid_composite,
-            other_connectivities=other_connectivities,
-            other_sid_composites=other_sid_composites,
-            ast=self.visit(node.stmt),
+        primary_sid = location_type_str
+        sids = []
+        sids.append(
+            ugpu.SidComposite(
+                name=primary_sid,
+                entries=primary_sid_entries,
+                location=ugpu.NeighborChain(elements=[node.location_type]),
+            )
         )
+
+        for k, v in other_sids_entries.items():
+            chain = ugpu.NeighborChain(elements=[node.location_type, k])
+            sids.append(
+                ugpu.SidComposite(name=str(chain), entries=v, location=chain)
+            )  # TODO _conn via property
+
+        kernel_name = "kernel_" + node.id_attr_
+        kernel = ugpu.Kernel(
+            ast=self.visit(
+                node.stmt,
+                sids_tbl={s.location: s for s in sids},
+                conn_tbl={c.chain: c for c in connectivities},
+                **kwargs,
+            ),
+            name=kernel_name,
+            primary_connectivity=primary_connectivity,
+            primary_sid=primary_sid,
+            connectivities=connectivities,
+            sids=sids,
+        )
+        return kernel, ugpu.KernelCall(name=kernel_name)
 
     def visit_VerticalLoop(self, node: nir.VerticalLoop, **kwargs):
         # TODO I am completely ignoring k loops at this point!
-        return [self.visit(loop, **kwargs) for loop in node.horizontal_loops]
+        kernels = []
+        kernel_calls = []
+        for loop in node.horizontal_loops:
+            k, c = self.visit(loop, **kwargs)
+            kernels.append(k)
+            kernel_calls.append(c)
+        return kernels, kernel_calls
 
     def visit_Stencil(self, node: nir.Stencil, **kwargs):
         if "temporaries" not in kwargs:
@@ -172,9 +216,12 @@ class NirToUgpu(eve.NodeTranslator):
             self.fields[converted_tmp.name] = converted_tmp
 
         kernels = []
+        kernel_calls = []
         for loop in node.vertical_loops:
-            kernels.extend(self.visit(loop, **kwargs))
-        return kernels
+            k, c = self.visit(loop, **kwargs)
+            kernels.extend(k)
+            kernel_calls.extend(c)
+        return kernels, kernel_calls
 
     def visit_Computation(self, node: nir.Computation, **kwargs):
         temporaries = []
@@ -185,9 +232,18 @@ class NirToUgpu(eve.NodeTranslator):
             self.fields[converted_param.name] = converted_param
 
         kernels = []
+        ctrlflow_ast = []
         for s in node.stencils:
-            kernels += self.visit(s, temporaries=temporaries)
+            kernel, kernel_call = self.visit(s, temporaries=temporaries)
+            kernels.extend(kernel)
+            ctrlflow_ast.extend(kernel_call)
+
+        debug(kernels)
 
         return ugpu.Computation(
-            name=node.name, parameters=parameters, temporaries=temporaries, kernels=kernels,
+            name=node.name,
+            parameters=parameters,
+            temporaries=temporaries,
+            kernels=kernels,
+            ctrlflow_ast=ctrlflow_ast,
         )

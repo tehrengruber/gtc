@@ -58,6 +58,9 @@ class NeighborChain(Node):
             raise ValueError("NeighborChain must contain at least one locations")
         return elements
 
+    def __str__(self):
+        return "_".join([common.LocationType(loc).name for loc in self.elements])
+
 
 class LocalVar(Node):
     name: Str
