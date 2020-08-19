@@ -1,5 +1,5 @@
 #include "../unstructured.hpp"
-#include <atlas/mesh/Connectivity.h>
+#include "gridtools/next/mesh.hpp"
 #include <gridtools/sid/rename_dimensions.hpp>
 #include <gridtools/storage/builder.hpp>
 #include <gridtools/storage/sid.hpp>
@@ -25,10 +25,11 @@ namespace gridtools::next::test_helper {
         };
     } // namespace make_field_impl_
 
-    template <class T, class Connectivity>
-    auto make_field(Connectivity const &conn) {
+    template <class T, class Location, class Mesh>
+    auto make_field(Mesh const &mesh) {
         // TODO seems it would be nice if we can adapt the data_store builder to create SIDs with named dimension
-        return sid::rename_numbered_dimensions<cell> // TODO
-            (make_field_impl_::builder<T>{}(gridtools::next::connectivity::size(conn))());
+        return sid::rename_numbered_dimensions<Location> // TODO
+            (make_field_impl_::builder<T>{}(
+                gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<Location>(mesh)))());
     }
 } // namespace gridtools::next::test_helper

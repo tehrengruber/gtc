@@ -216,12 +216,12 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 kernel_calls = map(_this_generator.make_kernel_call, _this_node.kernels)
                 cache_allocator = "auto cuda_alloc = gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>);"
             %>#include <gridtools/next/cuda_util.hpp>
+#include <gridtools/next/mesh.hpp>
 #include <gridtools/next/tmp_gpu_storage.hpp>
+#include <gridtools/next/unstructured.hpp>
+#include <gridtools/common/cuda_util.hpp>
 #include <gridtools/sid/allocator.hpp>
 #include <gridtools/sid/composite.hpp>
-#include <gridtools/next/atlas_adapter.hpp>
-#include <gridtools/next/atlas_array_view_adapter.hpp>
-#include <gridtools/next/atlas_field_util.hpp>
 
         namespace ${ name }_impl_ {
         ${ ''.join(sid_tags) }
