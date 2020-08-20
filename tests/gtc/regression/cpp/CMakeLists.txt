@@ -25,18 +25,38 @@ FetchContent_Declare(cpputil_unstructured
 FetchContent_MakeAvailable(cpputil_unstructured)
 
 
+function(add_regression_test_executable)
+    set(options)
+    set(oneValueArgs NAME INPUT MODE)
+    set(multiValueArgs SOURCES LIBRARIES)
+    cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    message(STATUS "${ARG_NAME}")
+    add_custom_command(OUTPUT generated_${ARG_NAME}.hpp
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_INPUT} ${ARG_MODE})
+    add_custom_target(generated_${ARG_NAME} DEPENDS generated_${ARG_NAME}.hpp)
+    add_executable(${ARG_NAME} ${ARG_SOURCES}) # TODO fix GridTools appending .cu to .hpp, then we don't need the custom_target
+    target_link_libraries(${ARG_NAME} ${ARG_LIBRARIES})
+    add_dependencies(${ARG_NAME} generated_${ARG_NAME})
+    add_test(NAME ${ARG_NAME} COMMAND $<TARGET_FILE:${ARG_NAME}>)
+endfunction()
+
 function(add_regression_test name)
-    add_executable(${name} ${name}_driver.cu)
-    # target_link_libraries(cell2cell PRIVATE
-    # target_link_libraries(${ARG_NAME} gencode)
-    # target_link_libraries(${ARG_NAME} test_util)
-    target_link_libraries(${name} GridTools::gridtools gtest gtest_main gmock gtnext)
-    target_link_libraries(${name} GridTools::stencil_gpu)
-    gridtools_setup_target(${name} CUDA_ARCH sm_50)
+    set(_sources ${name}_driver.cc)
+    set(default_libraries GridTools::gridtools gtest gtest_main gmock gtnext)
+
+    add_regression_test_executable(NAME ${name}_unaive INPUT ${name}.py MODE unaive SOURCES ${_sources} LIBRARIES ${default_libraries})
+
+    if(TARGET GridTools::stencil_gpu)
+        add_regression_test_executable(NAME ${name}_ugpu INPUT ${name}.py MODE ugpu SOURCES ${_sources} LIBRARIES ${default_libraries} GridTools::stencil_gpu)
+        gridtools_setup_target(${name}_ugpu CUDA_ARCH sm_50)
+    endif()
 endfunction()
 
 include(CTest)
 if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
     include(FetchGoogleTest.cmake)
     fetch_googletest()
 

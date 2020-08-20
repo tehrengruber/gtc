@@ -8,6 +8,7 @@
 # ```
 
 import os
+import sys
 
 from devtools import debug
 
@@ -32,6 +33,7 @@ from gtc.unstructured.gtir import (
 from gtc.unstructured.gtir_to_nir import GtirToNir
 from gtc.unstructured.nir_to_ugpu import NirToUgpu
 from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
+from gtc.unstructured.unaive_codegen import UnaiveCodeGenerator
 
 
 field_in = UField(
@@ -83,20 +85,34 @@ sten = Stencil(
             ],
         )
     ],
-    declarations=[],
 )
 
 comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[sten])
 # debug(comp)
 
-nir_comp = GtirToNir().visit(comp)
-debug(nir_comp)
-ugpu_comp = NirToUgpu().visit(nir_comp)
-debug(ugpu_comp)
 
-generated_code = UgpuCodeGenerator.apply(ugpu_comp)
-print(generated_code)
+def main():
+    mode = sys.argv[1] if len(sys.argv) > 1 else "unaive"
 
-output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_vertex2edge.hpp"
-with open(output_file, "w+") as output:
-    output.write(generated_code)
+    comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[sten])
+    nir_comp = GtirToNir().visit(comp)
+    debug(nir_comp)
+    ugpu_comp = NirToUgpu().visit(nir_comp)
+    debug(ugpu_comp)
+
+    if mode == "unaive":
+        generated_code = UnaiveCodeGenerator.apply(ugpu_comp)
+
+    else:  # 'ugpu':
+        generated_code = UgpuCodeGenerator.apply(ugpu_comp)
+
+    print(generated_code)
+    output_file = (
+        os.path.dirname(os.path.realpath(__file__)) + "/generated_vertex2edge_" + mode + ".hpp"
+    )
+    with open(output_file, "w+") as output:
+        output.write(generated_code)
+
+
+if __name__ == "__main__":
+    main()

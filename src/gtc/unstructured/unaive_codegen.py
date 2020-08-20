@@ -51,7 +51,7 @@ class SymbolTblHelper(NodeTranslator):
         )
 
 
-class UgpuCodeGenerator(codegen.TemplatedGenerator):
+class UnaiveCodeGenerator(codegen.TemplatedGenerator):
     LOCATION_TYPE_TO_STR: ClassVar[
         Mapping[common.LocationType, Mapping[str, str]]
     ] = MappingProxyType(
@@ -123,9 +123,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
 
                 ${ ''.join(sids) }
 
-                auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(${ primary_connectivity.name }));
-                ${ name }<<<blocks, threads_per_block>>>(${','.join(args)});
-                GT_CUDA_CHECK(cudaDeviceSynchronize());
+                ${ name }(${','.join(args)});
             }
             """
         )
@@ -136,17 +134,16 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
                 prim_sid = symbol_tbl_sids[_this_node.primary_sid]
             %>
             template<${ ','.join("class {}_t".format(p) for p in parameters)}>
-            __global__ void ${ name }( ${','.join("{0}_t {0}".format(p) for p in parameters) }) {
-                auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-                if (idx >= gridtools::next::connectivity::size(${ prim_conn.name }))
-                    return;
-                % if len(prim_sid.entries) > 0:
-                auto ${ prim_sid.ptr_name } = ${ prim_sid.origin_name }();
-                gridtools::sid::shift(${ prim_sid.ptr_name }, gridtools::device::at_key<
-                    ${ _this_generator.LOCATION_TYPE_TO_STR[prim_sid.location.elements[-1]] }
-                    >(${ prim_sid.strides_name }), idx);
-                % endif
-                ${ "".join(ast) }
+            void ${ name }( ${','.join("{0}_t {0}".format(p) for p in parameters) }) {
+                for(std::size_t idx = 0; idx < gridtools::next::connectivity::size(${ prim_conn.name }); idx++) {
+                    % if len(prim_sid.entries) > 0:
+                    auto ${ prim_sid.ptr_name } = ${ prim_sid.origin_name }();
+                    gridtools::sid::shift(${ prim_sid.ptr_name }, gridtools::device::at_key<
+                        ${ _this_generator.LOCATION_TYPE_TO_STR[prim_sid.location.elements[-1]] }
+                        >(${ prim_sid.strides_name }), idx);
+                    % endif
+                    ${ "".join(ast) }
+                }
             }
             """
         )
@@ -163,11 +160,9 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         BinaryOp = "({left} {op} {right})"
 
         Computation = mako_tpl.Template(
-            """#include <gridtools/next/cuda_util.hpp>
-            #include <gridtools/next/mesh.hpp>
-            #include <gridtools/next/tmp_storage.hpp>
+            """#include <gridtools/next/mesh.hpp>
             #include <gridtools/next/unstructured.hpp>
-            #include <gridtools/common/cuda_util.hpp>
+            #include <gridtools/next/tmp_storage.hpp>
             #include <gridtools/sid/allocator.hpp>
             #include <gridtools/sid/composite.hpp>
 
@@ -193,7 +188,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
         Temporary = mako_tpl.Template(
             """<%
             %>auto zavg_tmp = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
-                (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<${ loctype }>(mesh)), 1 /* TODO ksize */, cuda_alloc);"""
+                (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<${ loctype }>(mesh)), 1 /* TODO ksize */, tmp_alloc);"""
         )
 
         NeighborLoop = mako_tpl.Template(
@@ -296,7 +291,7 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             for s in k.sids:
                 for e in s.entries:
                     sid_tags.add("struct " + e.tag_name + ";")
-        cache_allocator = "auto cuda_alloc = gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>);"
+        cache_allocator = "auto tmp_alloc = gridtools::sid::device::make_cached_allocator(&std::make_unique<char[]>);"
 
         return self.generic_visit(
             node,

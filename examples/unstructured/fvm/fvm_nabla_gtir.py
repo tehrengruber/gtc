@@ -31,6 +31,7 @@ from gtc.unstructured.gtir_to_nir import GtirToNir
 from gtc.unstructured.nir_passes.merge_horizontal_loops import find_and_merge_horizontal_loops
 from gtc.unstructured.nir_to_ugpu import NirToUgpu
 from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
+from gtc.unstructured.unaive_codegen import UnaiveCodeGenerator
 
 
 vertical_loops = []
@@ -341,5 +342,10 @@ generated_code = UgpuCodeGenerator.apply(ugpu_comp)
 print(generated_code)
 
 output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_fvm_nabla_ugpu.hpp"
+with open(output_file, "w+") as output:
+    output.write(generated_code)
+
+generated_code = UnaiveCodeGenerator.apply(ugpu_comp)
+output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_fvm_nabla_unaive.hpp"
 with open(output_file, "w+") as output:
     output.write(generated_code)

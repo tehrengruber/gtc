@@ -88,7 +88,6 @@ sten = Stencil(
             ],
         )
     ],
-    declarations=[],
 )
 
 comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[sten])
