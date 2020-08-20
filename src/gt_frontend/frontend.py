@@ -1,7 +1,8 @@
 from typing import Type
 import gt_frontend.gtscript as gtscript
 from gt_frontend.gtscript import Mesh, Field, Edge, Vertex
-from gt_frontend.gtscript_to_gtir import GTScriptToGTIR, VarDeclExtractor, CallCanonicalizer
+from gt_frontend.gtscript_to_gtir import SymbolTable, GTScriptToGTIR, VarDeclExtractor, NodeCanonicalizer, TemporaryFieldDeclExtractor, SymbolResolutionValidation
+from gt_frontend.py_to_gtscript import PyToGTScript
 from gtc import common
 import inspect
 import ast
@@ -12,41 +13,24 @@ from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
 
 class GTScriptCompilationTask:
     def __init__(self, definition):
-        self.symbol_table = {
-            "dtype": common.DataType,
-            "Vertex": common.LocationType,
-            "Edge": common.LocationType,
-            "Cell": common.LocationType
-        }
-
-        self.constants = {
-            "dtype": common.DataType.FLOAT64,
-            "Vertex": common.LocationType.Vertex,
-            "Edge": common.LocationType.Edge,
-            "Cell": common.LocationType.Cell
-            #"Field": Field,
-            #"Mesh": Mesh
-        }
+        self.symbol_table = SymbolTable(
+            types = {
+                "dtype": common.DataType,
+                "Vertex": common.LocationType,
+                "Edge": common.LocationType,
+                "Cell": common.LocationType,
+            },
+            constants={
+                "dtype": common.DataType.FLOAT64,
+                "Vertex": common.LocationType.Vertex,
+                "Edge": common.LocationType.Edge,
+                "Cell": common.LocationType.Cell,
+                #"Field": Field,
+                #"Mesh": Mesh
+            }
+        )
 
         self.definition = definition
-
-    def compile(self):
-        self._annotate_args()
-        self.python_ast = ast.parse(inspect.getsource(self.definition)).body[0]
-        self.gt4py_ast = gtscript.transform_py_ast_into_gt4py_ast(self.python_ast)
-
-        VarDeclExtractor(self.symbol_table, self.constants).visit(self.gt4py_ast)
-        CallCanonicalizer().visit(self.gt4py_ast)
-
-        gtir = GTScriptToGTIR(self.symbol_table, self.constants).visit(self.gt4py_ast)
-
-        nir_comp = GtirToNir().visit(gtir)
-        nir_comp = find_and_merge_horizontal_loops(nir_comp)
-        ugpu_comp = NirToUgpu().visit(nir_comp)
-        # debug(ugpu_comp)
-
-        generated_code = UgpuCodeGenerator.apply(ugpu_comp)
-        print(generated_code)
 
     def _annotate_args(self):
         """
@@ -55,3 +39,28 @@ class GTScriptCompilationTask:
         sig = inspect.signature(self.definition)
         for name, param in sig.parameters.items():
             self.symbol_table[name] = param.annotation
+
+    def compile(self):
+        self._annotate_args()
+        self.python_ast = ast.parse(inspect.getsource(self.definition)).body[0]
+        self.gt4py_ast = PyToGTScript().transform(self.python_ast)
+
+        # Canonicalization
+        NodeCanonicalizer().visit(self.gt4py_ast)
+
+        # Populate symbol table
+        VarDeclExtractor(self.symbol_table).visit(self.gt4py_ast)
+        TemporaryFieldDeclExtractor(self.symbol_table).visit(self.gt4py_ast)
+        SymbolResolutionValidation(self.symbol_table).visit(self.gt4py_ast)
+
+        # Transform into GTIR
+        gtir = GTScriptToGTIR(self.symbol_table).visit(self.gt4py_ast)
+
+        # Code generation
+        nir_comp = GtirToNir().visit(gtir)
+        nir_comp = find_and_merge_horizontal_loops(nir_comp)
+        ugpu_comp = NirToUgpu().visit(nir_comp)
+        # debug(ugpu_comp)
+
+        generated_code = UgpuCodeGenerator.apply(ugpu_comp)
+        print(generated_code)
