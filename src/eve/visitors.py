@@ -28,6 +28,7 @@ from .types import IntEnum, StrEnum
 from .typing import (
     Any,
     Callable,
+    ClassVar,
     Collection,
     Iterable,
     List,
@@ -35,6 +36,7 @@ from .typing import (
     MutableSet,
     Optional,
     Tuple,
+    Type,
     TypeVar,
     Union,
 )
@@ -68,12 +70,16 @@ class NodeVisitor:
     allows modifications.
     """
 
-    ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
+    ATOMIC_COLLECTION_TYPES: ClassVar[Tuple[Type, ...]] = (str, bytes, bytearray)
 
     def visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
         visitor = self.generic_visit
-        if isinstance(node, Node):
-            for node_class in node.__class__.__mro__:
+
+        method_name = "visit_" + node.__class__.__name__
+        if hasattr(self, method_name):
+            visitor = getattr(self, method_name)
+        elif isinstance(node, Node):
+            for node_class in node.__class__.__mro__[1:]:
                 method_name = "visit_" + node_class.__name__
                 if hasattr(self, method_name):
                     visitor = getattr(self, method_name)
