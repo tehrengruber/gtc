@@ -18,7 +18,8 @@ class BuiltInTypeMeta(type):
         raise RuntimeError()
 
     def __subclasscheck__(self, other):
-        if self.namespace == other.namespace and self.class_name == other.class_name:
+        # todo: enhance
+        if isinstance(other, BuiltInTypeMeta) and self.namespace == other.namespace and self.class_name == other.class_name:
             if self.args == None or self.args == other.args:
                 return True
         return False
@@ -32,8 +33,12 @@ class Mesh(BuiltInType):
 class Field(BuiltInType):
     pass
 
-class TemporaryField(BuiltInType):
+class TemporaryField(BuiltInType): # todo: make this a subtype of Field
     pass
 
 class Location(BuiltInType):
+    pass
+
+# LocalDimension
+class Local(BuiltInType):
     pass
