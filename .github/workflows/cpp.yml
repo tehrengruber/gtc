@@ -1,29 +1,36 @@
 name: ctest
 
 on:
-  push:
-  pull_request:
-    branches:
-      - master
+    push:
+    pull_request:
+        branches:
+            - master
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    container: mrtravis/gridtools:${{ matrix.compiler }}
-    strategy:
-      matrix:
-        compiler: [gcc-9-atlas]
-        build_type: [Release]
+    build:
+        runs-on: ubuntu-latest
+        container: mrtravis/gridtools:${{ matrix.compiler }}
+        strategy:
+            matrix:
+                compiler: [gcc-9-atlas]
+                build_type: [Release]
 
-    steps:
-      - uses: actions/checkout@v1
-      - name: Configure
-        run: |
-          cd cpputil/unstructured
-          mkdir build && cd build
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-      - name: Build
-        run: cmake --build cpputil/unstructured/build --parallel 2
-      - name: Execute tests
-        run: cd cpputil/unstructured/build && ctest --output-on-failure
+        steps:
+            - uses: actions/checkout@v1
+            - name: Test cpputil
+              run: |
+                  cd cpputil/unstructured
+                  mkdir build && cd build
+                  cmake .. \
+                    -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+                  cmake --build . --parallel 2
+                  ctest --output-on-failure
+            - name: Test gtc cpp regression
+              run: |
+                  source scripts/activate
+                  cd tests/gtc/regression/cpp
+                  mkdir build && cd build
+                  cmake .. \
+                    -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+                  cmake --build . --parallel 2
+                  ctest --output-on-failure

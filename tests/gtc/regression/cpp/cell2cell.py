@@ -8,7 +8,7 @@
 #     field1 = sum(f[c1] * f[c2] for c2 in cells(c1))
 # ```
 
-import os
+import os, sys
 
 from devtools import debug
 
@@ -95,22 +95,25 @@ sten = Stencil(
     declarations=[],
 )
 
-comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[sten])
-# debug(comp)
+def main():
+    mode = sys.argv[1] if len(sys.argv) > 1 else 'unaive'
 
-nir_comp = GtirToNir().visit(comp)
-debug(nir_comp)
-ugpu_comp = NirToUgpu().visit(nir_comp)
-debug(ugpu_comp)
+    comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[sten])
+    nir_comp = GtirToNir().visit(comp)
+    debug(nir_comp)
+    ugpu_comp = NirToUgpu().visit(nir_comp)
+    debug(ugpu_comp)
 
-generated_code = UgpuCodeGenerator.apply(ugpu_comp)
-print(generated_code)
+    if(mode == 'unaive'):
+        generated_code = UnaiveCodeGenerator.apply(ugpu_comp)
 
-output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell2cell_ugpu.hpp"
-with open(output_file, "w+") as output:
-    output.write(generated_code)
+    else: # 'ugpu':
+        generated_code = UgpuCodeGenerator.apply(ugpu_comp)
 
-generated_code = UnaiveCodeGenerator.apply(ugpu_comp)
-output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell2cell_unaive.hpp"
-with open(output_file, "w+") as output:
-    output.write(generated_code)
+    print(generated_code)
+    output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell2cell_" + mode + ".hpp"
+    with open(output_file, "w+") as output:
+        output.write(generated_code)
+
+if __name__ == "__main__":
+    main()
