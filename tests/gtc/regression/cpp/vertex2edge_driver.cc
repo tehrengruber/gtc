@@ -1,4 +1,8 @@
-#include "generated_vertex2edge.hpp"
+#ifdef __CUDACC__
+#include "generated_vertex2edge_ugpu.hpp"
+#else
+#include "generated_vertex2edge_unaive.hpp"
+#endif
 
 #include <gridtools/next/test_helper/field_builder.hpp>
 #include <gridtools/next/test_helper/simple_mesh.hpp>

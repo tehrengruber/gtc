@@ -34,6 +34,7 @@ from gtc.unstructured.gtir import (
 from gtc.unstructured.gtir_to_nir import GtirToNir
 from gtc.unstructured.nir_to_ugpu import NirToUgpu
 from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
+from gtc.unstructured.unaive_codegen import UnaiveCodeGenerator
 
 
 field_in = UField(
@@ -105,6 +106,11 @@ debug(ugpu_comp)
 generated_code = UgpuCodeGenerator.apply(ugpu_comp)
 print(generated_code)
 
-output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell2cell.hpp"
+output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell2cell_ugpu.hpp"
+with open(output_file, "w+") as output:
+    output.write(generated_code)
+
+generated_code = UnaiveCodeGenerator.apply(ugpu_comp)
+output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell2cell_unaive.hpp"
 with open(output_file, "w+") as output:
     output.write(generated_code)
