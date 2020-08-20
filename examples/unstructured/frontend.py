@@ -10,24 +10,24 @@ from gt_frontend.frontend import GTScriptCompilationTask
 
 dtype = common.DataType.FLOAT64
 
-#def edge_reduction(
-#    mesh: Mesh,
-#    edge_field: Field[Edge, dtype],
-#    vertex_field: Field[Vertex, dtype]
-#):
-#    with computation(FORWARD), interval(0, None), location(Edge) as e:
-#        edge_field = sum(vertex_field[v] for v in vertices(e))
-#        #edge_field = 0.5 * sum(vertex_field[v] for v in vertices(e))
-#        #pass
-#        #edge_field[e] = 0.5*sum(vertex_field[v] for v in vertices(e))
+def edge_reduction(
+    mesh: Mesh,
+    edge_field: Field[Edge, dtype],
+    vertex_field: Field[Vertex, dtype]
+):
+    with computation(FORWARD), interval(0, None), location(Edge) as e:
+        edge_field = sum(vertex_field[v] for v in vertices(e))
+        #edge_field = 0.5 * sum(vertex_field[v] for v in vertices(e))
+        #pass
+        #edge_field[e] = 0.5*sum(vertex_field[v] for v in vertices(e))
 
-#def sparse_ex(
-#    mesh: Mesh,
-#    edge_field: Field[Edge, dtype],
-#    sparse_field: Field[Edge, Local[Vertex], dtype]
-#):
-#    with computation(FORWARD), interval(0, None), location(Edge) as e:
-#        edge_field = sum(sparse_field[e, v] for v in vertices(e))
+def sparse_ex(
+    mesh: Mesh,
+    edge_field: Field[Edge, dtype],
+    sparse_field: Field[Edge, Local[Vertex], dtype]
+):
+    with computation(FORWARD), interval(0, None), location(Edge) as e:
+        edge_field = sum(sparse_field[e, v] for v in vertices(e))
 
 def test_nested(
     mesh: Mesh,
@@ -53,7 +53,7 @@ def fvm_nabla_stencil(
     vol: Field[Vertex, dtype],
     sign: Field[Vertex, Local[Edge], dtype]
 ):
-    with computation(FORWARD), interval(0, None): #, interval(0, -1):
+    with computation(FORWARD), interval(0, None):
         with location(Edge) as e:
             zavg = 0.5*sum(pp[v] for v in vertices(e))
             zavg = sum(pp[v] for v in vertices(e))
