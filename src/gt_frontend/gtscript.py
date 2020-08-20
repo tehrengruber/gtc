@@ -18,20 +18,20 @@ Cell = common.LocationType.Cell
 # template is a 1-to-1 mapping from context and python ast node to gt4py ast node. context is encoded in the field types
 # all understood sementic is encoded in the structure
 
-class GT4PyAstNode(Node):
+class GTScriptAstNode(Node):
     pass
 
-class Statement(GT4PyAstNode):
+class Statement(GTScriptAstNode):
     pass
 
-class Expr(GT4PyAstNode):
+class Expr(GTScriptAstNode):
     pass
 
 class Name(Expr):
     id: str
 
 
-class IterationOrder(GT4PyAstNode):
+class IterationOrder(GTScriptAstNode):
     order: str
 
 
@@ -44,7 +44,7 @@ class Constant(Expr):
     value: Union[int, float, type(None), str] # note: due to automatic conversion in pydantic str must be at the end
 
 
-class Interval(GT4PyAstNode):
+class Interval(GTScriptAstNode):
     start: Constant  # todo: use Constant[Union[int, str, type(None)]]
     stop: Constant
 
@@ -53,7 +53,7 @@ class Interval(GT4PyAstNode):
 # Optional(captures={start=0, end=None})
 
 
-class LocationSpecification(GT4PyAstNode):
+class LocationSpecification(GTScriptAstNode):
     name: Name
     location_type: str
 
@@ -83,7 +83,7 @@ class Call(Expr):
     func: str
 
 
-class LocationComprehension(GT4PyAstNode):
+class LocationComprehension(GTScriptAstNode):
     target: Name
     iter: Call
 
@@ -100,7 +100,7 @@ class Assign(Statement):
 
 Stencil = ForwardRef('Stencil')
 
-class Stencil(GT4PyAstNode):
+class Stencil(GTScriptAstNode):
     iteration_spec: List[Union[IterationOrder, LocationSpecification, Interval]]
     body: List[Union[Statement, Stencil]] # todo: stencil only allowed non-canonicalized
 
@@ -119,7 +119,7 @@ class Pass(Statement):
         return ast.Pass()
 
 
-class Argument(GT4PyAstNode):
+class Argument(GTScriptAstNode):
     name: str
     type: Union[Name, Union[SubscriptMultiple, SubscriptSingle]]
     #is_keyword: bool
@@ -130,7 +130,7 @@ class Argument(GT4PyAstNode):
 #    arg_types: Ts
 #    args: List[Expr]
 
-class Computation(GT4PyAstNode):
+class Computation(GTScriptAstNode):
     name: str
     arguments: List[Argument]
     stencils: List[Stencil]

@@ -57,6 +57,10 @@ class SymbolTable:
         return val
 
 class NodeCanonicalizer(eve.NodeModifier):
+    @classmethod
+    def apply(cls, gt4py_ast: Computation):
+        return cls().visit(gt4py_ast)
+
     def visit_SubscriptSingle(self, node: SubscriptSingle):
         # todo: do canonicalization properly. this should happen in the translation from python to gtscript
         return self.visit(SubscriptMultiple(value=node.value, indices=[Name(id=node.index)]))
@@ -120,6 +124,10 @@ class VarDeclExtractor(eve.NodeVisitor):
         super().__init__(*args, **kwargs)
         self.symbol_table = symbol_table
 
+    @classmethod
+    def apply(cls, symbol_table, gt4py_ast : Computation):
+        return cls(symbol_table).visit(gt4py_ast)
+
     def visit_LocationComprehension(self, node: LocationComprehension):
         assert node.iter.func == "neighbors"
         location_type = self.symbol_table.materialize_constant(node.iter.args[-1].id)
@@ -147,6 +155,10 @@ class TemporaryFieldDeclExtractor(eve.NodeVisitor):
     def __init__(self, symbol_table):
         self.symbol_table = symbol_table
 
+    @classmethod
+    def apply(cls, symbol_table, gt4py_ast : Computation):
+        return cls(symbol_table).visit(gt4py_ast)
+
     def visit_LocationSpecification(self, node : LocationSpecification):
         assert self.primary_location == None
         self.primary_location = self.symbol_table[node.name.id]
@@ -169,6 +181,10 @@ class SymbolResolutionValidation(eve.NodeVisitor):
     def __init__(self, symbol_table):
         self.symbol_table = symbol_table
 
+    @classmethod
+    def apply(cls, symbol_table, gt4py_ast : Computation):
+        return cls(symbol_table).visit(gt4py_ast)
+
     def visit_Argument(self, node: Argument):
         # we don't visit any arguments, as their types (which are also symbols)
         #  are parsed in the frontend
@@ -183,6 +199,10 @@ class GTScriptToGTIR(eve.NodeTranslator):
         super().__init__(*args, **kwargs)
         # new scope so copy everything
         self.symbol_table = copy.deepcopy(symbol_table)
+
+    @classmethod
+    def apply(cls, symbol_table, gt4py_ast : Computation):
+        return cls(symbol_table).visit(gt4py_ast)
 
     #def _get_location_type_by_symbol(self, location_stack, location):
     #    if not issubclass(self.symbol_table[location], Location):
