@@ -23,9 +23,15 @@ import os
 import string
 import sys
 import textwrap
-import typing
 from subprocess import PIPE, Popen
-from typing import (
+
+import black
+import jinja2
+from mako import template as mako_tpl
+
+from . import typing, utils
+from .concepts import Node
+from .typing import (
     Any,
     ClassVar,
     Collection,
@@ -41,13 +47,6 @@ from typing import (
     Type,
     Union,
 )
-
-import black
-import jinja2
-from mako import template as mako_tpl
-
-from . import utils
-from .concepts import Node
 from .visitors import AnyTreeNode, NodeVisitor
 
 
@@ -312,14 +311,17 @@ class Template:
 
         return typing.cast("Template", super().__new__(template_cls))
 
-    @staticmethod
-    def from_file(template_cls: Type["Template"], file_path: Union[str, os.PathLike]) -> "Template":
+    @classmethod
+    def from_file(cls, file_path: Union[str, os.PathLike]) -> "Template":
+        if cls is Template:
+            raise RuntimeError("This method can only be called in concrete Template subclasses")
+
         with open(file_path, "r") as f:
             definition = f.read()
-        return template_cls(definition)
+        return cls(definition)
 
     def __init__(self, definition: Any, **kwargs: Any) -> None:
-        raise NotImplementedError("__init__() must be implemented in specific Template subclasses")
+        raise NotImplementedError("__init__() must be implemented in concrete Template subclasses")
 
     def render(self, mapping: Optional[Mapping[str, str]] = None, **kwargs: Any) -> str:
         """Render the template.
@@ -396,15 +398,7 @@ class TemplatedGenerator(NodeVisitor):
         }
 
     @classmethod
-    def generic_dump(cls, node: AnyTreeNode, **kwargs: Any) -> str:
-        """Class-specific ``dump()`` function for primitive types.
-
-        This class could be redefined in the subclasses.
-        """
-        return str(node)
-
-    @classmethod
-    def apply(cls, root: AnyTreeNode, **kwargs: Any) -> str:
+    def apply(cls, root: AnyTreeNode, **kwargs: Any) -> Union[str, Collection[str]]:
         """Public method to build a class instance and visit an IR node.
 
         The order followed to choose a `dump()` function for instances of
@@ -446,10 +440,18 @@ class TemplatedGenerator(NodeVisitor):
             String (or collection of strings) with the dumped version of the root IR node.
 
         """
-        return cls().visit(root, **kwargs)
+        return typing.cast(Union[str, Collection[str]], cls().visit(root, **kwargs))
 
-    def generic_visit(self, node: AnyTreeNode, **kwargs) -> Union[str, Collection[str]]:
-        result = ""
+    @classmethod
+    def generic_dump(cls, node: AnyTreeNode, **kwargs: Any) -> str:
+        """Class-specific ``dump()`` function for primitive types.
+
+        This class could be redefined in the subclasses.
+        """
+        return str(node)
+
+    def generic_visit(self, node: AnyTreeNode, **kwargs: Any) -> Union[str, Collection[str]]:
+        result: Union[str, Collection[str]] = ""
         if isinstance(node, Node):
             template, _ = self.get_template(node)
             if template:
@@ -487,26 +489,26 @@ class TemplatedGenerator(NodeVisitor):
     def render_template(
         self,
         template: Template,
-        node: Any,
+        node: Node,
         transformed_children: Mapping[str, Any],
         transformed_attrs: Mapping[str, Any],
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """Render a template using node instance data (see :meth:`apply`)."""
 
         return template.render(
             **transformed_children,
             **transformed_attrs,
-            _children=transformed_children,  # type: ignore
-            _attrs=transformed_attrs,  # type: ignore
+            _children=transformed_children,
+            _attrs=transformed_attrs,
             _this_node=node,
             _this_generator=self,
             _this_module=sys.modules[type(self).__module__],
             **kwargs,
         )
 
-    def transform_children(self, node: AnyTreeNode, **kwargs) -> Dict[str, Any]:
+    def transform_children(self, node: Node, **kwargs: Any) -> Dict[str, Any]:
         return {key: self.visit(value, **kwargs) for key, value in node.iter_children()}
 
-    def transform_attrs(self, node: AnyTreeNode, **kwargs) -> Dict[str, Any]:
+    def transform_attrs(self, node: Node, **kwargs: Any) -> Dict[str, Any]:
         return {key: self.visit(value, **kwargs) for key, value in node.iter_attributes()}
