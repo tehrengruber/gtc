@@ -20,7 +20,7 @@ class PyToGTScript:
              - ForwardRef (resolve the reference given the specified module and return its subclasses)
              - built-in python type: str, int, type(None) (return as is)
         """
-        if inspect.isclass(typ) and issubclass(typ, gtscript.GT4PyAstNode):
+        if inspect.isclass(typ) and issubclass(typ, gtscript.GTScriptAstNode):
             result = set()
             result.add(typ)
             result.update(typ.__subclasses__())

@@ -46,15 +46,15 @@ class GTScriptCompilationTask:
         self.gt4py_ast = PyToGTScript().transform(self.python_ast)
 
         # Canonicalization
-        NodeCanonicalizer().visit(self.gt4py_ast)
+        NodeCanonicalizer.apply(self.gt4py_ast)
 
         # Populate symbol table
-        VarDeclExtractor(self.symbol_table).visit(self.gt4py_ast)
-        TemporaryFieldDeclExtractor(self.symbol_table).visit(self.gt4py_ast)
-        SymbolResolutionValidation(self.symbol_table).visit(self.gt4py_ast)
+        VarDeclExtractor.apply(self.symbol_table, self.gt4py_ast)
+        TemporaryFieldDeclExtractor.apply(self.symbol_table, self.gt4py_ast)
+        SymbolResolutionValidation.apply(self.symbol_table, self.gt4py_ast)
 
         # Transform into GTIR
-        gtir = GTScriptToGTIR(self.symbol_table).visit(self.gt4py_ast)
+        gtir = GTScriptToGTIR.apply(self.symbol_table, self.gt4py_ast)
 
         # Code generation
         nir_comp = GtirToNir().visit(gtir)
