@@ -93,7 +93,6 @@ sten = Stencil(
             ],
         )
     ],
-    declarations=[],
 )
 
 
