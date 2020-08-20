@@ -28,8 +28,8 @@
 #include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_ugpu.hpp"
 // #include "nabla_cuda.hpp"
 #else
-#include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_unaive.hpp"
-// #include "nabla_naive.hpp"
+// #include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_unaive.hpp"
+#include "nabla_naive.hpp"
 #endif
 
 namespace {
