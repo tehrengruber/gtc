@@ -59,3 +59,33 @@ is a SID with the following dimensions:
 
 - If elements are not indexed contiguously, we need to abstract the mechanism for iterating the primary location loop. E.g. loop over pole edges.
 - k size?
+
+## Build instructions
+
+```export BASEPATH=`pwd`
+
+export ECBUILD_VERSION=3.3.2
+wget https://github.com/ecmwf/ecbuild/archive/${ECBUILD_VERSION}.tar.gz
+tar xzf ${ECBUILD_VERSION}.tar.gz
+export "PATH=$PATH:$(pwd)/ecbuild-${ECBUILD_VERSION}/bin"
+
+export ECKIT_VERSION=1.10.1
+wget https://github.com/ecmwf/eckit/archive/${ECKIT_VERSION}.tar.gz
+tar xzf ${ECKIT_VERSION}.tar.gz
+pushd eckit-${ECKIT_VERSION}
+mkdir build
+pushd build
+ecbuild ..
+popd
+popd
+
+export ATLAS_VERSION=0.20.1
+wget https://github.com/ecmwf/atlas/archive/${ATLAS_VERSION}.tar.gz
+tar xzf ${ATLAS_VERSION}.tar.gz
+cd atlas-${ATLAS_VERSION}
+mkdir build
+pushd build
+ecbuild -DECKIT_PATH="$BASEPATH/eckit-${ECKIT_VERSION}/build" .. 
+make -j4
+popd
+```
