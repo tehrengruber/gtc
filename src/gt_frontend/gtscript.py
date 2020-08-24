@@ -111,7 +111,7 @@ class Generator(Expr):
 
 
 class Assign(Statement):
-    target: Name  # todo: allow subscript
+    target: Union[Name, SubscriptSingle, SubscriptMultiple]  # todo: allow subscript
     value: Expr
 
 

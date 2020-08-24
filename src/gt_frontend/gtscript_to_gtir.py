@@ -174,9 +174,16 @@ class TemporaryFieldDeclExtractor(eve.NodeVisitor):
         self.primary_location = self.symbol_table[node.name.id]
 
     def visit_Assign(self, node : Assign):
-        if not node.target.id in self.symbol_table:
+        # extract target symbol
+        if isinstance(node.target, SubscriptMultiple):
+            target = node.target.value
+        elif isinstance(node.target, Name):
+            target = node.target
+        assert isinstance(target, Name)
+
+        if not target.id in self.symbol_table:
             location_type = self.primary_location.args[0]
-            self.symbol_table[node.target.id] = TemporaryField[location_type, self.symbol_table.materialize_constant("dtype")]
+            self.symbol_table[target.id] = TemporaryField[location_type, self.symbol_table.materialize_constant("dtype")]
 
     def visit_Stencil(self, node : Stencil):
         self.primary_location = None
