@@ -49,6 +49,7 @@ from .typing import (
 )
 from .visitors import AnyTreeNode, NodeVisitor
 
+from devtools import debug
 
 try:
     import clang_format
@@ -396,9 +397,7 @@ class TemplatedGenerator(NodeVisitor):
             key[:-9]: value if isinstance(value, Template) else Template(value)
             for key, value in cls_dict.items()
             if key.endswith("_template")
-            and key != "_template"
-            and key != "get_template"
-            and key != "render_template"
+            and (isinstance(value, Template) or type(value) in Template._DEFINITION_TYPES)
         }
 
     @classmethod
