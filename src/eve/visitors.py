@@ -22,9 +22,13 @@ import copy
 import dataclasses
 import enum
 import operator
-from typing import (
+
+from .concepts import Node
+from .types import IntEnum, StrEnum
+from .typing import (
     Any,
     Callable,
+    ClassVar,
     Collection,
     Iterable,
     List,
@@ -32,16 +36,16 @@ from typing import (
     MutableSet,
     Optional,
     Tuple,
+    Type,
+    TypeVar,
     Union,
 )
-
-from .concepts import Node
-from .types import IntEnum, StrEnum
 from .utils import NOTHING
 
 
-ValidLeafNodeType = Union[bool, bytes, int, float, str, IntEnum, StrEnum, Node, None]
-ValidNodeType = Union[ValidLeafNodeType, Collection[ValidLeafNodeType]]
+AnyNode = TypeVar("AnyNode", bound=Node)
+AnyTreeLeaf = Union[bool, bytes, int, float, str, IntEnum, StrEnum, Node, AnyNode]
+AnyTreeNode = Union[AnyTreeLeaf, Collection[AnyTreeLeaf]]
 
 
 class NodeVisitor:
@@ -66,12 +70,16 @@ class NodeVisitor:
     allows modifications.
     """
 
-    ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
+    ATOMIC_COLLECTION_TYPES: ClassVar[Tuple[Type, ...]] = (str, bytes, bytearray)
 
-    def visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
+    def visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
         visitor = self.generic_visit
-        if isinstance(node, Node):
-            for node_class in node.__class__.__mro__:
+
+        method_name = "visit_" + node.__class__.__name__
+        if hasattr(self, method_name):
+            visitor = getattr(self, method_name)
+        elif isinstance(node, Node):
+            for node_class in node.__class__.__mro__[1:]:
                 method_name = "visit_" + node_class.__name__
                 if hasattr(self, method_name):
                     visitor = getattr(self, method_name)
@@ -82,7 +90,7 @@ class NodeVisitor:
 
         return visitor(node, **kwargs)
 
-    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
+    def generic_visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
         items: Iterable[Tuple[Any, Any]] = []
         if isinstance(node, Node):
             items = list(node.iter_children())
@@ -117,16 +125,16 @@ class NodeTranslator(NodeVisitor):
        node = YourTranslator().visit(node)
     """
 
-    def __init__(self, *, memo: dict = None, **kwargs: Any):
+    def __init__(self, *, memo: dict = None, **kwargs: Any) -> None:
         assert memo is None or isinstance(memo, dict)
         self.memo = memo or {}
 
-    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
+    def generic_visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
         result: Any
         if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
-            tmp_items: Collection[ValidNodeType] = []
+            tmp_items: Collection[AnyTreeNode] = []
             if isinstance(node, Node):
                 tmp_items = {
                     key: self.visit(value, **kwargs) for key, value in node.iter_children()
@@ -175,13 +183,13 @@ class NodeModifier(NodeVisitor):
        node = YourTransformer().visit(node)
     """
 
-    def generic_visit(self, node: ValidNodeType, **kwargs: Any) -> Any:
+    def generic_visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
         result: Any = node
         if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             items: Iterable[Tuple[Any, Any]] = []
-            tmp_items: Collection[ValidNodeType] = []
+            tmp_items: Collection[AnyTreeNode] = []
             set_op: Union[Callable[[Any, str, Any], None], Callable[[Any, int, Any], None]]
             del_op: Union[Callable[[Any, str], None], Callable[[Any, int], None]]
 
@@ -193,7 +201,7 @@ class NodeModifier(NodeVisitor):
                 items = enumerate(node)
                 index_shift = 0
 
-                def set_op(container: MutableSequence, idx: int, value: ValidNodeType) -> None:
+                def set_op(container: MutableSequence, idx: int, value: AnyTreeNode) -> None:
                     container[idx - index_shift] = value
 
                 def del_op(container: MutableSequence, idx: int) -> None:
@@ -204,7 +212,7 @@ class NodeModifier(NodeVisitor):
             elif isinstance(node, collections.abc.MutableSet):
                 items = list(enumerate(node))
 
-                def set_op(container: MutableSet, idx: Any, value: ValidNodeType) -> None:
+                def set_op(container: MutableSet, idx: Any, value: AnyTreeNode) -> None:
                     container.add(value)
 
                 def del_op(container: MutableSet, idx: int) -> None:
@@ -214,12 +222,14 @@ class NodeModifier(NodeVisitor):
                 items = node.items()
                 set_op = operator.setitem
                 del_op = operator.delitem
+
             elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)):
                 # Inmutable sequence or set: create a new container instance with the new values
                 tmp_items = [self.visit(value, **kwargs) for value in node]
                 result = node.__class__(  # type: ignore
-                    [value for value in tmp_items if value is not NOTHING]
+                    [value for value in tmp_items if value is not NOTHING]  # type: ignore
                 )
+
             elif isinstance(node, collections.abc.Mapping):
                 # Inmutable mapping: create a new mapping instance with the new values
                 tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
@@ -234,6 +244,7 @@ class NodeModifier(NodeVisitor):
                     del_op(result, key)
                 elif new_value != value:
                     set_op(result, key, new_value)
+
         return result
 
 
@@ -245,7 +256,7 @@ class PathItemKind(enum.Enum):
 
 @dataclasses.dataclass(frozen=True)
 class PathItem:
-    node: ValidNodeType
+    node: AnyTreeNode
     kind: PathItemKind
     member: Union[str, int]
 
@@ -280,7 +291,7 @@ class PathNodeVisitor:
     ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
 
     def visit(
-        self, node: ValidNodeType, *, path_info: Optional[PathInfo] = None, **kwargs: Any
+        self, node: AnyTreeNode, *, path_info: Optional[PathInfo] = None, **kwargs: Any
     ) -> Any:
         if path_info is None:
             path_info = PathInfo()
@@ -298,7 +309,7 @@ class PathNodeVisitor:
 
         return visitor(node, path_info=path_info, **kwargs)
 
-    def generic_visit(self, node: ValidNodeType, *, path_info: PathInfo, **kwargs: Any) -> Any:
+    def generic_visit(self, node: AnyTreeNode, *, path_info: PathInfo, **kwargs: Any) -> Any:
         items: Iterable[Tuple[Any, Any]] = []
 
         if isinstance(node, Node):

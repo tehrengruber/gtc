@@ -86,167 +86,35 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             raise ValueError("Doesn't contain a LocationType!")
         return location_type[0]
 
-    class Templates:
-        # Node = mako_tpl.Template("${_this_node.__class__.__name__.upper()}")  # only for testing
-        Connectivity = "auto {name} = gridtools::next::mesh::connectivity<{chain}>(mesh);"
+    # class Templates:
+    # Node = mako_tpl.Template("${_this_node.__class__.__name__.upper()}")  # only for testing
+    Connectivity_template = "auto {name} = gridtools::next::mesh::connectivity<{chain}>(mesh);"
 
-        NeighborChain = mako_tpl.Template(
-            """<%
-                loc_strs = [_this_generator.LOCATION_TYPE_TO_STR[e] for e in _this_node.elements]
-            %>
-            % if len(loc_strs) == 1:
-                ${ loc_strs[0] }
-            % else:
-                std::tuple<${ ','.join(loc_strs) }>
-            % endif
-            """
-        )
+    NeighborChain_template = mako_tpl.Template(
+        """<%
+            loc_strs = [_this_generator.LOCATION_TYPE_TO_STR[e] for e in _this_node.elements]
+        %>
+        % if len(loc_strs) == 1:
+            ${ loc_strs[0] }
+        % else:
+            std::tuple<${ ','.join(loc_strs) }>
+        % endif
+        """
+    )
 
-        SidCompositeNeighborTableEntry = (
-            "gridtools::next::connectivity::neighbor_table({_this_node.connectivity_deref_.name})"
-        )
+    SidCompositeNeighborTableEntry_template = (
+        "gridtools::next::connectivity::neighbor_table({_this_node.connectivity_deref_.name})"
+    )
 
-        SidCompositeEntry = "{name}"
+    SidCompositeEntry_template = "{name}"
 
-        SidComposite = mako_tpl.Template(
-            """
-            auto ${ _this_node.field_name } = tu::make<gridtools::sid::composite::keys<${ ','.join([t.tag_name for t in _this_node.entries]) }>::values>(
-            ${ ','.join(entries)});
-            static_assert(gridtools::is_sid<decltype(${ _this_node.field_name })>{});
-            """
-        )
-
-        KernelCall = mako_tpl.Template(
-            """
-            {
-                ${ ''.join(connectivities) }
-
-                ${ ''.join(sids) }
-
-                auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(${ primary_connectivity.name }));
-                ${ name }<<<blocks, threads_per_block>>>(${','.join(args)});
-                GT_CUDA_CHECK(cudaDeviceSynchronize());
-            }
-            """
-        )
-
-        Kernel = mako_tpl.Template(
-            """<%
-                prim_conn = symbol_tbl_conn[_this_node.primary_connectivity]
-                prim_sid = symbol_tbl_sids[_this_node.primary_sid]
-            %>
-            template<${ ','.join("class {}_t".format(p) for p in parameters)}>
-            __global__ void ${ name }( ${','.join("{0}_t {0}".format(p) for p in parameters) }) {
-                auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-                if (idx >= gridtools::next::connectivity::size(${ prim_conn.name }))
-                    return;
-                % if len(prim_sid.entries) > 0:
-                auto ${ prim_sid.ptr_name } = ${ prim_sid.origin_name }();
-                gridtools::sid::shift(${ prim_sid.ptr_name }, gridtools::device::at_key<
-                    ${ _this_generator.LOCATION_TYPE_TO_STR[prim_sid.location.elements[-1]] }
-                    >(${ prim_sid.strides_name }), idx);
-                % endif
-                ${ "".join(ast) }
-            }
-            """
-        )
-
-        FieldAccess = mako_tpl.Template(
-            """<%
-                sid_deref = symbol_tbl_sids[_this_node.sid]
-                sid_entry_deref = sid_deref.symbol_tbl[_this_node.name]
-            %>*gridtools::device::at_key<${ sid_entry_deref.tag_name }>(${ sid_deref.ptr_name })"""
-        )
-
-        AssignStmt = "{left} = {right};"
-
-        BinaryOp = "({left} {op} {right})"
-
-        Computation = mako_tpl.Template(
-            """#include <gridtools/next/cuda_util.hpp>
-            #include <gridtools/next/mesh.hpp>
-            #include <gridtools/next/tmp_storage.hpp>
-            #include <gridtools/next/unstructured.hpp>
-            #include <gridtools/common/cuda_util.hpp>
-            #include <gridtools/sid/allocator.hpp>
-            #include <gridtools/sid/composite.hpp>
-
-            namespace ${ name }_impl_ {
-                ${ ''.join(sid_tags) }
-
-                ${ ''.join(kernels) }
-            }
-
-            template<class mesh_t, ${ ','.join('class ' + p.name + '_t' for p in _this_node.parameters) }>
-            void ${ name }(mesh_t&& mesh, ${ ','.join(p.name + '_t&& ' + p.name for p in _this_node.parameters) }){
-                namespace tu = gridtools::tuple_util;
-                using namespace ${ name }_impl_;
-
-                ${ cache_allocator if len(temporaries) > 0 else '' }
-                ${ ''.join(temporaries) }
-
-                ${ ''.join(ctrlflow_ast) }
-            }
-            """
-        )
-
-        Temporary = mako_tpl.Template(
-            """<%
-            %>auto zavg_tmp = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
-                (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<${ loctype }>(mesh)), 1 /* TODO ksize */, cuda_alloc);"""
-        )
-
-        NeighborLoop = mako_tpl.Template(
-            """<%
-                outer_sid_deref = symbol_tbl_sids[_this_node.outer_sid]
-                sid_deref = symbol_tbl_sids[_this_node.sid] if _this_node.sid else None
-                conn_deref = symbol_tbl_conn[_this_node.connectivity]
-                body_location = _this_generator.LOCATION_TYPE_TO_STR[sid_deref.location.elements[-1]] if sid_deref else None
-            %>
-            for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ conn_deref.name }); ++neigh) {
-                auto absolute_neigh_index = *gridtools::device::at_key<${ conn_deref.neighbor_tbl_tag }>(${ outer_sid_deref.ptr_name});
-                if (absolute_neigh_index != gridtools::next::connectivity::skip_value(${ conn_deref.name })) {
-                    % if sid_deref:
-                        auto ${ sid_deref.ptr_name } = ${ sid_deref.origin_name }();
-                        gridtools::sid::shift(
-                            ${ sid_deref.ptr_name }, gridtools::device::at_key<${ body_location }>(${ sid_deref.strides_name }), absolute_neigh_index);
-                    % endif
-
-                    // bodyparameters
-                    ${ ''.join(body) }
-                    // end body
-                }
-                gridtools::sid::shift(${ outer_sid_deref.ptr_name }, gridtools::device::at_key<neighbor>(${ outer_sid_deref.strides_name }), 1);
-            }
-            gridtools::sid::shift(${ outer_sid_deref.ptr_name }, gridtools::device::at_key<neighbor>(${ outer_sid_deref.strides_name }),
-                -gridtools::next::connectivity::max_neighbors(${ conn_deref.name }));
-
-            """
-        )
-
-        Literal = mako_tpl.Template(
-            """<%
-                literal= _this_node.value if isinstance(_this_node.value, str) else _this_generator.BUILTIN_LITERAL_TO_STR[_this_node.value]
-            %>(${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] })${ literal }"""
-        )
-
-        VarAccess = "{name}"
-
-        VarDecl = mako_tpl.Template(
-            "${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] } ${ name } = ${ init };"
-        )
-
-    @classmethod
-    def apply(cls, root, **kwargs) -> str:
-        symbol_tbl_resolved = SymbolTblHelper().visit(root)
-        generated_code = super().apply(symbol_tbl_resolved, **kwargs)
-        formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
-        return formatted_code
-
-    def visit_Temporary(self, node: Temporary, **kwargs):
-        c_vtype = self.DATA_TYPE_TO_STR[node.vtype]
-        loctype = self.LOCATION_TYPE_TO_STR[self.location_type_from_dimensions(node.dimensions)]
-        return self.generic_visit(node, loctype=loctype, c_vtype=c_vtype, **kwargs)
+    SidComposite_template = mako_tpl.Template(
+        """
+        auto ${ _this_node.field_name } = tu::make<gridtools::sid::composite::keys<${ ','.join([t.tag_name for t in _this_node.entries]) }>::values>(
+        ${ ','.join(entries)});
+        static_assert(gridtools::is_sid<decltype(${ _this_node.field_name })>{});
+        """
+    )
 
     def visit_KernelCall(self, node: KernelCall, **kwargs):
         kernel: Kernel = kwargs["symbol_tbl_kernel"][node.name]
@@ -271,6 +139,20 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             **kwargs,
         )
 
+    KernelCall_template = mako_tpl.Template(
+        """
+        {
+            ${ ''.join(connectivities) }
+
+            ${ ''.join(sids) }
+
+            auto [blocks, threads_per_block] = gridtools::next::cuda_util::cuda_setup(gridtools::next::connectivity::size(${ primary_connectivity.name }));
+            ${ name }<<<blocks, threads_per_block>>>(${','.join(args)});
+            GT_CUDA_CHECK(cudaDeviceSynchronize());
+        }
+        """
+    )
+
     def visit_Kernel(self, node: Kernel, **kwargs):
         symbol_tbl_conn = {c.name: c for c in node.connectivities}
         symbol_tbl_sids = {s.name: s for s in node.sids}
@@ -289,6 +171,38 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             **kwargs,
         )
 
+    Kernel_template = mako_tpl.Template(
+        """<%
+            prim_conn = symbol_tbl_conn[_this_node.primary_connectivity]
+            prim_sid = symbol_tbl_sids[_this_node.primary_sid]
+        %>
+        template<${ ','.join("class {}_t".format(p) for p in parameters)}>
+        __global__ void ${ name }( ${','.join("{0}_t {0}".format(p) for p in parameters) }) {
+            auto idx = blockIdx.x * blockDim.x + threadIdx.x;
+            if (idx >= gridtools::next::connectivity::size(${ prim_conn.name }))
+                return;
+            % if len(prim_sid.entries) > 0:
+            auto ${ prim_sid.ptr_name } = ${ prim_sid.origin_name }();
+            gridtools::sid::shift(${ prim_sid.ptr_name }, gridtools::device::at_key<
+                ${ _this_generator.LOCATION_TYPE_TO_STR[prim_sid.location.elements[-1]] }
+                >(${ prim_sid.strides_name }), idx);
+            % endif
+            ${ "".join(ast) }
+        }
+        """
+    )
+
+    FieldAccess_template = mako_tpl.Template(
+        """<%
+            sid_deref = symbol_tbl_sids[_this_node.sid]
+            sid_entry_deref = sid_deref.symbol_tbl[_this_node.name]
+        %>*gridtools::device::at_key<${ sid_entry_deref.tag_name }>(${ sid_deref.ptr_name })"""
+    )
+
+    AssignStmt_template = "{left} = {right};"
+
+    BinaryOp_template = "({left} {op} {right})"
+
     def visit_Computation(self, node: Computation, **kwargs):
         symbol_tbl_kernel = {k.name: k for k in node.kernels}
         sid_tags = set()
@@ -306,3 +220,89 @@ class UgpuCodeGenerator(codegen.TemplatedGenerator):
             symbol_tbl_kernel=symbol_tbl_kernel,
             **kwargs,
         )
+
+    Computation_template = mako_tpl.Template(
+        """#include <gridtools/next/cuda_util.hpp>
+        #include <gridtools/next/mesh.hpp>
+        #include <gridtools/next/tmp_storage.hpp>
+        #include <gridtools/next/unstructured.hpp>
+        #include <gridtools/common/cuda_util.hpp>
+        #include <gridtools/sid/allocator.hpp>
+        #include <gridtools/sid/composite.hpp>
+
+        namespace ${ name }_impl_ {
+            ${ ''.join(sid_tags) }
+
+            ${ ''.join(kernels) }
+        }
+
+        template<class mesh_t, ${ ','.join('class ' + p.name + '_t' for p in _this_node.parameters) }>
+        void ${ name }(mesh_t&& mesh, ${ ','.join(p.name + '_t&& ' + p.name for p in _this_node.parameters) }){
+            namespace tu = gridtools::tuple_util;
+            using namespace ${ name }_impl_;
+
+            ${ cache_allocator if len(temporaries) > 0 else '' }
+            ${ ''.join(temporaries) }
+
+            ${ ''.join(ctrlflow_ast) }
+        }
+        """
+    )
+
+    def visit_Temporary(self, node: Temporary, **kwargs):
+        c_vtype = self.DATA_TYPE_TO_STR[node.vtype]
+        loctype = self.LOCATION_TYPE_TO_STR[self.location_type_from_dimensions(node.dimensions)]
+        return self.generic_visit(node, loctype=loctype, c_vtype=c_vtype, **kwargs)
+
+    Temporary_template = mako_tpl.Template(
+        """<%
+        %>auto zavg_tmp = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
+            (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<${ loctype }>(mesh)), 1 /* TODO ksize */, cuda_alloc);"""
+    )
+
+    NeighborLoop_template = mako_tpl.Template(
+        """<%
+            outer_sid_deref = symbol_tbl_sids[_this_node.outer_sid]
+            sid_deref = symbol_tbl_sids[_this_node.sid] if _this_node.sid else None
+            conn_deref = symbol_tbl_conn[_this_node.connectivity]
+            body_location = _this_generator.LOCATION_TYPE_TO_STR[sid_deref.location.elements[-1]] if sid_deref else None
+        %>
+        for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(${ conn_deref.name }); ++neigh) {
+            auto absolute_neigh_index = *gridtools::device::at_key<${ conn_deref.neighbor_tbl_tag }>(${ outer_sid_deref.ptr_name});
+            if (absolute_neigh_index != gridtools::next::connectivity::skip_value(${ conn_deref.name })) {
+                % if sid_deref:
+                    auto ${ sid_deref.ptr_name } = ${ sid_deref.origin_name }();
+                    gridtools::sid::shift(
+                        ${ sid_deref.ptr_name }, gridtools::device::at_key<${ body_location }>(${ sid_deref.strides_name }), absolute_neigh_index);
+                % endif
+
+                // bodyparameters
+                ${ ''.join(body) }
+                // end body
+            }
+            gridtools::sid::shift(${ outer_sid_deref.ptr_name }, gridtools::device::at_key<neighbor>(${ outer_sid_deref.strides_name }), 1);
+        }
+        gridtools::sid::shift(${ outer_sid_deref.ptr_name }, gridtools::device::at_key<neighbor>(${ outer_sid_deref.strides_name }),
+            -gridtools::next::connectivity::max_neighbors(${ conn_deref.name }));
+
+        """
+    )
+
+    Literal_template = mako_tpl.Template(
+        """<%
+            literal= _this_node.value if isinstance(_this_node.value, str) else _this_generator.BUILTIN_LITERAL_TO_STR[_this_node.value]
+        %>(${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] })${ literal }"""
+    )
+
+    VarAccess_template = "{name}"
+
+    VarDecl_template = mako_tpl.Template(
+        "${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] } ${ name } = ${ init };"
+    )
+
+    @classmethod
+    def apply(cls, root, **kwargs) -> str:
+        symbol_tbl_resolved = SymbolTblHelper().visit(root)
+        generated_code = super().apply(symbol_tbl_resolved, **kwargs)
+        formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
+        return formatted_code

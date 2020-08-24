@@ -14,29 +14,28 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import Any, Callable, Type
-
 from .concepts import Node
-from .visitors import NodeVisitor
+from .typing import Any, Callable, List, Type
+from .visitors import AnyTreeNode, NodeVisitor
 
 
 class FindNodes(NodeVisitor):
-    def __init__(self, **kwargs):
-        self.result = []
+    def __init__(self, **kwargs: Any) -> None:
+        self.result: List = []
 
-    def visit(self, node: Node, **kwargs) -> Any:
+    def visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
         if kwargs["predicate"](node):
             self.result.append(node)
         self.generic_visit(node, **kwargs)
         return self.result
 
     @classmethod
-    def by_predicate(cls, predicate: Callable[[Node], bool], node: Node, **kwargs):
+    def by_predicate(cls, predicate: Callable[[Node], bool], node: Node, **kwargs: Any) -> Any:
         return cls().visit(node, predicate=predicate)
 
     @classmethod
-    def by_type(cls, node_type: Type[Node], node: Node, **kwargs):
-        def type_predicate(node: Node):
+    def by_type(cls, node_type: Type[Node], node: Node, **kwargs: Any) -> Any:
+        def type_predicate(node: Node) -> bool:
             return isinstance(node, node_type)
 
         return cls.by_predicate(type_predicate, node)

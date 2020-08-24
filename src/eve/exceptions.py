@@ -16,7 +16,7 @@
 
 """Definitions of specific Eve exceptions."""
 
-from typing import Any
+from .typing import Any
 
 
 class EveError:
@@ -32,12 +32,12 @@ class EveError:
 
 
 class EveTypeError(EveError, TypeError):
-    message_template = "Invalid or unexpected type (info: {info}) "
+    message_template = "Invalid or unexpected type (info: {info})"
 
 
 class EveValueError(EveError, ValueError):
-    message_template = "Invalid value (info: {info}) "
+    message_template = "Invalid value (info: {info})"
 
 
 class EveRuntimeError(EveError, RuntimeError):
-    message_template = "Runtime error (info: {info}) "
+    message_template = "Runtime error (info: {info})"
