@@ -14,6 +14,7 @@ jobs:
             matrix:
                 compiler: [gcc-9-atlas]
                 build_type: [Release]
+                python-version: [3.8]
 
         steps:
             - uses: actions/checkout@v1
