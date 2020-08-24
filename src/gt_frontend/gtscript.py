@@ -18,6 +18,7 @@ import ast
 from typing import ForwardRef, Union, Dict, List, Optional, Any, Generic, TypeVar
 import inspect
 from eve import Node, UIDGenerator
+import eve.types
 import gtc.common as common
 from . import ast_node_matcher as anm
 
@@ -56,7 +57,8 @@ class IterationOrder(GTScriptAstNode):
 #    value: T
 
 class Constant(Expr):
-    value: Union[int, float, type(None), str] # note: due to automatic conversion in pydantic str must be at the end
+    # todo: due to automatic conversion in pydantic str must be at the end. evaluate usage of StrictStr etc.
+    value: Union[int, float, type(None), str]
 
 
 class Interval(GTScriptAstNode):
@@ -129,9 +131,7 @@ class Stencil(GTScriptAstNode):
 
 
 class Pass(Statement):
-    @staticmethod
-    def template():
-        return ast.Pass()
+    pass
 
 
 class Argument(GTScriptAstNode):

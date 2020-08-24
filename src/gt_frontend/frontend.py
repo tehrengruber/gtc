@@ -15,6 +15,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from typing import Type
+import devtools
 import gt_frontend.gtscript as gtscript
 from gt_frontend.gtscript import Mesh, Field, Edge, Vertex
 from gt_frontend.gtscript_to_gtir import SymbolTable, GTScriptToGTIR, VarDeclExtractor, NodeCanonicalizer, TemporaryFieldDeclExtractor, SymbolResolutionValidation
@@ -56,7 +57,7 @@ class GTScriptCompilationTask:
         for name, param in sig.parameters.items():
             self.symbol_table[name] = param.annotation
 
-    def compile(self):
+    def compile(self, *, debug=False, code_generator=UgpuCodeGenerator):
         self._annotate_args()
         self.python_ast = ast.parse(inspect.getsource(self.definition)).body[0]
         self.gt4py_ast = PyToGTScript().transform(self.python_ast)
@@ -75,8 +76,12 @@ class GTScriptCompilationTask:
         # Code generation
         nir_comp = GtirToNir().visit(gtir)
         nir_comp = find_and_merge_horizontal_loops(nir_comp)
-        ugpu_comp = NirToUgpu().visit(nir_comp)
-        # debug(ugpu_comp)
+        usid_comp = NirToUsid().visit(nir_comp)
 
-        generated_code = UgpuCodeGenerator.apply(ugpu_comp)
-        print(generated_code)
+        if debug:
+            devtools.debug(nir_comp)
+            devtools.debug(usid_comp)
+
+        generated_code = code_generator.apply(usid_comp)
+
+        return generated_code

@@ -10,100 +10,27 @@
 import os
 import sys
 
-from devtools import debug
+from gtc.common import DataType
+from gt_frontend.gtscript import Mesh, Field, Local, Cell, Edge, Vertex
+from gt_frontend.frontend import GTScriptCompilationTask
+from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
+from gtc.unstructured.unaive_codegen import UnaiveCodeGenerator
 
-from gtc.common import DataType, LocationType, LoopOrder
-from gtc.unstructured import gtir
-from gtc.unstructured.gtir import (
-    AssignStmt,
-    Dimensions,
-    Domain,
-    FieldAccess,
-    HorizontalDimension,
-    HorizontalLoop,
-    LocationComprehension,
-    LocationRef,
-    NeighborChain,
-    NeighborReduce,
-    ReduceOperator,
-    Stencil,
-    UField,
-    VerticalLoop,
-)
-from gtc.unstructured.gtir_to_nir import GtirToNir
-from gtc.unstructured.nir_to_usid import NirToUsid
-from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGenerator
+dtype = DataType.FLOAT64
 
-
-field_in = UField(
-    name="field_in",
-    dimensions=Dimensions(horizontal=HorizontalDimension(primary=LocationType.Vertex)),
-    vtype=DataType.FLOAT64,
-)
-field_out = UField(
-    name="field_out",
-    dimensions=Dimensions(horizontal=HorizontalDimension(primary=LocationType.Edge)),
-    vtype=DataType.FLOAT64,
-)
-
-red_operand = FieldAccess(
-    name="field_in", location_type=LocationType.Vertex, subscript=[LocationRef(name="v")]
-)
-
-
-red_v2e = NeighborReduce(
-    op=ReduceOperator.ADD,
-    operand=red_operand,
-    neighbors=LocationComprehension(
-        name="v",
-        chain=NeighborChain(elements=[LocationType.Edge, LocationType.Vertex]),
-        of=LocationRef(name="e"),
-    ),
-    location_type=LocationType.Edge,
-)
-
-assign_v2e_red = AssignStmt(
-    left=FieldAccess(
-        name="field_out", subscript=[LocationRef(name="e")], location_type=LocationType.Edge
-    ),
-    right=red_v2e,
-)
-
-
-sten = Stencil(
-    vertical_loops=[
-        VerticalLoop(
-            loop_order=LoopOrder.FORWARD,
-            horizontal_loops=[
-                HorizontalLoop(
-                    location=LocationComprehension(
-                        name="e", chain=NeighborChain(elements=[LocationType.Edge]), of=Domain()
-                    ),
-                    stmt=assign_v2e_red,
-                )
-            ],
-        )
-    ],
-)
-
-comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[sten])
-# debug(comp)
-
+def sten(mesh : Mesh, field_in : Field[Vertex, dtype], field_out : Field[Edge, dtype]):
+    with computation(FORWARD), location(Edge) as e:
+        field_out = sum(field_in[v] for v in vertices(e))
 
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "unaive"
 
-    comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[sten])
-    nir_comp = GtirToNir().visit(comp)
-    debug(nir_comp)
-    usid_comp = NirToUsid().visit(nir_comp)
-    debug(usid_comp)
-
     if mode == "unaive":
-        generated_code = UsidNaiveCodeGenerator.apply(usid_comp)
+        code_generator = UsidNaiveCodeGenerator
+    else: # 'ugpu':
+        code_generator = UsidGpuCodeGenerator
 
-    else:  # 'ugpu':
-        generated_code = UsidGpuCodeGenerator.apply(usid_comp)
+    generated_code = GTScriptCompilationTask(sten).compile(debug=True, code_generator=code_generator)
 
     print(generated_code)
     output_file = (

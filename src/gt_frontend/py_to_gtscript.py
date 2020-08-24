@@ -22,6 +22,7 @@ from . import gtscript
 from . import ast_node_matcher as anm
 from .ast_node_matcher import Capture
 from eve import UIDGenerator
+import eve.types
 import enum
 import gtc.common
 
@@ -58,7 +59,7 @@ class PyToGTScript:
                 raise ValueError(
                     "Reference to type `{}` in `ForwardRef` not found in module {}".format(type_name, module.__name__))
             return PyToGTScript._all_subclasses(getattr(module, type_name), module=module)
-        elif typ in [str, int, float, type(None)]:  # todo: enhance
+        elif typ in [eve.types.StrictStr, eve.types.StrictInt, eve.types.StrictFloat, str, int, float, type(None)]:  # todo: enhance
             return set([typ])
 
         raise ValueError("Invalid field type {}".format(typ))
@@ -153,4 +154,4 @@ class PyToGTScript:
         elif type(node) in eligible_node_types:
             return node
 
-        raise ValueError("Expected a node of type {}, but got {}".format(eligible_node_types + [ast.AST], type(node)))
+        raise ValueError("Expected a node of type {}, but got {}".format({*eligible_node_types, ast.AST}, type(node)))
