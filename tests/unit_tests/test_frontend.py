@@ -1,7 +1,10 @@
+# -*- coding: utf-8 -*-
 import ast
 import inspect
 import textwrap
+
 from gt_frontend import ast_node_matcher as anm
+
 
 class TestAstNodeMatcher:
     def test_simple(self):
@@ -29,16 +32,16 @@ class TestAstNodeMatcher:
         assert not matches
 
     def test_capture_nested(self):
-        ast_node = ast.List(elts=[
-            ast.Constant(value=1),
-            ast.Constant(value=2),
-            ast.Constant(value=3)
-        ])
-        pattern_node = ast.List(elts=[
-            ast.Constant(value=anm.Capture("first")),
-            ast.Constant(value=anm.Capture("second")),
-            ast.Constant(value=anm.Capture("third"))
-        ])
+        ast_node = ast.List(
+            elts=[ast.Constant(value=1), ast.Constant(value=2), ast.Constant(value=3)]
+        )
+        pattern_node = ast.List(
+            elts=[
+                ast.Constant(value=anm.Capture("first")),
+                ast.Constant(value=anm.Capture("second")),
+                ast.Constant(value=anm.Capture("third")),
+            ]
+        )
         captures = {}
         matches = anm.match(ast_node, pattern_node, captures)
         assert matches
@@ -50,18 +53,14 @@ class TestAstNodeMatcher:
     def test_capture_from_definition(self):
         def some_func(arg1, arg2):
             return arg1
+
         ast_node = ast.parse(textwrap.dedent(inspect.getsource(some_func))).body[0]
         pattern_node = ast.FunctionDef(
             name=anm.Capture("function_name"),
             args=ast.arguments(
-                args=[
-                    ast.arg(arg=anm.Capture("arg1_name")),
-                    ast.arg(arg=anm.Capture("arg2_name"))
-                ]
+                args=[ast.arg(arg=anm.Capture("arg1_name")), ast.arg(arg=anm.Capture("arg2_name"))]
             ),
-            body=[
-                ast.Return(value=ast.Name(anm.Capture("return_name")))
-            ]
+            body=[ast.Return(value=ast.Name(anm.Capture("return_name")))],
         )
         captures = {}
         matches = anm.match(ast_node, pattern_node, captures)
@@ -103,7 +102,9 @@ class TestAstNodeMatcher:
 
     def test_arr_optional(self):
         ast_node = ast.Tuple(elts=[ast.Name(id="1")])
-        pattern_node = ast.Tuple(elts=[ast.Name(id="1"), ast.Name(id=anm.Capture("id", default="some_default"))])
+        pattern_node = ast.Tuple(
+            elts=[ast.Name(id="1"), ast.Name(id=anm.Capture("id", default="some_default"))]
+        )
 
         captures = {}
         matches = anm.match(ast_node, pattern_node, captures)

@@ -23,6 +23,7 @@ from gt_frontend.gtscript import *
 import eve
 import gtc.unstructured.gtir as gtir
 
+
 _reduction_mapping = {
     "sum": gtir.ReduceOperator.ADD,
     "product": gtir.ReduceOperator.MUL,
@@ -34,6 +35,7 @@ _reduction_mapping = {
 #  - BuiltInType
 #  - LocationType
 #  - DataType
+
 
 class SymbolTable:
     def __init__(self, types, constants):
@@ -67,8 +69,12 @@ class SymbolTable:
         val = self.constants[name]
         if expected_type != None and not isinstance(val, expected_type):
             raise ValueError(
-                "Expected a symbol {} of type {}, but got {}".format(name, expected_type, self.types[name]))
+                "Expected a symbol {} of type {}, but got {}".format(
+                    name, expected_type, self.types[name]
+                )
+            )
         return val
+
 
 class NodeCanonicalizer(eve.NodeModifier):
     @classmethod
@@ -79,7 +85,7 @@ class NodeCanonicalizer(eve.NodeModifier):
         # todo: do canonicalization properly. this should happen in the translation from python to gtscript
         return self.visit(SubscriptMultiple(value=node.value, indices=[Name(id=node.index)]))
 
-    def visit_Computation(self, node : Computation):
+    def visit_Computation(self, node: Computation):
         # canonicalize nested stencils
         stencils = []
         for stencil in node.stencils:
@@ -88,8 +94,10 @@ class NodeCanonicalizer(eve.NodeModifier):
                 for nested_stencil in stencil.body:
                     # todo: validate iteration_spec otherwise the TemporaryFieldDeclExtractor fails
                     flattened_stencil = Stencil(
-                        iteration_spec=self.generic_visit(stencil.iteration_spec) + self.generic_visit(nested_stencil.iteration_spec),
-                        body=self.generic_visit(nested_stencil.body))
+                        iteration_spec=self.generic_visit(stencil.iteration_spec)
+                        + self.generic_visit(nested_stencil.iteration_spec),
+                        body=self.generic_visit(nested_stencil.body),
+                    )
                     if any(isinstance(body_node, Stencil) for body_node in flattened_stencil.body):
                         raise ValueError("Nesting a stencil inside a nested stencil not allowed.")
                     stencils.append(flattened_stencil)
@@ -117,6 +125,7 @@ class NodeCanonicalizer(eve.NodeModifier):
 
         return self.generic_visit(node)
 
+
 # poor mans variable declarations extractor
 # todo: first type inference, than symbol table population?
 class VarDeclExtractor(eve.NodeVisitor):
@@ -139,7 +148,7 @@ class VarDeclExtractor(eve.NodeVisitor):
         self.symbol_table = symbol_table
 
     @classmethod
-    def apply(cls, symbol_table, gt4py_ast : Computation):
+    def apply(cls, symbol_table, gt4py_ast: Computation):
         return cls(symbol_table).visit(gt4py_ast)
 
     def visit_LocationComprehension(self, node: LocationComprehension):
@@ -160,20 +169,21 @@ class VarDeclExtractor(eve.NodeVisitor):
         if not node.name in self.symbol_table:
             raise ValueError("Argument declarations need to be handled in the frontend.")
 
+
 class TemporaryFieldDeclExtractor(eve.NodeVisitor):
     # todo: enhance to support sparse dimension
     def __init__(self, symbol_table):
         self.symbol_table = symbol_table
 
     @classmethod
-    def apply(cls, symbol_table, gt4py_ast : Computation):
+    def apply(cls, symbol_table, gt4py_ast: Computation):
         return cls(symbol_table).visit(gt4py_ast)
 
-    def visit_LocationSpecification(self, node : LocationSpecification):
+    def visit_LocationSpecification(self, node: LocationSpecification):
         assert self.primary_location == None
         self.primary_location = self.symbol_table[node.name.id]
 
-    def visit_Assign(self, node : Assign):
+    def visit_Assign(self, node: Assign):
         # extract target symbol
         if isinstance(node.target, SubscriptMultiple):
             target = node.target.value
@@ -183,9 +193,11 @@ class TemporaryFieldDeclExtractor(eve.NodeVisitor):
 
         if not target.id in self.symbol_table:
             location_type = self.primary_location.args[0]
-            self.symbol_table[target.id] = TemporaryField[location_type, self.symbol_table.materialize_constant("dtype")]
+            self.symbol_table[target.id] = TemporaryField[
+                location_type, self.symbol_table.materialize_constant("dtype")
+            ]
 
-    def visit_Stencil(self, node : Stencil):
+    def visit_Stencil(self, node: Stencil):
         self.primary_location = None
         self.generic_visit(node)
         self.primary_location = None
@@ -195,11 +207,12 @@ class SymbolResolutionValidation(eve.NodeVisitor):
     """
     Ensure all occurring symbols are in the symbol table
     """
+
     def __init__(self, symbol_table):
         self.symbol_table = symbol_table
 
     @classmethod
-    def apply(cls, symbol_table, gt4py_ast : Computation):
+    def apply(cls, symbol_table, gt4py_ast: Computation):
         return cls(symbol_table).visit(gt4py_ast)
 
     def visit_Argument(self, node: Argument):
@@ -211,6 +224,7 @@ class SymbolResolutionValidation(eve.NodeVisitor):
         # every symbol not yet parsed must be supplied externally
         assert node.id in self.symbol_table
 
+
 class GTScriptToGTIR(eve.NodeTranslator):
     def __init__(self, symbol_table, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -218,10 +232,10 @@ class GTScriptToGTIR(eve.NodeTranslator):
         self.symbol_table = copy.deepcopy(symbol_table)
 
     @classmethod
-    def apply(cls, symbol_table, gt4py_ast : Computation):
+    def apply(cls, symbol_table, gt4py_ast: Computation):
         return cls(symbol_table).visit(gt4py_ast)
 
-    #def _get_location_type_by_symbol(self, location_stack, location):
+    # def _get_location_type_by_symbol(self, location_stack, location):
     #    if not issubclass(self.symbol_table[location], Location):
     #        raise ValueError("`{}` is not a location.".format(location))
     #    for location_compr in location_stack:
@@ -237,16 +251,25 @@ class GTScriptToGTIR(eve.NodeTranslator):
     def visit_Interval(self, node: Interval):
         return None
 
-    def visit_LocationSpecification(self, node: LocationSpecification, **kwargs) -> gtir.LocationComprehension:
-        loc_type = self.symbol_table.materialize_constant(node.location_type, expected_type=common.LocationType)
+    def visit_LocationSpecification(
+        self, node: LocationSpecification, **kwargs
+    ) -> gtir.LocationComprehension:
+        loc_type = self.symbol_table.materialize_constant(
+            node.location_type, expected_type=common.LocationType
+        )
         return gtir.LocationComprehension(
             name=node.name.id, chain=gtir.NeighborChain(elements=[loc_type]), of=gtir.Domain()
         )
 
-    def visit_LocationComprehension(self, node: LocationComprehension, *, location_stack, **kwargs) -> gtir.LocationComprehension:
+    def visit_LocationComprehension(
+        self, node: LocationComprehension, *, location_stack, **kwargs
+    ) -> gtir.LocationComprehension:
         if not node.iter.func == "neighbors":
             raise ValueError(
-                "Invalid neighbor specification. Expected a call to `neighbors`, but got ``".format(node.iter.func))
+                "Invalid neighbor specification. Expected a call to `neighbors`, but got ``".format(
+                    node.iter.func
+                )
+            )
 
         of = self.visit(node.iter.args[0], location_stack=location_stack, **kwargs)
         if not isinstance(of, gtir.LocationRef):
@@ -255,7 +278,9 @@ class GTScriptToGTIR(eve.NodeTranslator):
         src_comprehension = location_stack[-1]
         assert src_comprehension.name == of.name
         elements = [src_comprehension.chain.elements[-1]] + [
-            self.symbol_table.materialize_constant(loc_type.id, expected_type=gtir.common.LocationType)
+            self.symbol_table.materialize_constant(
+                loc_type.id, expected_type=gtir.common.LocationType
+            )
             for loc_type in node.iter.args[1:]
         ]
         chain = gtir.NeighborChain(elements=elements)
@@ -269,17 +294,23 @@ class GTScriptToGTIR(eve.NodeTranslator):
             if not len(node.args):
                 raise ValueError(
                     "Invalid number of arguments specified for function {}. Expected 1, but {} were given.".format(
-                        node.func, len(node.args)))
+                        node.func, len(node.args)
+                    )
+                )
             if not isinstance(node.args[0], Generator) or len(node.args[0].generators) != 1:
                 raise ValueError("Invalid argument to {}".format(node.func))
 
             op = _reduction_mapping[node.func]
-            neighbors = self.visit(node.args[0].generators[0], **{**kwargs, "location_stack": location_stack})
+            neighbors = self.visit(
+                node.args[0].generators[0], **{**kwargs, "location_stack": location_stack}
+            )
 
             # operand gets new location stack
             new_location_stack = location_stack + [neighbors]
 
-            operand = self.visit(node.args[0].elt, **{**kwargs, "location_stack": new_location_stack})
+            operand = self.visit(
+                node.args[0].elt, **{**kwargs, "location_stack": new_location_stack}
+            )
 
             return gtir.NeighborReduce(
                 op=op,
@@ -290,17 +321,22 @@ class GTScriptToGTIR(eve.NodeTranslator):
 
         raise ValueError()
 
-    def visit_Constant(self, node : Constant, *, location_stack, **kwargs):
-        py_dtype_to_eve = { # todo: check
+    def visit_Constant(self, node: Constant, *, location_stack, **kwargs):
+        py_dtype_to_eve = {  # todo: check
             int: common.DataType.INT32,
-            float: common.DataType.FLOAT64
+            float: common.DataType.FLOAT64,
         }
-        return gtir.Literal(value=str(node.value), vtype=py_dtype_to_eve[type(node.value)],
-                            location_type=location_stack[-1].chain.elements[-1])
+        return gtir.Literal(
+            value=str(node.value),
+            vtype=py_dtype_to_eve[type(node.value)],
+            location_type=location_stack[-1].chain.elements[-1],
+        )
 
     def visit_Name(self, node: Name, *, location_stack):
         assert node.id in self.symbol_table
-        if issubclass(self.symbol_table[node.id], Field) or issubclass(self.symbol_table[node.id], TemporaryField):
+        if issubclass(self.symbol_table[node.id], Field) or issubclass(
+            self.symbol_table[node.id], TemporaryField
+        ):
             return gtir.FieldAccess(
                 name=node.id,
                 location_type=location_stack[-1].chain.elements[-1],
@@ -313,7 +349,9 @@ class GTScriptToGTIR(eve.NodeTranslator):
 
     def visit_SubscriptMultiple(self, node: SubscriptMultiple, *, location_stack):
         assert node.value.id in self.symbol_table
-        if issubclass(self.symbol_table[node.value.id], Field) or issubclass(self.symbol_table[node.value.id], TemporaryField):
+        if issubclass(self.symbol_table[node.value.id], Field) or issubclass(
+            self.symbol_table[node.value.id], TemporaryField
+        ):
             assert all(issubclass(self.symbol_table[index.id], Location) for index in node.indices)
             # todo: just visit the index symbol
             return gtir.FieldAccess(
@@ -329,8 +367,10 @@ class GTScriptToGTIR(eve.NodeTranslator):
             left=self.visit(node.target, **kwargs), right=self.visit(node.value, **kwargs)
         )
 
-    def visit_BinaryOp(self, node : BinaryOp, **kwargs):
-        return gtir.BinaryOp(op=node.op, left=self.visit(node.left, **kwargs), right=self.visit(node.right, **kwargs))
+    def visit_BinaryOp(self, node: BinaryOp, **kwargs):
+        return gtir.BinaryOp(
+            op=node.op, left=self.visit(node.left, **kwargs), right=self.visit(node.right, **kwargs)
+        )
 
     def visit_Stencil(self, node: Stencil, **kwargs) -> gtir.Stencil:
         loop_order, primary_location = None, None
@@ -374,23 +414,22 @@ class GTScriptToGTIR(eve.NodeTranslator):
         assert isinstance(vtype, common.DataType)
 
         if len(location_types) == 1:
-            assert (isinstance(location_types[0], common.LocationType))
+            assert isinstance(location_types[0], common.LocationType)
             horizontal_dim = gtir.HorizontalDimension(primary=location_types[0])
         elif len(location_types) == 2:
-            assert (isinstance(location_types[0], common.LocationType))
-            assert (issubclass(location_types[1], Local) and isinstance(location_types[1].args[0], common.LocationType))
-            horizontal_dim = gtir.HorizontalDimension(primary=location_types[0],
-                                                      secondary=gtir.NeighborChain(
-                                                          elements=[location_types[1].args[0]]))
+            assert isinstance(location_types[0], common.LocationType)
+            assert issubclass(location_types[1], Local) and isinstance(
+                location_types[1].args[0], common.LocationType
+            )
+            horizontal_dim = gtir.HorizontalDimension(
+                primary=location_types[0],
+                secondary=gtir.NeighborChain(elements=[location_types[1].args[0]]),
+            )
         else:
             raise ValueError()
 
         return gtir.UField(
-            name=name,
-            vtype=vtype,
-            dimensions=gtir.Dimensions(
-                horizontal=horizontal_dim
-            ),
+            name=name, vtype=vtype, dimensions=gtir.Dimensions(horizontal=horizontal_dim),
         )
 
     def visit_Computation(self, node: Computation) -> gtir.Computation:
@@ -402,14 +441,15 @@ class GTScriptToGTIR(eve.NodeTranslator):
         for arg in node.arguments[1:]:
             field_args.append(self._transform_field_type(arg.name, self.symbol_table[arg.name]))
 
-
         # parse temporary fields
         temporary_field_decls = []
         for name, type in self.symbol_table.types.items():
             if issubclass(type, TemporaryField):
                 temporary_field_decls.append(self._transform_field_type(name, type))
 
-
         return gtir.Computation(
-            name=node.name, params=field_args, stencils=self.visit(node.stencils), declarations=temporary_field_decls
+            name=node.name,
+            params=field_args,
+            stencils=self.visit(node.stencils),
+            declarations=temporary_field_decls,
         )
