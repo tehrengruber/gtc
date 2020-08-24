@@ -13,9 +13,10 @@
 # distribution for a copy of the license or check <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-from typing import Tuple, Dict, Any, List
-import copy
 import ast
+import copy
+from typing import Any, Dict, List, Tuple
+
 
 class Capture:
     name: str
@@ -25,15 +26,19 @@ class Capture:
         self.name = name
         self.default = default
 
+
 # just some dummy classes for capturing defaults in lists
 class _Placeholder:
     pass
 
+
 class _PlaceholderList(List):
     pass
 
+
 class _PlaceholderAst(ast.AST):
     pass
+
 
 def _get_placeholder_node(pattern_node):
     if isinstance(pattern_node, List):
@@ -42,6 +47,7 @@ def _get_placeholder_node(pattern_node):
         return _PlaceholderAst()
 
     return _Placeholder()
+
 
 def _is_placeholder_for(node, pattern_node):
     """
@@ -53,6 +59,7 @@ def _is_placeholder_for(node, pattern_node):
         return True
 
     return False
+
 
 def check_optional(pattern_node, captures={}):
     """
@@ -69,6 +76,7 @@ def check_optional(pattern_node, captures={}):
         return is_optional
     return False
 
+
 def match(concrete_node, pattern_node, captures=None) -> Tuple[bool, Dict[str, ast.AST]]:
     if captures == None:
         captures = {}
@@ -76,7 +84,9 @@ def match(concrete_node, pattern_node, captures=None) -> Tuple[bool, Dict[str, a
     if isinstance(pattern_node, Capture):
         captures[pattern_node.name] = concrete_node
         return True
-    elif type(concrete_node) != type(pattern_node) and not _is_placeholder_for(concrete_node, pattern_node):
+    elif type(concrete_node) != type(pattern_node) and not _is_placeholder_for(
+        concrete_node, pattern_node
+    ):
         return False
     elif isinstance(pattern_node, ast.AST):
         # iterate over the fields of the concrete- and pattern-node side by side and check if they match
@@ -101,13 +111,19 @@ def match(concrete_node, pattern_node, captures=None) -> Tuple[bool, Dict[str, a
             return False
         elif len(pattern_node) > len(concrete_node):
             # insert dummy nodes so that we can still call match on the pattern node and capture the defaults
-            concrete_node = [concrete_node[i] if i < len(concrete_node) else _get_placeholder_node(cpn) for i, cpn in enumerate(pattern_node)]
+            concrete_node = [
+                concrete_node[i] if i < len(concrete_node) else _get_placeholder_node(cpn)
+                for i, cpn in enumerate(pattern_node)
+            ]
 
-        return all([match(ccn, cpn, captures=captures) for ccn, cpn in zip(concrete_node, pattern_node)])
+        return all(
+            [match(ccn, cpn, captures=captures) for ccn, cpn in zip(concrete_node, pattern_node)]
+        )
     elif concrete_node == pattern_node:
         return True
 
     return False
+
 
 # todo: pattern node ast.Name(bla=123) matches ast.Name(id="123") since bla is not an attribute
 #  this can lead to errors which are hard to track

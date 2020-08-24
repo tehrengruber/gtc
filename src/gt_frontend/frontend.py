@@ -14,24 +14,34 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import ast
+import inspect
 from typing import Type
+
 import devtools
 import gt_frontend.gtscript as gtscript
-from gt_frontend.gtscript import Mesh, Field, Edge, Vertex
-from gt_frontend.gtscript_to_gtir import SymbolTable, GTScriptToGTIR, VarDeclExtractor, NodeCanonicalizer, TemporaryFieldDeclExtractor, SymbolResolutionValidation
+from gt_frontend.gtscript import Edge, Field, Mesh, Vertex
+from gt_frontend.gtscript_to_gtir import (
+    GTScriptToGTIR,
+    NodeCanonicalizer,
+    SymbolResolutionValidation,
+    SymbolTable,
+    TemporaryFieldDeclExtractor,
+    VarDeclExtractor,
+)
 from gt_frontend.py_to_gtscript import PyToGTScript
+
 from gtc import common
-import inspect
-import ast
 from gtc.unstructured.gtir_to_nir import GtirToNir
 from gtc.unstructured.nir_passes.merge_horizontal_loops import find_and_merge_horizontal_loops
 from gtc.unstructured.nir_to_ugpu import NirToUgpu
 from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
 
+
 class GTScriptCompilationTask:
     def __init__(self, definition):
         self.symbol_table = SymbolTable(
-            types = {
+            types={
                 "dtype": common.DataType,
                 "Vertex": common.LocationType,
                 "Edge": common.LocationType,
@@ -42,9 +52,9 @@ class GTScriptCompilationTask:
                 "Vertex": common.LocationType.Vertex,
                 "Edge": common.LocationType.Edge,
                 "Cell": common.LocationType.Cell,
-                #"Field": Field,
-                #"Mesh": Mesh
-            }
+                # "Field": Field,
+                # "Mesh": Mesh
+            },
         )
 
         self.definition = definition
