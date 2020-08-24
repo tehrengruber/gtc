@@ -391,10 +391,12 @@ class TemplatedGenerator(NodeVisitor):
 
     @classmethod
     def __init_subclass__(cls) -> None:
+        cls_dict = {attr: getattr(cls, attr) for attr in dir(cls)}
         cls._TEMPLATES = {
             key[:-9]: value if isinstance(value, Template) else Template(value)
-            for key, value in cls.__dict__.items()
-            if key.endswith("_template") and key != "_template"
+            for key, value in cls_dict.items()
+            if key.endswith("_template")
+            and (isinstance(value, Template) or type(value) in Template._DEFINITION_TYPES)
         }
 
     @classmethod

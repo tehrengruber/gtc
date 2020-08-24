@@ -8,8 +8,8 @@ from devtools import debug  # noqa: F401
 import eve  # noqa: F401
 from gtc import common
 from gtc.common import LocationType
-from gtc.unstructured import ugpu_codegen
-from gtc.unstructured.ugpu import (
+from gtc.unstructured import usid_codegen
+from gtc.unstructured.usid import (
     AssignStmt,
     BinaryOp,
     Computation,
@@ -325,7 +325,7 @@ comp = Computation(
 
 debug(comp)
 
-generated_code = ugpu_codegen.UgpuCodeGenerator.apply(comp)
+generated_code = usid_codegen.UsidGpuCodeGenerator.apply(comp)
 print(generated_code)
 
 output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_fvm_nabla_ugpu.hpp"
