@@ -49,6 +49,7 @@ from .typing import (
 )
 from .visitors import AnyTreeNode, NodeVisitor
 
+
 try:
     import clang_format
 
