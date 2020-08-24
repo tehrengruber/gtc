@@ -31,8 +31,8 @@ from gtc.unstructured.gtir import (
     VerticalLoop,
 )
 from gtc.unstructured.gtir_to_nir import GtirToNir
-from gtc.unstructured.nir_to_ugpu import NirToUgpu
-from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
+from gtc.unstructured.nir_to_usid import NirToUsid
+from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator
 
 
 field_in = UField(
@@ -95,10 +95,10 @@ comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[ste
 
 nir_comp = GtirToNir().visit(comp)
 debug(nir_comp)
-ugpu_comp = NirToUgpu().visit(nir_comp)
-debug(ugpu_comp)
+usid_comp = NirToUsid().visit(nir_comp)
+debug(usid_comp)
 
-generated_code = UgpuCodeGenerator.apply(ugpu_comp)
+generated_code = UsidGpuCodeGenerator.apply(usid_comp)
 print(generated_code)
 
 output_file = os.path.dirname(os.path.realpath(__file__)) + "/generated_cell2cell_sparse.hpp"
