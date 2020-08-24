@@ -20,7 +20,7 @@ dtype = DataType.FLOAT64
 
 def sten(mesh : Mesh, field_in : Field[Cell, dtype], field_out : Field[Cell, dtype]):
     with computation(FORWARD), location(Cell) as c1:
-        field_out = sum(field_in[c1]+field_in[c2] for c2 in cells(c1))
+        field_out[c1] = sum(field_in[c1]+field_in[c2] for c2 in cells(c1))
 
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "unaive"
