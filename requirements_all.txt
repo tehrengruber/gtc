@@ -44,7 +44,7 @@ importlib-metadata==1.7.0  # via flake8, jsonschema, pep517, pluggy, pre-commit,
 iniconfig==1.0.1          # via pytest
 ipykernel==5.3.4          # via -r /home/enriqueg/Projects/eve/requirements_dev.in, ipywidgets, jupyter, jupyter-console, notebook, qtconsole
 ipython-genutils==0.2.0   # via nbformat, notebook, qtconsole, traitlets
-ipython==7.17.0           # via -r /home/enriqueg/Projects/eve/requirements_dev.in, ipykernel, ipywidgets, jupyter-console
+ipython==7.16.1           # via -r /home/enriqueg/Projects/eve/requirements_dev.in, ipykernel, ipywidgets, jupyter-console
 ipywidgets==7.5.1         # via jupyter
 isort==5.4.2              # via -r /home/enriqueg/Projects/eve/requirements_dev.in
 jedi==0.17.2              # via ipython
