@@ -23,7 +23,7 @@ from gt_frontend.gtscript import *
 import eve
 import gtc.unstructured.gtir as gtir
 
-reduction_mapping = {
+_reduction_mapping = {
     "sum": gtir.ReduceOperator.ADD,
     "product": gtir.ReduceOperator.MUL,
     "min": gtir.ReduceOperator.MIN,
@@ -95,7 +95,7 @@ class NodeCanonicalizer(eve.NodeModifier):
                     stencils.append(flattened_stencil)
             elif not any(isinstance(body_node, Stencil) for body_node in stencil.body):
                 # if we have a non-nested stencil just keep it as is
-                stencils.append(stencil)
+                stencils.append(self.visit(stencil))
             else:
                 raise ValueError("Mixing nested and unnested stencils not allowed.")
 
@@ -159,10 +159,6 @@ class VarDeclExtractor(eve.NodeVisitor):
     def visit_Argument(self, node: Argument):
         if not node.name in self.symbol_table:
             raise ValueError("Argument declarations need to be handled in the frontend.")
-
-    #def visit_Assign(self, node : Assign):
-    #    if not node.target in self.symbol_table:
-    #        self.symbol_table[node.target] = TemporaryField
 
 class TemporaryFieldDeclExtractor(eve.NodeVisitor):
     # todo: enhance to support sparse dimension
@@ -262,7 +258,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
     def visit_Call(self, node: Call, *, location_stack, **kwargs):
         # todo: all of this can be done with the symbol table and the call inliner
         # reductions
-        if node.func in reduction_mapping:
+        if node.func in _reduction_mapping:
             if not len(node.args):
                 raise ValueError(
                     "Invalid number of arguments specified for function {}. Expected 1, but {} were given.".format(
@@ -270,7 +266,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
             if not isinstance(node.args[0], Generator) or len(node.args[0].generators) != 1:
                 raise ValueError("Invalid argument to {}".format(node.func))
 
-            op = reduction_mapping[node.func]
+            op = _reduction_mapping[node.func]
             neighbors = self.visit(node.args[0].generators[0], **{**kwargs, "location_stack": location_stack})
 
             # operand gets new location stack
