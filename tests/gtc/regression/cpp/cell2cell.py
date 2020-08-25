@@ -12,7 +12,7 @@ import os
 import sys
 
 from gt_frontend.frontend import GTScriptCompilationTask
-from gt_frontend.gtscript import Cell, Field, Mesh
+from gt_frontend.gtscript import FORWARD, Cell, Field, Mesh, cells, computation, location
 
 from gtc.common import DataType
 from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGenerator
@@ -31,10 +31,10 @@ def main():
 
     if mode == "unaive":
         code_generator = UsidNaiveCodeGenerator
-    else: # 'ugpu':
+    else:  # 'ugpu':
         code_generator = UsidGpuCodeGenerator
 
-    generated_code = GTScriptCompilationTask(sten).compile(
+    generated_code = GTScriptCompilationTask(sten).generate(
         debug=True, code_generator=code_generator
     )
 

@@ -13,20 +13,11 @@
 # distribution for a copy of the license or check <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-import ast
-import inspect
-from typing import Any, Dict, ForwardRef, Generic, List, Optional, TypeVar, Union
+import sys
+from typing import Callable
 
-import typing_inspect
-
-import eve.types
 import gtc.common as common
-from eve import Node, UIDGenerator
 
-from . import ast_node_matcher as anm
-
-# builtins
-# todo: is this the right way?
 from .built_in_types import Field, Local, Location, Mesh, TemporaryField
 
 
@@ -34,131 +25,43 @@ Vertex = common.LocationType.Vertex
 Edge = common.LocationType.Edge
 Cell = common.LocationType.Cell
 
-# template is a 1-to-1 mapping from context and python ast node to gt4py ast node. context is encoded in the field types
-# all understood sementic is encoded in the structure
+built_in_functions = ["computation", "location", "neighbors", "vertices", "edges", "cells"]
+built_in_symbols = ["FORWARD", "BACKWARD"]
+
+__all__ = (
+    built_in_functions
+    + built_in_symbols
+    + ["Field", "Local", "Location", "Mesh", "TemporaryField", "Vertex", "Edge", "Cell"]
+)
 
 
-class GTScriptAstNode(Node):
-    pass
+# generate built-in function stubs
+class GTScriptBuiltInNotCallableFromPythonException(Exception):
+    def __init__(self, name: str):
+        self.message = "GTScript built-in function `{}` not callable from python".format(name)
+        super().__init__(self.message)
 
 
-class Statement(GTScriptAstNode):
-    pass
+def _generate_built_in_function_stub(func_name: str) -> Callable:
+    def stub(*_):
+        raise GTScriptBuiltInNotCallableFromPythonException(func_name)
+
+    return stub
 
 
-class Expr(GTScriptAstNode):
-    pass
+for built_in_function in built_in_functions:
+    setattr(
+        sys.modules[__name__],
+        built_in_function,
+        _generate_built_in_function_stub(built_in_function),
+    )
 
 
-class Name(Expr):
-    id: str
+# generate built-in symbol stubs
+class GTScriptBuiltInSymbol:
+    def __init__(self, name: str):
+        pass
 
 
-class IterationOrder(GTScriptAstNode):
-    order: str
-
-
-# todo: use type parameter see https://github.com/samuelcolvin/pydantic/pull/595
-# T = TypeVar('T')
-# class Constant(GT4PyAstNode, Generic[T]):
-#    value: T
-
-
-class Constant(Expr):
-    # todo: due to automatic conversion in pydantic str must be at the end. evaluate usage of StrictStr etc.
-    value: Union[int, float, type(None), str]
-
-
-class Interval(GTScriptAstNode):
-    start: Constant  # todo: use Constant[Union[int, str, type(None)]]
-    stop: Constant
-
-
-# todo: allow interval(...) by introducing Optional(captures={...}) placeholder
-# Optional(captures={start=0, end=None})
-
-
-class LocationSpecification(GTScriptAstNode):
-    name: Name
-    location_type: str
-
-
-# todo: proper cannonicalization (CanBeCanonicalizedTo[Subscript] ?)
-class SubscriptSingle(Expr):
-    value: Name
-    index: str
-
-
-SubscriptMultiple = ForwardRef("SubscriptMultiple")
-
-
-class SubscriptMultiple(Expr):
-    value: Name
-    indices: List[Union[Name, SubscriptSingle, SubscriptMultiple]]
-
-
-class BinaryOp(Expr):
-    op: common.BinaryOperator
-    left: Expr
-    right: Expr
-
-
-class Call(Expr):
-    args: List[Expr]
-    func: str
-
-
-class LocationComprehension(GTScriptAstNode):
-    target: Name
-    iter: Call
-
-
-class Generator(Expr):
-    generators: List[LocationComprehension]
-    elt: Expr
-
-
-class Assign(Statement):
-    target: Union[Name, SubscriptSingle, SubscriptMultiple]  # todo: allow subscript
-    value: Expr
-
-
-Stencil = ForwardRef("Stencil")
-
-
-class Stencil(GTScriptAstNode):
-    iteration_spec: List[Union[IterationOrder, LocationSpecification, Interval]]
-    body: List[Union[Statement, Stencil]]  # todo: stencil only allowed non-canonicalized
-
-
-# class Attribute(GT4PyAstNode):
-#    attr: str
-#    value: Union[Attribute, Name]
-#
-#    @staticmethod
-#    def template():
-#        return ast.Attribute(attr=Capture("attr"), value=Capture("value"))
-
-
-class Pass(Statement):
-    pass
-
-
-class Argument(GTScriptAstNode):
-    name: str
-    type: Union[Name, Union[SubscriptMultiple, SubscriptSingle]]
-    # is_keyword: bool
-
-
-# class Call(Generic[T]):
-#    name: str
-#    return_type: T
-#    arg_types: Ts
-#    args: List[Expr]
-
-
-class Computation(GTScriptAstNode):
-    name: str
-    arguments: List[Argument]
-    stencils: List[Stencil]
-    # stencils: List[Union[Stencil[Stencil[Statement]], Stencil[Statement]]]
+for built_in_symbol in built_in_symbols:
+    setattr(sys.modules[__name__], built_in_symbol, GTScriptBuiltInSymbol(built_in_symbol))

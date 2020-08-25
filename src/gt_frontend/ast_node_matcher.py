@@ -14,7 +14,6 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 import ast
-import copy
 from typing import Any, Dict, List, Tuple
 
 
@@ -61,24 +60,27 @@ def _is_placeholder_for(node, pattern_node):
     return False
 
 
-def check_optional(pattern_node, captures={}):
+def check_optional(pattern_node, captures=None):
     """
     Check if the given pattern node is optional and populate the `captures` dict with the default values stored
     in the `Capture` nodes
     """
-    if isinstance(pattern_node, Capture) and pattern_node.default != None:
+    if captures is None:
+        captures = {}
+
+    if isinstance(pattern_node, Capture) and pattern_node.default is not None:
         captures[pattern_node.name] = pattern_node.default
         return True
     elif isinstance(pattern_node, ast.AST):
         is_optional = True
-        for fieldname, child_node in ast.iter_fields(pattern_node):
+        for _fieldname, child_node in ast.iter_fields(pattern_node):
             is_optional &= check_optional(child_node, captures)
         return is_optional
     return False
 
 
 def match(concrete_node, pattern_node, captures=None) -> Tuple[bool, Dict[str, ast.AST]]:
-    if captures == None:
+    if captures is None:
         captures = {}
 
     if isinstance(pattern_node, Capture):

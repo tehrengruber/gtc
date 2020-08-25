@@ -26,7 +26,7 @@ import gtc.common
 from eve import UIDGenerator
 
 from . import ast_node_matcher as anm
-from . import gtscript
+from . import gtscript_ast
 from .ast_node_matcher import Capture
 
 
@@ -40,7 +40,7 @@ class PyToGTScript:
              - ForwardRef (resolve the reference given the specified module and return its subclasses)
              - built-in python type: str, int, type(None) (return as is)
         """
-        if inspect.isclass(typ) and issubclass(typ, gtscript.GTScriptAstNode):
+        if inspect.isclass(typ) and issubclass(typ, gtscript_ast.GTScriptAstNode):
             result = set()
             result.add(typ)
             result.update(typ.__subclasses__())
@@ -89,8 +89,10 @@ class PyToGTScript:
 
         raise ValueError("Invalid field type {}".format(typ))
 
+    # template is a 1-to-1 mapping from context and python ast node to gt4py ast node. context is encoded in the field types
+    # all understood sementic is encoded in the structure
     class Templates:
-        Name = ast.Name(id=Capture("id"))
+        Symbol = ast.Name(id=Capture("name"))
 
         IterationOrder = ast.withitem(
             context_expr=ast.Call(
@@ -127,7 +129,9 @@ class PyToGTScript:
 
         Call = ast.Call(args=Capture("args"), func=ast.Name(id=Capture("func")))
 
-        LocationComprehension = ast.comprehension(target=Capture("target"), iter=Capture("iter"))
+        LocationComprehension = ast.comprehension(
+            target=Capture("target"), iter=Capture("iterator")
+        )
 
         Generator = ast.GeneratorExp(generators=Capture("generators"), elt=Capture("elt"))
 
@@ -137,7 +141,7 @@ class PyToGTScript:
 
         Pass = ast.Pass()
 
-        Argument = ast.arg(arg=Capture("name"), annotation=Capture("type"))
+        Argument = ast.arg(arg=Capture("name"), annotation=Capture("type_"))
 
         Computation = ast.FunctionDef(
             args=ast.arguments(args=Capture("arguments")),
@@ -151,10 +155,13 @@ class PyToGTScript:
         ast.Div: gtc.common.BinaryOperator.DIV,
     }
 
-    def transform(self, node, eligible_node_types=[gtscript.Computation]):
+    def transform(self, node, eligible_node_types=None):
         """
         Transform python ast into GTScript ast recursively
         """
+        if eligible_node_types is None:
+            eligible_node_types = [gtscript_ast.Computation]
+
         if isinstance(node, ast.AST):
             is_leaf_node = len(list(ast.iter_fields(node))) == 0
             if is_leaf_node:
@@ -178,6 +185,11 @@ class PyToGTScript:
                     module = sys.modules[node_type.__module__]
                     transformed_captures = {}
                     for name, capture in captures.items():
+                        assert (
+                            name in node_type.__annotations__
+                        ), "Invalid capture. No field named `{}` in `{}`".format(
+                            name, str(node_type)
+                        )
                         field_type = node_type.__annotations__[name]
                         if typing_inspect.get_origin(field_type) == list:
                             # determine eligible capture types
