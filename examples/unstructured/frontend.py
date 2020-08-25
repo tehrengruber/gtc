@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
-import ast
-import inspect
-from typing import Type
-
-import gt_frontend.gtscript as gtscript
+# ignore "local variable '...' is assigned to but never used" for the entire file
+# flake8: noqa: F841
 from gt_frontend.frontend import GTScriptCompilationTask
-from gt_frontend.gtscript import Edge, Field, Local, Mesh, Vertex
-from gt_frontend.gtscript_to_gtir import GTScriptToGTIR, VarDeclExtractor
+from gt_frontend.gtscript import (
+    FORWARD,
+    Edge,
+    Field,
+    Mesh,
+    Vertex,
+    computation,
+    interval,
+    location,
+    vertices,
+)
 
 from gtc import common
 
@@ -64,4 +70,4 @@ def fvm_nabla_stencil(
             pnabla_MYY = pnabla_MYY / vol
 
 
-GTScriptCompilationTask(fvm_nabla_stencil).compile()
+GTScriptCompilationTask(fvm_nabla_stencil).generate()

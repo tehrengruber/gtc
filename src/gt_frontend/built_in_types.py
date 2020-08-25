@@ -13,6 +13,8 @@
 # distribution for a copy of the license or check <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+
 class BuiltInTypeMeta(type):
     def __new__(cls, class_name, bases, namespace, args=None):
         assert bases == () or (len(bases) == 1 and issubclass(bases[0], BuiltInType))
@@ -39,7 +41,7 @@ class BuiltInTypeMeta(type):
             and self.namespace == other.namespace
             and self.class_name == other.class_name
         ):
-            if self.args == None or self.args == other.args:
+            if self.args is None or self.args == other.args:
                 return True
         return False
 

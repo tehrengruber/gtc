@@ -11,7 +11,7 @@ import os
 import sys
 
 from gt_frontend.frontend import GTScriptCompilationTask
-from gt_frontend.gtscript import Edge, Field, Mesh, Vertex
+from gt_frontend.gtscript import FORWARD, Edge, Field, Mesh, Vertex, computation, location, vertices
 
 from gtc.common import DataType
 from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGenerator
@@ -22,7 +22,7 @@ dtype = DataType.FLOAT64
 
 def sten(mesh: Mesh, field_in: Field[Vertex, dtype], field_out: Field[Edge, dtype]):
     with computation(FORWARD), location(Edge) as e:
-        field_out = sum(field_in[v] for v in vertices(e))
+        field_out[e] = sum(field_in[v] for v in vertices(e))
 
 
 def main():
@@ -30,10 +30,10 @@ def main():
 
     if mode == "unaive":
         code_generator = UsidNaiveCodeGenerator
-    else: # 'ugpu':
+    else:  # 'ugpu':
         code_generator = UsidGpuCodeGenerator
 
-    generated_code = GTScriptCompilationTask(sten).compile(
+    generated_code = GTScriptCompilationTask(sten).generate(
         debug=True, code_generator=code_generator
     )
 

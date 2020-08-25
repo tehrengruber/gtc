@@ -16,11 +16,8 @@
 
 import ast
 import inspect
-from typing import Type
 
 import devtools
-import gt_frontend.gtscript as gtscript
-from gt_frontend.gtscript import Edge, Field, Mesh, Vertex
 from gt_frontend.gtscript_to_gtir import (
     GTScriptToGTIR,
     NodeCanonicalizer,
@@ -34,8 +31,8 @@ from gt_frontend.py_to_gtscript import PyToGTScript
 from gtc import common
 from gtc.unstructured.gtir_to_nir import GtirToNir
 from gtc.unstructured.nir_passes.merge_horizontal_loops import find_and_merge_horizontal_loops
-from gtc.unstructured.nir_to_ugpu import NirToUgpu
-from gtc.unstructured.ugpu_codegen import UgpuCodeGenerator
+from gtc.unstructured.nir_to_usid import NirToUsid
+from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator
 
 
 class GTScriptCompilationTask:
@@ -67,7 +64,7 @@ class GTScriptCompilationTask:
         for name, param in sig.parameters.items():
             self.symbol_table[name] = param.annotation
 
-    def compile(self, *, debug=False, code_generator=UgpuCodeGenerator):
+    def generate(self, *, debug=False, code_generator=UsidGpuCodeGenerator):
         self._annotate_args()
         self.python_ast = ast.parse(inspect.getsource(self.definition)).body[0]
         self.gt4py_ast = PyToGTScript().transform(self.python_ast)
