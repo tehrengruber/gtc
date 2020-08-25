@@ -1,6 +1,6 @@
 #pragma once
 
-#include <gridtools/next/tmp_gpu_storage.hpp>
+#include <gridtools/next/tmp_storage.hpp>
 #include <gridtools/sid/allocator.hpp>
 
 struct connectivity_tag;
@@ -232,7 +232,7 @@ void nabla(Mesh &&mesh,
         int k_size = 1; // TODO
         auto cuda_alloc =
             gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>); // TODO
-        auto zavg_tmp = gridtools::next::gpu::make_simple_tmp_storage<edge, double>(
+        auto zavg_tmp = gridtools::next::make_simple_tmp_storage<edge, double>(
             (int)gridtools::next::connectivity::size(e2v), k_size, cuda_alloc);
 
         auto edge_fields = tu::make<gridtools::sid::composite::
