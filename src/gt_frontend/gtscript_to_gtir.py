@@ -129,7 +129,7 @@ class NodeCanonicalizer(eve.NodeModifier):
         # neighbor accessor canonicalization
         neighbor_selector_mapping = {
             "vertices": Symbol(name="Vertex"),  # todo: common.LocationType.Vertex,
-            "edges": Symbol(name="Vertex"),  # common.LocationType.Edge,
+            "edges": Symbol(name="Edge"),  # common.LocationType.Edge,
             "cells": Symbol(name="Cell"),  # common. LocationType.Cell
         }
         if node.func in neighbor_selector_mapping:
