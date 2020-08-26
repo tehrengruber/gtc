@@ -69,8 +69,9 @@ class IterationOrder(GTScriptAstNode):
 
 
 class Constant(Expr):
-    # todo: due to automatic conversion in pydantic str must be at the end. evaluate usage of StrictStr etc.
-    value: Union[int, float, type(None), str]
+    # todo: use StrictStr, StrictInt, StrictFloat as pydantic automatically converts into the first
+    #  type it occurs. As a result currently all integers become floats
+    value: Union[float, int, type(None), str]
 
 
 class Interval(GTScriptAstNode):
