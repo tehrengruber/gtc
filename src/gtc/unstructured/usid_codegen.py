@@ -94,6 +94,8 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         "<gridtools/sid/composite.hpp>",
     ]
 
+    preface = ""
+
     Connectivity_template = "auto {name} = gridtools::next::mesh::connectivity<{chain}>(mesh);"
 
     NeighborChain_template = mako_tpl.Template(
@@ -232,7 +234,8 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         )
 
     Computation_template = mako_tpl.Template(
-        """${ '\\n'.join('#include ' + header for header in _this_generator.headers) }
+        """${_this_generator.preface}
+        ${ '\\n'.join('#include ' + header for header in _this_generator.headers) }
 
         namespace ${ name }_impl_ {
             ${ ''.join(sid_tags) }
@@ -284,6 +287,12 @@ class UsidGpuCodeGenerator(UsidCodeGenerator):
         "<gridtools/next/cuda_util.hpp>",
         "<gridtools/common/cuda_util.hpp>",
     ]
+
+    preface = UsidCodeGenerator.preface + """
+        #ifndef __CUDACC__
+        #error "Tried to compile CUDA code with a regular C++ compiler."
+        #endif
+    """
 
     KernelCall_template = mako_tpl.Template(
         """
