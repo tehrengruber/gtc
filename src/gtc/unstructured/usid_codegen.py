@@ -120,7 +120,6 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         """
         auto ${ _this_node.field_name } = tu::make<gridtools::sid::composite::keys<${ ','.join([t.tag_name for t in _this_node.entries]) }>::values>(
         ${ ','.join(entries)});
-        static_assert(gridtools::is_sid<decltype(${ _this_node.field_name })>{});
         """
     )
 
