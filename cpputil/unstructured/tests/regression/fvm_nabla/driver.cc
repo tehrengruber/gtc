@@ -24,13 +24,7 @@
 
 #include <gtest/gtest.h>
 
-#ifdef __CUDACC__
-#include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_ugpu.hpp"
-// #include "nabla_cuda.hpp"
-#else
-// #include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_unaive.hpp"
-#include "nabla_naive.hpp"
-#endif
+#include STENCIL_IMPL_SOURCE
 
 namespace {
     template <typename DS>
@@ -237,8 +231,9 @@ TEST(FVM, nabla) {
     atlas::Field m_pnabla_MYY = driver.fs_nodes().createField<double>(atlas::option::name("pnabla_MYY"));
 
     // temporary
-    atlas::Field m_zavgS_MXX = driver.fs_edges().createField<double>(atlas::option::name("zavgS_MXX"));
-    atlas::Field m_zavgS_MYY = driver.fs_edges().createField<double>(atlas::option::name("zavgS_MYY"));
+    //  note: temporary fields are allocated in the stencil, but are still here if needed for debugging purposes
+    //atlas::Field m_zavgS_MXX = driver.fs_edges().createField<double>(atlas::option::name("zavgS_MXX"));
+    //atlas::Field m_zavgS_MYY = driver.fs_edges().createField<double>(atlas::option::name("zavgS_MYY"));
 
     driver.fillInputData(m_pp);
     //   print_min_max(m_pp);
@@ -256,8 +251,8 @@ TEST(FVM, nabla) {
 
     auto S_MXX_ds = edge_sid(driver.S_MXX());
     auto S_MYY_ds = edge_sid(driver.S_MYY());
-    auto m_zavgS_MXX_ds = edge_sid(m_zavgS_MXX);
-    auto m_zavgS_MYY_ds = edge_sid(m_zavgS_MYY);
+    //auto m_zavgS_MXX_ds = edge_sid(m_zavgS_MXX);
+    //auto m_zavgS_MYY_ds = edge_sid(m_zavgS_MYY);
     auto m_pp_ds = node_sid(m_pp);
     auto m_pnabla_MXX_ds = node_sid(m_pnabla_MXX);
     auto m_pnabla_MYY_ds = node_sid(m_pnabla_MYY);
@@ -268,8 +263,6 @@ TEST(FVM, nabla) {
     nabla(driver.mesh(),
         S_MXX_ds,
         S_MYY_ds,
-        m_zavgS_MXX_ds,
-        m_zavgS_MYY_ds,
         m_pp_ds,
         m_pnabla_MXX_ds,
         m_pnabla_MYY_ds,
@@ -278,12 +271,12 @@ TEST(FVM, nabla) {
 
     //   gmesh.write(m_pnabla_MXX);
 
-    auto [zavgS_x_min, zavgS_x_max, zavgS_x_avg] = min_max(m_zavgS_MXX_ds);
+    /*auto [zavgS_x_min, zavgS_x_max, zavgS_x_avg] = min_max(m_zavgS_MXX_ds);
     auto [zavgS_y_min, zavgS_y_max, zavgS_y_avg] = min_max(m_zavgS_MYY_ds);
     EXPECT_DOUBLE_EQ(-199755464.25741270, zavgS_x_min);
     EXPECT_DOUBLE_EQ(388241977.58389181, zavgS_x_max);
     EXPECT_DOUBLE_EQ(-1000788897.3202186, zavgS_y_min);
-    EXPECT_DOUBLE_EQ(1000788897.3202186, zavgS_y_max);
+    EXPECT_DOUBLE_EQ(1000788897.3202186, zavgS_y_max);*/
 
     auto [x_min, x_max, x_avg] = min_max(m_pnabla_MXX_ds);
     auto [y_min, y_max, y_avg] = min_max(m_pnabla_MYY_ds);

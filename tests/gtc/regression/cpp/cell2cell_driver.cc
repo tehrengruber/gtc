@@ -1,8 +1,4 @@
-#ifdef __CUDACC__
-#include "generated_cell2cell_ugpu.hpp"
-#else
-#include "generated_cell2cell_unaive.hpp"
-#endif
+#include STENCIL_IMPL_SOURCE
 #include <gridtools/next/test_helper/field_builder.hpp>
 #include <gridtools/next/test_helper/simple_mesh.hpp>
 
