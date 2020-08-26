@@ -32,9 +32,11 @@ function(add_regression_test_executable)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     message(STATUS "${ARG_NAME}")
-    add_custom_command(OUTPUT generated_${ARG_NAME}.hpp
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_INPUT} ${ARG_MODE})
-    add_custom_target(generated_${ARG_NAME} DEPENDS generated_${ARG_NAME}.hpp)
+    set(generated_stencil_source ${CMAKE_CURRENT_SOURCE_DIR}/generated_${ARG_NAME}.hpp)
+    add_custom_command(OUTPUT ${generated_stencil_source}
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_INPUT} ${ARG_MODE}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_INPUT})
+    add_custom_target(generated_${ARG_NAME} DEPENDS ${generated_stencil_source})
     add_executable(${ARG_NAME} ${ARG_SOURCES}) # TODO fix GridTools appending .cu to .hpp, then we don't need the custom_target
     target_link_libraries(${ARG_NAME} ${ARG_LIBRARIES})
     add_dependencies(${ARG_NAME} generated_${ARG_NAME})
