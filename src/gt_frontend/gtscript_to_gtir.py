@@ -64,6 +64,11 @@ class SymbolTable:
         return self.types[item]
 
     def __setitem__(self, item, val):
+        if item in self.types:
+            if self.types[item] == val: # todo: just a workaround. remove when symbol table has proper scope!
+                return self.types[item]
+            raise ValueError("Symbol `{}` already in symbol table.".format(item))
+
         self.types[item] = val
         return self.types[item]
 
