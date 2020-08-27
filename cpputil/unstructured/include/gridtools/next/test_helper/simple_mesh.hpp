@@ -85,20 +85,16 @@ namespace gridtools {
                     }
                 };
 
-                template <class Key, std::enable_if_t<std::is_same_v<Key, vertex>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                friend decltype(auto) mesh_connectivity(meta::list<vertex> const &, const simple_mesh &) {
                     return primary_connectivity<vertex>{9};
                 }
-                template <class Key, std::enable_if_t<std::is_same_v<Key, edge>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                friend decltype(auto) mesh_connectivity(meta::list<edge>, const simple_mesh &) {
                     return primary_connectivity<edge>{18};
                 }
-                template <class Key, std::enable_if_t<std::is_same_v<Key, cell>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                friend decltype(auto) mesh_connectivity(meta::list<cell>, const simple_mesh &) {
                     return primary_connectivity<cell>{9};
                 }
-                template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<cell, cell>>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                friend decltype(auto) mesh_connectivity(meta::list<cell, cell> const &, const simple_mesh &) {
                     return regular_connectivity<cell, 4>{{
                         {6, 1, 3, 2}, // 0
                         {7, 2, 4, 0}, // 1
@@ -111,8 +107,7 @@ namespace gridtools {
                         {5, 6, 2, 7}  // 8
                     }};
                 }
-                template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<edge, vertex>>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                friend decltype(auto) mesh_connectivity(meta::list<edge, vertex> const &, const simple_mesh &) {
                     return regular_connectivity<edge, 2>{{
                         {0, 1}, // 0
                         {1, 2},

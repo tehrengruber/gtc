@@ -2,7 +2,6 @@
 #include <gridtools/common/tuple_util.hpp>
 #include <gridtools/next/mesh.hpp>
 #include <gridtools/next/unstructured.hpp>
-#include <gridtools/next/unstructured_helper.hpp>
 #include <gridtools/sid/composite.hpp>
 #include <gridtools/sid/concept.hpp>
 #include <gridtools/sid/synthetic.hpp>
@@ -13,9 +12,9 @@
 
 namespace tu = gridtools::tuple_util;
 
-using vertex2edge = std::tuple<vertex, edge>;
-using edge2vertex = std::tuple<edge, vertex>;
-using cell2vertex = std::tuple<cell, vertex>;
+using vertex2edge = gridtools::meta::list<vertex, edge>;
+using edge2vertex = gridtools::meta::list<edge, vertex>;
+using cell2vertex = gridtools::meta::list<cell, vertex>;
 
 namespace my_personal_connectivity {
     template <std::size_t MaxNeighbors, class LocationType>
@@ -65,8 +64,8 @@ template <class Mesh, class In, class Out>
 void sum_vertex_to_cell(Mesh const &mesh, In &&in, Out &&out) {
     auto n_cells = gridtools::next::connectivity::size(gridtools::at_key<cell2vertex>(mesh));
 
-    auto cell_to_vertex =
-        gridtools::next::connectivity::neighbor_table(gridtools::next::mesh::connectivity<cell2vertex>(mesh));
+    auto cell2vertex_conn = gridtools::next::mesh::connectivity<cell2vertex>(mesh);
+    auto cell_to_vertex = gridtools::next::connectivity::neighbor_table(cell2vertex_conn);
 
     static_assert(gridtools::sid::concept_impl_::is_sid<decltype(cell_to_vertex)>{});
 
