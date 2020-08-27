@@ -19,7 +19,7 @@ namespace gridtools::next::test_helper {
 
         template <class T>
         struct builder {
-            auto operator()(std::size_t size) {
+            auto operator()(std::size_t size) const {
                 return gridtools::storage::builder<storage_trait>.template type<T>().template dimensions(size);
             }
         };
@@ -29,7 +29,7 @@ namespace gridtools::next::test_helper {
     auto make_field(Mesh const &mesh) {
         // TODO seems it would be nice if we can adapt the data_store builder to create SIDs with named dimension
         return sid::rename_numbered_dimensions<Location> // TODO
-            (make_field_impl_::builder<T>{}(
-                gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<Location>(mesh)))());
+            (make_field_impl_::builder<T>{}(gridtools::next::connectivity::size(
+                gridtools::next::mesh::connectivity<meta::list<Location>>(mesh)))());
     }
 } // namespace gridtools::next::test_helper

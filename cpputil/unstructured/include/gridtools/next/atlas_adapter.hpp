@@ -75,25 +75,21 @@ namespace gridtools::next::atlas_wrappers {
 
 namespace atlas {
 
-    template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<vertex, edge>>, int> = 0> // TODO protect
-    decltype(auto) mesh_connectivity(const Mesh &mesh) {
+    decltype(auto) mesh_connectivity(gridtools::meta::list<vertex, edge> const &, const Mesh &mesh) {
         return gridtools::next::atlas_wrappers::regular_connectivity<vertex, 7
             // TODO this number must passed by the user (probably wrap atlas mesh)
             >{mesh.nodes().edge_connectivity()};
     }
 
-    template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<edge, vertex>>, int> = 0> // TODO protect
-    decltype(auto) mesh_connectivity(const Mesh &mesh) {
+    decltype(auto) mesh_connectivity(gridtools::meta::list<edge, vertex> const &, const Mesh &mesh) {
         return gridtools::next::atlas_wrappers::regular_connectivity<edge, 2>{mesh.edges().node_connectivity()};
     }
 
-    template <class Key, std::enable_if_t<std::is_same_v<Key, edge>, int> = 0> // TODO protect
-    decltype(auto) mesh_connectivity(const Mesh &mesh) {
+    decltype(auto) mesh_connectivity(gridtools::meta::list<edge> const &, const Mesh &mesh) {
         return gridtools::next::atlas_wrappers::primary_connectivity<edge>{std::size_t(mesh.edges().size())};
     }
-    template <class Key, std::enable_if_t<std::is_same_v<Key, vertex>, int> = 0> // TODO protect
-    decltype(auto) mesh_connectivity(const Mesh &mesh) {
+
+    decltype(auto) mesh_connectivity(gridtools::meta::list<vertex> const &, const Mesh &mesh) {
         return gridtools::next::atlas_wrappers::primary_connectivity<vertex>{std::size_t(mesh.nodes().size())};
     }
-
 } // namespace atlas
