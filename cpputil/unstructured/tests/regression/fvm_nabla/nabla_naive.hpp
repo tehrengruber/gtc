@@ -71,10 +71,11 @@ void nabla(Mesh &&mesh,
 
         auto ptrs = gridtools::sid::get_origin(edge_fields)();
         auto strides = gridtools::sid::get_strides(edge_fields);
-        for (int i = 0; i < gridtools::next::connectivity::size(e2v); ++i) {
+        for (std::size_t i = 0; i < gridtools::next::connectivity::size(e2v); ++i) {
             double acc = 0.;
             { // reduce
-                for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(e2v); ++neigh) {
+                for (int neigh = 0; neigh < static_cast<int>(gridtools::next::connectivity::max_neighbors(e2v));
+                     ++neigh) {
                     // body
                     auto absolute_neigh_index = *gridtools::at_key<connectivity_tag>(ptrs);
 
@@ -134,10 +135,11 @@ void nabla(Mesh &&mesh,
         auto ptrs = gridtools::sid::get_origin(vertex_fields)();
         auto strides = gridtools::sid::get_strides(vertex_fields);
 
-        for (int i = 0; i < gridtools::next::connectivity::size(v2e); ++i) {
+        for (std::size_t i = 0; i < gridtools::next::connectivity::size(v2e); ++i) {
             *gridtools::at_key<pnabla_MXX_tag>(ptrs) = 0.;
             { // reduce
-                for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(v2e); ++neigh) {
+                for (int neigh = 0; neigh < static_cast<int>(gridtools::next::connectivity::max_neighbors(v2e));
+                     ++neigh) {
                     // body
                     auto absolute_neigh_index = *gridtools::at_key<connectivity_tag>(ptrs);
                     if (absolute_neigh_index != gridtools::next::connectivity::skip_value(v2e)) {
@@ -163,7 +165,8 @@ void nabla(Mesh &&mesh,
             }
             *gridtools::at_key<pnabla_MYY_tag>(ptrs) = 0.;
             { // reduce
-                for (int neigh = 0; neigh < gridtools::next::connectivity::max_neighbors(v2e); ++neigh) {
+                for (int neigh = 0; neigh < static_cast<int>(gridtools::next::connectivity::max_neighbors(v2e));
+                     ++neigh) {
                     // body
                     auto absolute_neigh_index = *gridtools::at_key<connectivity_tag>(ptrs);
                     if (absolute_neigh_index != gridtools::next::connectivity::skip_value(v2e)) {
@@ -227,7 +230,7 @@ void nabla(Mesh &&mesh,
         auto ptrs = gridtools::sid::get_origin(vertex_fields)();
         auto strides = gridtools::sid::get_strides(vertex_fields);
 
-        for (int i = 0; i < gridtools::next::connectivity::size(v2e); ++i) {
+        for (std::size_t i = 0; i < gridtools::next::connectivity::size(v2e); ++i) {
             *gridtools::at_key<pnabla_MXX_tag>(ptrs) /= *gridtools::at_key<vol_tag>(ptrs);
             *gridtools::at_key<pnabla_MYY_tag>(ptrs) /= *gridtools::at_key<vol_tag>(ptrs);
             gridtools::sid::shift(ptrs, gridtools::at_key<vertex>(strides), 1);

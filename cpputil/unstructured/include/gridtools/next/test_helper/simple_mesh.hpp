@@ -85,16 +85,20 @@ namespace gridtools {
                     }
                 };
 
-                friend decltype(auto) mesh_connectivity(meta::list<vertex> const &, const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<vertex>, simple_mesh const &) {
                     return primary_connectivity<vertex>{9};
                 }
-                friend decltype(auto) mesh_connectivity(meta::list<edge>, const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<edge>, simple_mesh const &) {
                     return primary_connectivity<edge>{18};
                 }
-                friend decltype(auto) mesh_connectivity(meta::list<cell>, const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<cell>, simple_mesh const &) {
                     return primary_connectivity<cell>{9};
                 }
-                friend decltype(auto) mesh_connectivity(meta::list<cell, cell> const &, const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<cell, cell>, simple_mesh const &) {
                     return regular_connectivity<cell, 4>{{
                         {6, 1, 3, 2}, // 0
                         {7, 2, 4, 0}, // 1
@@ -107,7 +111,8 @@ namespace gridtools {
                         {5, 6, 2, 7}  // 8
                     }};
                 }
-                friend decltype(auto) mesh_connectivity(meta::list<edge, vertex> const &, const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<edge, vertex>, simple_mesh const &) {
                     return regular_connectivity<edge, 2>{{
                         {0, 1}, // 0
                         {1, 2},

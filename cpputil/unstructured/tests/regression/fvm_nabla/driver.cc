@@ -143,10 +143,10 @@ class FVMDriver {
         using Topology = atlas::mesh::Nodes::Topology;
         auto is_pole_edge = [&](size_t e) { return Topology::check(edge_flags(e), Topology::POLE); };
 
-        for (std::size_t jnode = 0; jnode < mesh_.nodes().size(); ++jnode) {
+        for (atlas::idx_t jnode = 0; jnode < mesh_.nodes().size(); ++jnode) {
             auto const &node_edge_connectivity = mesh_.nodes().edge_connectivity();
             auto const &edge_node_connectivity = mesh_.edges().node_connectivity();
-            for (std::size_t jedge = 0; jedge < node_edge_connectivity.cols(jnode); ++jedge) {
+            for (atlas::idx_t jedge = 0; jedge < node_edge_connectivity.cols(jnode); ++jedge) {
                 auto iedge = node_edge_connectivity(jnode, jedge);
                 auto ip1 = edge_node_connectivity(iedge, 0);
                 if (jnode == ip1) {
@@ -200,7 +200,7 @@ class FVMDriver {
 
         const auto rcoords_deg = atlas::array::make_view<double, 2>(mesh_.nodes().field("lonlat"));
 
-        for (std::size_t jnode = 0; jnode < mesh_.nodes().size(); ++jnode) {
+        for (atlas::idx_t jnode = 0; jnode < mesh_.nodes().size(); ++jnode) {
             for (std::size_t i = 0; i < 2; ++i) {
                 rcoords(jnode, k_level, i) = rcoords_deg(jnode, i) * deg2rad;
                 rlonlatcr(jnode, k_level, i) = rcoords(jnode, k_level, i); // lonlatcr is in physical space and may
@@ -209,7 +209,7 @@ class FVMDriver {
             rcosa(jnode, k_level) = cos(rlonlatcr(jnode, k_level, MYY));
             rsina(jnode, k_level) = sin(rlonlatcr(jnode, k_level, MYY));
         }
-        for (std::size_t jnode = 0; jnode < mesh_.nodes().size(); ++jnode) {
+        for (atlas::idx_t jnode = 0; jnode < mesh_.nodes().size(); ++jnode) {
             double zlon = rlonlatcr(jnode, k_level, MXX);
             //   double zlat = rlonlatcr(jnode, k_level, MYY);
             double zdist = sin(zlatc) * rsina(jnode, k_level) + cos(zlatc) * rcosa(jnode, k_level) * cos(zlon - zlonc);
