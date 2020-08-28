@@ -25,8 +25,8 @@
 #include <gtest/gtest.h>
 
 #ifdef __CUDACC__
-#include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_ugpu.hpp"
-// #include "nabla_cuda.hpp"
+//#include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_ugpu.hpp"
+#include "nabla_cuda.hpp"
 #else
 // #include "../../../../../examples/unstructured/fvm/generated_fvm_nabla_unaive.hpp"
 #include "nabla_naive.hpp"

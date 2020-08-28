@@ -12,9 +12,8 @@ namespace gridtools {
     namespace next {
 
         namespace connectivity {
-            // Doesn't need to be callable on device
             template <class Connectivity>
-            GT_FUNCTION_HOST auto neighbor_table(Connectivity const &connectivity)
+            auto neighbor_table(Connectivity const &connectivity)
             /* -> decltype(connectivity_neighbor_table(connectivity)) */ // TODO this results in a CUDA error
             {
                 return connectivity_neighbor_table(connectivity);
@@ -32,22 +31,40 @@ namespace gridtools {
 
             // TODO remove(after refactoring)
             template <class Connectivity>
-            GT_FUNCTION auto max_neighbors(Connectivity const &connectivity)
-                -> decltype(connectivity_max_neighbors(connectivity)) {
+            auto max_neighbors(Connectivity const &connectivity) -> decltype(connectivity_max_neighbors(connectivity)) {
                 // return max_neighbors_type<Connectivity>::value;
                 return connectivity_max_neighbors(connectivity);
             }
 
             template <class Connectivity>
-            GT_FUNCTION std::size_t size(Connectivity const &connectivity) {
+            std::size_t size(Connectivity const &connectivity) {
                 return connectivity_size(connectivity);
             }
 
             template <class Connectivity>
-            GT_FUNCTION auto skip_value(Connectivity const &connectivity)
-                -> decltype(connectivity_skip_value(connectivity)) {
+            auto skip_value(Connectivity const &connectivity) -> decltype(connectivity_skip_value(connectivity)) {
                 return connectivity_skip_value(connectivity);
             }
+
+            template <class MaxNeighborsT, class SkipValueT>
+            struct info {
+                MaxNeighborsT max_neighbors;
+                SkipValueT skip_value;
+                std::size_t size;
+            };
+
+            template <class MaxNeighborsT, class SkipValueT>
+            info<MaxNeighborsT, SkipValueT> make_info(MaxNeighborsT max_neighbors,
+                SkipValueT skip_value,
+                std::size_t size /* size last as it will probably be replaced by iteration_space concept */) {
+                return {max_neighbors, skip_value, size};
+            }
+
+            template <class Connectivity>
+            auto extract_info(Connectivity const &connectivity) {
+                return make_info(max_neighbors(connectivity), skip_value(connectivity), size(connectivity));
+            }
+
         } // namespace connectivity
 
         namespace mesh {

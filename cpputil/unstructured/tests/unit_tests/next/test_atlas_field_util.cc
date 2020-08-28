@@ -1,8 +1,8 @@
-#include <array_fwd.h>
 #include <gridtools/next/atlas_field_util.hpp>
 
-#include "gridtools/sid/concept.hpp"
 #include "util/atlas_util.hpp"
+#include <array_fwd.h>
+#include <gridtools/sid/concept.hpp>
 
 #include <gtest/gtest.h>
 
