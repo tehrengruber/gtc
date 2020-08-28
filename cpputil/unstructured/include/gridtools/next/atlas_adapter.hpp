@@ -14,6 +14,7 @@
 #include "mesh.hpp"
 #include "unstructured.hpp"
 #include <gridtools/next/atlas_field_util.hpp>
+#include <gridtools/next/iteration_space.hpp>
 
 #ifdef __CUDACC__ // TODO proper handling
 #include <gridtools/storage/gpu.hpp>
@@ -87,12 +88,14 @@ namespace atlas {
     }
 
     template <template <class...> class L>
-    decltype(auto) mesh_connectivity(L<edge>, Mesh const &mesh) {
-        return gridtools::next::atlas_wrappers::primary_connectivity<edge>{std::size_t(mesh.edges().size())};
+    decltype(auto) mesh_iteration_space(L<edge>, Mesh const &mesh) {
+        return gridtools::next::regular_iteration_space<edge>{
+            0, mesh.edges().size()}; // TODO is that the correct range? Where are halos?
     }
 
     template <template <class...> class L>
-    decltype(auto) mesh_connectivity(L<vertex>, Mesh const &mesh) {
-        return gridtools::next::atlas_wrappers::primary_connectivity<vertex>{std::size_t(mesh.nodes().size())};
+    decltype(auto) mesh_iteration_space(L<vertex>, Mesh const &mesh) {
+        return gridtools::next::regular_iteration_space<vertex>{
+            0, mesh.nodes().size()}; // TODO is that the correct range? Where are halos?
     }
 } // namespace atlas

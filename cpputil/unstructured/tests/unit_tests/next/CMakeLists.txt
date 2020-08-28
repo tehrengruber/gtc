@@ -32,4 +32,5 @@ add_subdirectory(test_helper)
 
 add_gtnext_atlas_test(NAME test_atlas_array_view_adapter)
 add_gtnext_atlas_test(NAME test_atlas_field_util SOURCES test_atlas_field_util.cc)
-add_gtnext_atlas_test(NAME test_mesh SOURCES test_mesh.cc)
+add_gtnext_test(NAME test_mesh SOURCES test_mesh.cc)
+add_gtnext_test(NAME test_iteration_space SOURCES test_iteration_space.cc)

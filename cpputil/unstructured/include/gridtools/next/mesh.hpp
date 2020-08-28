@@ -36,10 +36,10 @@ namespace gridtools {
                 return connectivity_max_neighbors(connectivity);
             }
 
-            template <class Connectivity>
-            std::size_t size(Connectivity const &connectivity) {
-                return connectivity_size(connectivity);
-            }
+            // template <class Connectivity>
+            // std::size_t size(Connectivity const &connectivity) {
+            //     return connectivity_size(connectivity);
+            // }
 
             template <class Connectivity>
             auto skip_value(Connectivity const &connectivity) -> decltype(connectivity_skip_value(connectivity)) {
@@ -92,6 +92,12 @@ namespace gridtools {
                 std::enable_if_t<!std::is_same<Res, not_provided>::value, int> = 0>
             Res connectivity(Mesh const &mesh) {
                 return mesh_connectivity(K(), mesh);
+            }
+
+            // TODO hymap fallback
+            template <class Key, class Mesh, class LazyK = meta::lazy::id<Key>>
+            auto iteration_space(Mesh const &mesh) -> decltype(mesh_iteration_space(LazyK(), mesh)) {
+                return mesh_iteration_space(LazyK(), mesh);
             }
         } // namespace mesh
 
