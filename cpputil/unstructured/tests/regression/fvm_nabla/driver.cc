@@ -24,7 +24,7 @@
 
 #include <gtest/gtest.h>
 
-#include STENCIL_IMPL_SOURCE
+#include "${STENCIL_IMPL_SOURCE}"
 
 namespace {
     template <typename DS>

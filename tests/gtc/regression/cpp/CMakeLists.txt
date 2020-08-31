@@ -24,6 +24,14 @@ FetchContent_Declare(cpputil_unstructured
 )
 FetchContent_MakeAvailable(cpputil_unstructured)
 
+# given a (potentially absolute) file path generate a unique filename
+#  e.g. for /my/dir/my_file.cpp returns 1e78d9c_my_file.cpp
+function(hash_path file_path output_var)
+    string(MD5 tmp_hash "${file_path}")
+    string(SUBSTRING ${tmp_hash} 0 7 tmp_hash)
+    get_filename_component(file_name "${file_path}" NAME)
+    set(${output_var} "${tmp_hash}_${file_path}" PARENT_SCOPE)
+endfunction()
 
 function(add_regression_test_executable)
     set(options)
@@ -32,13 +40,30 @@ function(add_regression_test_executable)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     message(STATUS "${ARG_NAME}")
-    set(generated_stencil_source ${CMAKE_CURRENT_SOURCE_DIR}/generated_${ARG_NAME}.hpp)
-    add_custom_command(OUTPUT ${generated_stencil_source}
+
+    # generate c++ from gtscript
+    set(STENCIL_IMPL_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/generated_${ARG_NAME}.hpp)
+    add_custom_command(OUTPUT ${STENCIL_IMPL_SOURCE}
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_INPUT} ${ARG_MODE}
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_INPUT})
-    add_custom_target(generated_${ARG_NAME} DEPENDS ${generated_stencil_source})
-    add_executable(${ARG_NAME} ${ARG_SOURCES}) # TODO fix GridTools appending .cu to .hpp, then we don't need the custom_target
-    target_compile_definitions(${ARG_NAME} PRIVATE STENCIL_IMPL_SOURCE="${generated_stencil_source}")
+    add_custom_target(generated_${ARG_NAME} DEPENDS ${STENCIL_IMPL_SOURCE})
+
+
+    # generate driver code
+    #  create directory to generate code to
+    set(gen_dir ${CMAKE_CURRENT_BINARY_DIR}/generated_${ARG_NAME})
+    file(MAKE_DIRECTORY ${gen_dir})
+    #  the gridtools_setup_target expect a relative path so transform it
+    file(RELATIVE_PATH bin_dir_rel_to_src_dir ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/.)
+    set(generated_arg_sources)
+    foreach(arg_source ${ARG_SOURCES})
+        hash_path(${arg_source} generated_source)
+        configure_file(${arg_source} ${gen_dir}/${generated_source})
+        list(APPEND generated_arg_sources ${bin_dir_rel_to_src_dir}/generated_${ARG_NAME}/${generated_source})
+    endforeach()
+
+    # setup actual test
+    add_executable(${ARG_NAME} ${generated_arg_sources}) # TODO fix GridTools appending .cu to .hpp, then we don't need the custom_target
     target_link_libraries(${ARG_NAME} ${ARG_LIBRARIES})
     add_dependencies(${ARG_NAME} generated_${ARG_NAME})
     add_test(NAME ${ARG_NAME} COMMAND $<TARGET_FILE:${ARG_NAME}>)
