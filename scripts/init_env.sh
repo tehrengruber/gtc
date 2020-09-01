@@ -4,7 +4,6 @@ EVE_PYTHON_CMD=${EVE_PYTHON_CMD:-python3}
 EVE_ROOT=$(dirname $(dirname "$(readlink -e $0)"))
 
 MAKE_VENV="true"
-DEV_INSTALL="true"
 
 # Help function
 usage() {
@@ -16,12 +15,11 @@ usage() {
     echo -e " Options:"
     echo -e "   -h : show help"
     echo -e "   -i : skip venv creation and only install packages"
-    echo -e "   -d <true|false>: developer/editable installation"
     echo -e ""
 }
 
 # Parse options
-while getopts "hid:" opt; do
+while getopts "hi" opt; do
     case "${opt}" in
         h)
             usage
@@ -29,9 +27,6 @@ while getopts "hid:" opt; do
             ;;
         i)
             MAKE_VENV="false"
-            ;;
-        d)
-            DEV_INSTALL="${OPTARG}"
             ;;
         :)
             echo -e "\nError: missing argument for option '${OPTARG}'"
@@ -75,11 +70,7 @@ set -e
 echo -e "\nInstalling Python packages..."
 ${EVE_PYTHON_CMD} -m pip install --upgrade pip setuptools wheel
 ${EVE_PYTHON_CMD} -m pip install -r ${EVE_ROOT}/requirements_all.txt
-if [ "$DEV_INSTALL" = "true" ]; then
-    ${EVE_PYTHON_CMD} -m pip install -e ${EVE_ROOT}[cpp]
-else
-    ${EVE_PYTHON_CMD} -m pip install ${EVE_ROOT}[cpp]
-fi
+${EVE_PYTHON_CMD} -m pip install -e ${EVE_ROOT}[cpp]
 echo -e "\nDone!"
 
 echo -e "\nCreating local debug folder ('_local') ..."
