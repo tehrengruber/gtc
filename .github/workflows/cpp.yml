@@ -20,6 +20,7 @@ jobs:
             - name: Install eve and dependencies
               run: |
                   python3 -m pip install eve
+                  python3 -m pip install -r -r eve/requirements_all.txt
             - name: Test cpputil
               run: |
                   cd cpputil/unstructured
