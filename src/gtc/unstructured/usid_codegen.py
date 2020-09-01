@@ -264,7 +264,7 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
 
     Temporary_template = mako_tpl.Template(
         """
-        auto ${ tmp_field_name } = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
+        auto ${ name } = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
             (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<${ loctype }>(mesh)), 1 /* TODO ksize */, tmp_alloc);"""
     )
 
