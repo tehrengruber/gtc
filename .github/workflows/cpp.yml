@@ -19,7 +19,7 @@ jobs:
             - uses: actions/checkout@v1
             - name: Install eve and dependencies
               run: |
-                  python -m pip install eve
+                  python3 -m pip install eve
             - name: Test cpputil
               run: |
                   cd cpputil/unstructured
