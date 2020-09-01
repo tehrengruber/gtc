@@ -70,4 +70,5 @@ def fvm_nabla_stencil(
             pnabla_MYY = pnabla_MYY / vol
 
 
-GTScriptCompilationTask(fvm_nabla_stencil).generate()
+if __name__ == "__main__":
+    GTScriptCompilationTask(fvm_nabla_stencil).generate()
