@@ -82,10 +82,7 @@ def _check_optional(pattern_node, captures=None):
         captures[pattern_node.name] = pattern_node.default
         return True
     elif isinstance(pattern_node, ast.AST):
-        is_optional = True
-        for _fieldname, child_node in ast.iter_fields(pattern_node):
-            is_optional &= _check_optional(child_node, captures)
-        return is_optional
+        return all(_check_optional(child_node) for _, child_node in ast.iter_fields(pattern_node))
     return False
 
 
