@@ -260,7 +260,7 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
     def visit_Temporary(self, node: Temporary, **kwargs):
         c_vtype = self.DATA_TYPE_TO_STR[node.vtype]
         loctype = self.LOCATION_TYPE_TO_STR[self.location_type_from_dimensions(node.dimensions)]
-        return self.generic_visit(node, tmp_field_name=node.name, loctype=loctype, c_vtype=c_vtype, **kwargs)
+        return self.generic_visit(node, loctype=loctype, c_vtype=c_vtype, **kwargs)
 
     Temporary_template = mako_tpl.Template(
         """
