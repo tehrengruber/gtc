@@ -20,17 +20,17 @@ import gtc.common as common
 
 from .built_in_types import Field, Local, Location, Mesh, TemporaryField
 
-
+# built-in symbols
 Vertex = common.LocationType.Vertex
 Edge = common.LocationType.Edge
 Cell = common.LocationType.Cell
+FORWARD = common.LoopOrder.FORWARD
+BACKWARD = common.LoopOrder.BACKWARD
 
-built_in_functions = ["computation", "location", "neighbors", "vertices", "edges", "cells"]
-built_in_symbols = ["FORWARD", "BACKWARD"]
+_built_in_functions = ["computation", "location", "neighbors", "vertices", "edges", "cells"]
 
 __all__ = (
-    built_in_functions
-    + built_in_symbols
+    _built_in_functions
     + ["Field", "Local", "Location", "Mesh", "TemporaryField", "Vertex", "Edge", "Cell"]
 )
 
@@ -49,19 +49,9 @@ def _generate_built_in_function_stub(func_name: str) -> Callable:
     return stub
 
 
-for built_in_function in built_in_functions:
+for built_in_function in _built_in_functions:
     setattr(
         sys.modules[__name__],
         built_in_function,
         _generate_built_in_function_stub(built_in_function),
     )
-
-
-# generate built-in symbol stubs
-class GTScriptBuiltInSymbol:
-    def __init__(self, name: str):
-        pass
-
-
-for built_in_symbol in built_in_symbols:
-    setattr(sys.modules[__name__], built_in_symbol, GTScriptBuiltInSymbol(built_in_symbol))
