@@ -24,15 +24,6 @@ FetchContent_Declare(cpputil_unstructured
 )
 FetchContent_MakeAvailable(cpputil_unstructured)
 
-# given a (potentially absolute) file path generate a unique filename
-#  e.g. for /my/dir/my_file.cpp returns 1e78d9c_my_file.cpp
-function(hash_path file_path output_var)
-    string(MD5 tmp_hash "${file_path}")
-    string(SUBSTRING ${tmp_hash} 0 7 tmp_hash)
-    get_filename_component(file_name "${file_path}" NAME)
-    set(${output_var} "${tmp_hash}_${file_path}" PARENT_SCOPE)
-endfunction()
-
 function(add_regression_test_executable)
     set(options)
     set(oneValueArgs NAME INPUT MODE)
@@ -57,7 +48,7 @@ function(add_regression_test_executable)
     file(RELATIVE_PATH bin_dir_rel_to_src_dir ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/.)
     set(generated_arg_sources)
     foreach(arg_source ${ARG_SOURCES})
-        hash_path(${arg_source} generated_source)
+        get_filename_component(generated_source ${arg_source} NAME)
         configure_file(${arg_source} ${gen_dir}/${generated_source})
         list(APPEND generated_arg_sources ${bin_dir_rel_to_src_dir}/generated_${ARG_NAME}/${generated_source})
     endforeach()
