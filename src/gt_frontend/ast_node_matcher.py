@@ -90,6 +90,29 @@ def _check_optional(pattern_node, captures=None):
 
 
 def match(concrete_node, pattern_node, captures=None) -> Tuple[bool, Dict[str, ast.AST]]:
+    """
+    Determine if `concrete_node` matches the `pattern_node` and capture values as specified in the pattern
+    node into `captures`
+
+    Example
+    -------
+
+    .. code-block: python
+
+        captures = {}
+        matches = match(ast.Name(id="some_name"), id=Capture("captured_id"), captures=captures)
+
+        assert(matches)
+        assert(captures["captured_id"]=="some_name")
+
+    .. code-block: python
+
+        captures = {}
+        matches = anm.match(ast.Name(), ast.Name(id=anm.Capture("id", default="some_name")), captures)
+
+        assert matches
+        assert captures["id"] == "some_name"
+    """
     if captures is None:
         captures = {}
 
