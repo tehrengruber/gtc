@@ -157,7 +157,7 @@ class PyToGTScript:
 
     def transform(self, node, eligible_node_types=None):
         """
-        Transform python ast into GTScript ast recursively
+        Transform python ast into GTScript ast recursively.
         """
         if eligible_node_types is None:
             eligible_node_types = [gtscript_ast.Computation]
