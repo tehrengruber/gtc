@@ -18,6 +18,16 @@ from typing import Any, Dict, List, Tuple
 
 
 class Capture:
+    """
+    Capture node used to identify and capture nodes in a python ast by :py:func:`match`.
+
+    Example
+    -------
+
+    .. code-block: python
+
+        ast.Name(id=Capture("some_name"))
+    """
     name: str
     default: Any
 
@@ -60,10 +70,10 @@ def _is_placeholder_for(node, pattern_node):
     return False
 
 
-def check_optional(pattern_node, captures=None):
+def _check_optional(pattern_node, captures=None):
     """
     Check if the given pattern node is optional and populate the `captures` dict with the default values stored
-    in the `Capture` nodes
+    in the `Capture` nodes.
     """
     if captures is None:
         captures = {}
@@ -74,7 +84,7 @@ def check_optional(pattern_node, captures=None):
     elif isinstance(pattern_node, ast.AST):
         is_optional = True
         for _fieldname, child_node in ast.iter_fields(pattern_node):
-            is_optional &= check_optional(child_node, captures)
+            is_optional &= _check_optional(child_node, captures)
         return is_optional
     return False
 
@@ -98,7 +108,7 @@ def match(concrete_node, pattern_node, captures=None) -> Tuple[bool, Dict[str, a
                     return False
             else:
                 opt_captures = {}
-                is_opt = check_optional(pattern_val, opt_captures)
+                is_opt = _check_optional(pattern_val, opt_captures)
                 if is_opt:
                     # if the node is optional populate captures from the default values stored in the pattern node
                     captures.update(opt_captures)
