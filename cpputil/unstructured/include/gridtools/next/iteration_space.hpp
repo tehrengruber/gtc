@@ -68,5 +68,15 @@ namespace gridtools::next {
             return gridtools::sid::get_upper_bound<Key>(gridtools::sid::get_upper_bounds(std::forward<Sid>(sid))) -
                    gridtools::sid::get_lower_bound<Key>(gridtools::sid::get_lower_bounds(std::forward<Sid>(sid)));
         }
+
+        template <class Key, class Sid>
+        std::enable_if_t<is_sid<Sid>{}, int> lower_bound(Sid &&sid) {
+            return gridtools::at_key<Key>(gridtools::sid::get_lower_bounds(std::forward<Sid>(sid)));
+        }
+        template <class Key, class Sid>
+        std::enable_if_t<is_sid<Sid>{}, int> upper_bound(Sid &&sid) {
+            return gridtools::at_key<Key>(gridtools::sid::get_upper_bounds(std::forward<Sid>(sid)));
+        }
+
     } // namespace sid_helper
 } // namespace gridtools::next

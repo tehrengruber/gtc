@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gridtools/next/iteration_space.hpp"
 #include "gridtools/next/mesh.hpp"
 #include "gridtools/sid/concept.hpp"
 struct connectivity_tag;
@@ -34,6 +35,7 @@ void nabla(Mesh &&mesh,
     vol_t &&vol,
     sign_t &&sign) {
     namespace tu = gridtools::tuple_util;
+    namespace gtsh = gridtools::next::sid_helper;
 
     static_assert(gridtools::is_sid<S_MXX_t>{});
     static_assert(gridtools::is_sid<S_MYY_t>{});
@@ -71,21 +73,21 @@ void nabla(Mesh &&mesh,
             gridtools::next::connectivity::neighbor_table(e2v), S_MXX, S_MYY, zavgS_MXX, zavgS_MYY);
         static_assert(gridtools::sid::concept_impl_::is_sid<decltype(edge_fields)>{});
 
+        auto origin_ptrs = gridtools::sid::get_origin(edge_fields)();
         auto strides = gridtools::sid::get_strides(edge_fields);
 
         // TODO apply this pattern to the other dimension
         auto edge_iteration_space = gridtools::next::mesh::iteration_space<edge>(
             mesh); // TODO this is broken: I say edge here, but repeat it below
-        auto lower_bound =
-            gridtools::sid::get_lower_bound<edge>(gridtools::sid::get_lower_bounds(edge_iteration_space));
-        auto upper_bound =
-            gridtools::sid::get_upper_bound<edge>(gridtools::sid::get_upper_bounds(edge_iteration_space));
         auto idx_ptr = gridtools::sid::get_origin(edge_iteration_space)();
-        for (std::size_t tmpi = lower_bound; tmpi < upper_bound; ++tmpi,
+        for (std::size_t tmpi = gtsh::lower_bound<edge>(edge_iteration_space);
+             tmpi < gtsh::upper_bound<edge>(edge_iteration_space);
+             ++tmpi,
                          gridtools::sid::shift(
                              idx_ptr, gridtools::at_key<edge>(gridtools::sid::get_strides(edge_iteration_space)), 1)) {
             int i = *idx_ptr;
-            auto ptrs = gridtools::sid::get_origin(edge_fields)();
+            auto ptrs = origin_ptrs;
+
             gridtools::sid::shift(ptrs, gridtools::at_key<edge>(strides), i);
             double acc = 0.;
             { // reduce
@@ -102,9 +104,8 @@ void nabla(Mesh &&mesh,
 
                     gridtools::sid::shift(ptrs, gridtools::at_key<neighbor>(strides), 1);
                 }
-                gridtools::sid::shift(ptrs,
-                    gridtools::at_key<neighbor>(strides),
-                    -gridtools::next::connectivity::max_neighbors(e2v)); // or reset ptr to origin and shift ?
+                gridtools::sid::shift(
+                    ptrs, gridtools::at_key<neighbor>(strides), -gridtools::next::connectivity::max_neighbors(e2v));
             }
             double zavg = 0.5 * acc;
             *gridtools::at_key<zavgS_MXX_tag>(ptrs) = *gridtools::at_key<S_MXX_tag>(ptrs) * zavg;
@@ -149,7 +150,7 @@ void nabla(Mesh &&mesh,
         auto strides = gridtools::sid::get_strides(vertex_fields);
 
         auto vertex_iteration_space = gridtools::next::mesh::iteration_space<vertex>(mesh);
-        for (std::size_t i = 0; i < gridtools::next::sid_helper::size<vertex>(vertex_iteration_space); ++i) {
+        for (int i = 0; i < gridtools::next::sid_helper::size<vertex>(vertex_iteration_space); ++i) {
             // for (std::size_t i = 0; i < gridtools::next::connectivity::size(v2e); ++i) {
             *gridtools::at_key<pnabla_MXX_tag>(ptrs) = 0.;
             { // reduce

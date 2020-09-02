@@ -4,13 +4,13 @@
 
 ###  _Allocation_ of a computation object is provided by free function with the following properties
 
-- takes one argument _Mesh_
+- takes 2 arguments _Mesh_ and _VerticalIterationSpace_
 - returns a Callable _Computation_
 
 ### _Mesh_
 
 - `mesh::connectivity<NeighborChain>(Mesh)` returns an object modeling the _Connectivity_ concept.
-- `mesh::iteration_space<Tag>` returns a SID providing the _IterationSpace_. Tags can be _LocationTypes_, `dim::k` or some custom tag, e.g. `pole_edges`
+- `mesh::iteration_space<Tag>` returns a _RegularIterationSpace_ when Tag is a _LocationType_ or a _SpecialIterationSpace_ in other cases, e.g. for custom tags like `pole_edges`.
 
 Notes:
 
@@ -39,12 +39,21 @@ The following functions are defined
 - `connectivity::skip_value(Connectivity)` returns the element signaling a non-existent value in a regular neighbor table (e.g. of type `int` or `integral_constant`)
 - `connectivity::neighbor_table(Connectivity)` returns a two dimensional SID with dimensions _LocationType_ and `neighbor` (TODO better name). Note that the neighbor table SID can be a special SID providing strided access ("on-the-fly neighbor table").
 
-### _IterationSpace_
-is a 1 dimensional SID containing the indices to iterate over.
+### _RegularIterationSpace_
 
-For the unstructured iteration spaces, at least 2 SID implementations are useful for the following patterns
-- regular iteration space, a range of consecutive indices: this would be implemented by a special SID containing start and endpoint (const ints) and the current position (int).
+is a pair of convertible-to-ints, e.g. `int` or `integral_constant<int, N>`, representing the lower and upper bounds of the index space.
+
+### _SpecialIterationSpace_
+
+is expected to be a 1 dimensional SID containing the indices to iterate over.
+
+2 SID implementations are useful for the following patterns
+- for a range of consecutive indices: this would be implemented by a special SID containing start and endpoint (const ints) and the current position (int).
 - set of non-consecutive indices: implemented as a normal array of indices.
+
+### _VerticalIterationSpace_
+
+is a tuple of convertible-to-ints defining sizes of intervals (or maybe splitter positions?).
 
 ### _Computation_ has
 
@@ -57,9 +66,3 @@ is a SID which expects specific tags to identify dimensions:
   \[TODO maybe something like `local<LocationType>` or `neighbor<LocationType>`, but then the same for the neighbor table to be able to iterate both with the same tag.\]
 - the vertical dimension is identified with `namespace dim {struct k;}` (TODO better ideas?)
 - TODO what to do with extra dimensions?
-
-
-## TODO
-
-- If elements are not indexed contiguously, we need to abstract the mechanism for iterating the primary location loop. E.g. loop over pole edges.
-- k size?
