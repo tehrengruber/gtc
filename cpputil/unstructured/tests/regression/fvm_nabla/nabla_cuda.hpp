@@ -1,6 +1,10 @@
 #pragma once
 
-#include "gridtools/next/mesh.hpp"
+#ifndef __CUDACC__
+#error "Tried to compile CUDA code with a regular C++ compiler."
+#endif
+
+#include <gridtools/next/mesh.hpp>
 #include <gridtools/next/tmp_storage.hpp>
 #include <gridtools/sid/allocator.hpp>
 
@@ -9,7 +13,7 @@ struct S_MXX_tag;
 struct S_MYY_tag;
 struct zavgS_MXX_tag;
 struct zavgS_MYY_tag;
-struct zavg_tmp_tag;
+struct zavg_tag;
 
 struct pnabla_MXX_tag;
 struct pnabla_MYY_tag;
@@ -65,12 +69,12 @@ __global__ void nabla_edge_1(ConnInfoE2V e2v,
             }
             gridtools::sid::shift(edge_ptrs, gridtools::device::at_key<neighbor>(edge_strides), -e2v.max_neighbors);
         }
-        *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs) =
+        *gridtools::device::at_key<zavg_tag>(edge_ptrs) =
             0.5 * acc; // via temporary for non-optimized parallel model
         *gridtools::device::at_key<zavgS_MXX_tag>(edge_ptrs) =
-            *gridtools::device::at_key<S_MXX_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs);
+            *gridtools::device::at_key<S_MXX_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tag>(edge_ptrs);
         *gridtools::device::at_key<zavgS_MYY_tag>(edge_ptrs) =
-            *gridtools::device::at_key<S_MYY_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tmp_tag>(edge_ptrs);
+            *gridtools::device::at_key<S_MYY_tag>(edge_ptrs) * *gridtools::device::at_key<zavg_tag>(edge_ptrs);
     }
 }
 
@@ -208,8 +212,6 @@ std::tuple<int, int> cuda_setup(int N) {
 template <class Mesh,
     class S_MXX_t,
     class S_MYY_t,
-    class zavgS_MXX_t,
-    class zavgS_MYY_t,
     class pp_t,
     class pnabla_MXX_t,
     class pnabla_MYY_t,
@@ -218,27 +220,30 @@ template <class Mesh,
 void nabla(Mesh &&mesh,
     S_MXX_t &&S_MXX,
     S_MYY_t &&S_MYY,
-    zavgS_MXX_t &&zavgS_MXX,
-    zavgS_MYY_t &&zavgS_MYY,
     pp_t &&pp,
     pnabla_MXX_t &&pnabla_MXX,
     pnabla_MYY_t &&pnabla_MYY,
     vol_t &&vol,
     sign_t &&sign) {
     namespace tu = gridtools::tuple_util;
+    // allocate temporary field storage
+    int k_size = 1; // TODO
+    auto cuda_alloc =
+        gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>); // TODO
+    auto zavgS_MXX = gridtools::next::make_simple_tmp_storage<edge, double>(
+        (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<edge>(mesh)), k_size, cuda_alloc);
+    auto zavgS_MYY = gridtools::next::make_simple_tmp_storage<edge, double>(
+        (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<edge>(mesh)), k_size, cuda_alloc);
     {
         auto e2v = gridtools::next::mesh::connectivity<std::tuple<edge, vertex>>(mesh);
         static_assert(gridtools::is_sid<decltype(gridtools::next::connectivity::neighbor_table(e2v))>{});
 
-        int k_size = 1; // TODO
-        auto cuda_alloc =
-            gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>); // TODO
-        auto zavg_tmp = gridtools::next::make_simple_tmp_storage<edge, double>(
-            (int)gridtools::next::connectivity::size(e2v), k_size, cuda_alloc);
+        auto zavg = gridtools::next::make_simple_tmp_storage<edge, double>(
+            (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<edge>(mesh)), k_size, cuda_alloc);
 
         auto edge_fields = tu::make<gridtools::sid::composite::
-                keys<connectivity_tag, S_MXX_tag, S_MYY_tag, zavgS_MXX_tag, zavgS_MYY_tag, zavg_tmp_tag>::values>(
-            gridtools::next::connectivity::neighbor_table(e2v), S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, zavg_tmp);
+                keys<connectivity_tag, S_MXX_tag, S_MYY_tag, zavgS_MXX_tag, zavgS_MYY_tag, zavg_tag>::values>(
+            gridtools::next::connectivity::neighbor_table(e2v), S_MXX, S_MYY, zavgS_MXX, zavgS_MYY, zavg);
         static_assert(gridtools::sid::concept_impl_::is_sid<decltype(edge_fields)>{});
 
         auto edge_ptrs = gridtools::sid::get_origin(edge_fields);
