@@ -88,14 +88,13 @@ namespace atlas {
     }
 
     template <template <class...> class L>
-    decltype(auto) mesh_iteration_space(L<edge>, Mesh const &mesh) {
-        return gridtools::next::regular_iteration_space<edge>{
-            0, mesh.edges().size()}; // TODO is that the correct range? Where are halos?
+    std::pair<int, int> mesh_iteration_space(L<edge>, Mesh const &mesh) {
+        return {0, mesh.edges().size()}; // TODO is that the correct range? Where are halos?
     }
 
     template <template <class...> class L>
-    decltype(auto) mesh_iteration_space(L<vertex>, Mesh const &mesh) {
-        return gridtools::next::regular_iteration_space<vertex>{
+    std::pair<int, int> mesh_iteration_space(L<vertex>, Mesh const &mesh) {
+        return gridtools::next::range_iteration_space<vertex>{
             0, mesh.nodes().size()}; // TODO is that the correct range? Where are halos?
     }
 } // namespace atlas

@@ -6,58 +6,58 @@
 #include <type_traits>
 
 namespace gridtools::next {
-    // similar to gridtools::stencil::regular_iteration_space
+    // similar to gridtools::stencil::positional
 
-    struct regular_iteration_space_stride {};
+    struct range_iteration_space_stride {};
 
     // TODO probably the LocationType should be removed everywhere
     template <class LocationType>
-    struct regular_iteration_space {
+    struct range_iteration_space {
         const int m_from; // TODO or integral_constant
         const int m_to;
         int m_cur;
 
-        GT_FUNCTION regular_iteration_space(int from, int to, int cur) : m_from{from}, m_to{to}, m_cur{cur} {};
-        GT_FUNCTION regular_iteration_space(int from, int to) : m_from{from}, m_to{to}, m_cur{from} {};
+        GT_FUNCTION range_iteration_space(int from, int to, int cur) : m_from{from}, m_to{to}, m_cur{cur} {};
+        GT_FUNCTION range_iteration_space(int from, int to) : m_from{from}, m_to{to}, m_cur{from} {};
         GT_FUNCTION int operator*() const { return m_cur; }
-        GT_FUNCTION regular_iteration_space const &operator()() const { return *this; }
+        GT_FUNCTION range_iteration_space const &operator()() const { return *this; }
     };
 
     template <class LocationType>
-    GT_FUNCTION regular_iteration_space<LocationType> operator+(regular_iteration_space<LocationType> lhs, int rhs) {
+    GT_FUNCTION range_iteration_space<LocationType> operator+(range_iteration_space<LocationType> lhs, int rhs) {
         return {lhs.m_from, lhs.m_to, lhs.m_cur + rhs};
     }
 
     template <class LocationType>
-    typename hymap::keys<LocationType>::template values<regular_iteration_space_stride> sid_get_strides(
-        regular_iteration_space<LocationType>) {
+    typename hymap::keys<LocationType>::template values<range_iteration_space_stride> sid_get_strides(
+        range_iteration_space<LocationType>) {
         return {};
     }
 
     template <class LocationType>
     typename hymap::keys<LocationType>::template values<int> sid_get_lower_bounds(
-        regular_iteration_space<LocationType> s) {
+        range_iteration_space<LocationType> s) {
         return {s.m_from};
     }
 
     template <class LocationType>
     typename hymap::keys<LocationType>::template values<int> sid_get_upper_bounds(
-        regular_iteration_space<LocationType> s) {
+        range_iteration_space<LocationType> s) {
         return {s.m_to};
     }
 
     template <class LocationType>
-    GT_FUNCTION void sid_shift(regular_iteration_space<LocationType> &p, regular_iteration_space_stride, int_t offset) {
+    GT_FUNCTION void sid_shift(range_iteration_space<LocationType> &p, range_iteration_space_stride, int_t offset) {
         p.m_cur += offset;
     }
 
-    GT_FUNCTION void sid_shift(int &ptr_diff, regular_iteration_space_stride, int_t offset) { ptr_diff += offset; }
+    GT_FUNCTION void sid_shift(int &ptr_diff, range_iteration_space_stride, int_t offset) { ptr_diff += offset; }
 
     template <class LocationType>
-    int sid_get_ptr_diff(regular_iteration_space<LocationType>);
+    int sid_get_ptr_diff(range_iteration_space<LocationType>);
 
     template <class LocationType>
-    regular_iteration_space<LocationType> sid_get_origin(regular_iteration_space<LocationType> obj) {
+    range_iteration_space<LocationType> sid_get_origin(range_iteration_space<LocationType> obj) {
         return obj;
     }
 

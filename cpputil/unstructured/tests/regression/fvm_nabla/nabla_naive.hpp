@@ -73,22 +73,16 @@ void nabla(Mesh &&mesh,
             gridtools::next::connectivity::neighbor_table(e2v), S_MXX, S_MYY, zavgS_MXX, zavgS_MYY);
         static_assert(gridtools::sid::concept_impl_::is_sid<decltype(edge_fields)>{});
 
-        auto origin_ptrs = gridtools::sid::get_origin(edge_fields)();
+        auto ptrs = gridtools::sid::get_origin(edge_fields)();
         auto strides = gridtools::sid::get_strides(edge_fields);
 
         // TODO apply this pattern to the other dimension
         auto edge_iteration_space = gridtools::next::mesh::iteration_space<edge>(
             mesh); // TODO this is broken: I say edge here, but repeat it below
-        auto idx_ptr = gridtools::sid::get_origin(edge_iteration_space)();
-        for (std::size_t tmpi = gtsh::lower_bound<edge>(edge_iteration_space);
-             tmpi < gtsh::upper_bound<edge>(edge_iteration_space);
-             ++tmpi,
-                         gridtools::sid::shift(
-                             idx_ptr, gridtools::at_key<edge>(gridtools::sid::get_strides(edge_iteration_space)), 1)) {
-            int i = *idx_ptr;
-            auto ptrs = origin_ptrs;
+        for (std::size_t tmpi = edge_iteration_space.first; tmpi < edge_iteration_space.second; ++tmpi) {
+            gridtools::sid::shift(
+                idx_ptr, gridtools::at_key<edge>(gridtools::sid::get_strides(edge_iteration_space)), 1);
 
-            gridtools::sid::shift(ptrs, gridtools::at_key<edge>(strides), i);
             double acc = 0.;
             { // reduce
                 for (int neigh = 0; neigh < static_cast<int>(gridtools::next::connectivity::max_neighbors(e2v));

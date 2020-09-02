@@ -10,7 +10,7 @@
 ### _Mesh_
 
 - `mesh::connectivity<NeighborChain>(Mesh)` returns an object modeling the _Connectivity_ concept.
-- `mesh::iteration_space<Tag>` returns a _RegularIterationSpace_ when Tag is a _LocationType_ or a _SpecialIterationSpace_ in other cases, e.g. for custom tags like `pole_edges`.
+- `mesh::iteration_space<Tag>` returns a _RegularIterationSpace_ when Tag is a _LocationType_ or a _CustomIterationSpace_ in other cases, e.g. for custom tags like `pole_edges`.
 
 Notes:
 
@@ -43,7 +43,7 @@ The following functions are defined
 
 is a pair of convertible-to-ints, e.g. `int` or `integral_constant<int, N>`, representing the lower and upper bounds of the index space.
 
-### _SpecialIterationSpace_
+### _CustomIterationSpace_
 
 is expected to be a 1 dimensional SID containing the indices to iterate over.
 
@@ -60,7 +60,7 @@ is a tuple of convertible-to-ints defining sizes of intervals (or maybe splitter
 - one argument for each input or output variable modelling _uSID_
 
 ### _unstructured SID (uSID)_
-is a SID which expects specific tags to identify dimensions:
+is a SID with a given set of tags to identify dimensions:
 - the unstructured dimension is identified with key _LocationType_
 - a possible sparse dimension is identified with the `neighbor` tag
   \[TODO maybe something like `local<LocationType>` or `neighbor<LocationType>`, but then the same for the neighbor table to be able to iterate both with the same tag.\]
