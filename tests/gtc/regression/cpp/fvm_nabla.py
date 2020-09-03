@@ -7,12 +7,24 @@ import os
 import sys
 
 from gt_frontend.frontend import GTScriptCompilationTask
-from gt_frontend.gtscript import FORWARD, Edge, Vertex, Field, Mesh, Local, cells, computation, location
+from gt_frontend.gtscript import (
+    FORWARD,
+    Edge,
+    Field,
+    Local,
+    Mesh,
+    Vertex,
+    cells,
+    computation,
+    location,
+)
 
 from gtc.common import DataType
 from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGenerator
 
+
 dtype = DataType.FLOAT64
+
 
 def nabla(
     mesh: Mesh,
@@ -35,6 +47,7 @@ def nabla(
             pnabla_MXX = pnabla_MXX / vol
             pnabla_MYY = pnabla_MYY / vol
 
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "unaive"
 
@@ -47,7 +60,7 @@ def main():
         debug=False, code_generator=code_generator
     )
 
-    #print(generated_code)
+    # print(generated_code)
     output_file = (
         os.path.dirname(os.path.realpath(__file__)) + "/generated_fvm_nabla_" + mode + ".hpp"
     )

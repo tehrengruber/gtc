@@ -28,6 +28,7 @@ class Capture:
 
         ast.Name(id=Capture("some_name"))
     """
+
     name: str
     default: Any
 

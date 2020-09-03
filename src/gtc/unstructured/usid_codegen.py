@@ -283,11 +283,14 @@ class UsidGpuCodeGenerator(UsidCodeGenerator):
         "<gridtools/common/cuda_util.hpp>",
     ]
 
-    preface = UsidCodeGenerator.preface + """
+    preface = (
+        UsidCodeGenerator.preface
+        + """
         #ifndef __CUDACC__
         #error "Tried to compile CUDA code with a regular C++ compiler."
         #endif
     """
+    )
 
     KernelCall_template = mako_tpl.Template(
         """

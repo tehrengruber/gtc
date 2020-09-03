@@ -20,6 +20,7 @@ import gtc.common as common
 
 from .built_in_types import Field, Local, Location, Mesh, TemporaryField
 
+
 # built-in symbols
 Vertex = common.LocationType.Vertex
 Edge = common.LocationType.Edge
@@ -29,10 +30,16 @@ BACKWARD = common.LoopOrder.BACKWARD
 
 _built_in_functions = ["computation", "location", "neighbors", "vertices", "edges", "cells"]
 
-__all__ = (
-    _built_in_functions
-    + ["Field", "Local", "Location", "Mesh", "TemporaryField", "Vertex", "Edge", "Cell"]
-)
+__all__ = _built_in_functions + [
+    "Field",
+    "Local",
+    "Location",
+    "Mesh",
+    "TemporaryField",
+    "Vertex",
+    "Edge",
+    "Cell",
+]
 
 
 # generate built-in function stubs

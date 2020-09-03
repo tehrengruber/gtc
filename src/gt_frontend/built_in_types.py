@@ -14,7 +14,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import List, Any
+from typing import Any, List
+
 
 class BuiltInTypeMeta(type):
     class_name: str

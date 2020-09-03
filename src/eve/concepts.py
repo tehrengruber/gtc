@@ -187,7 +187,7 @@ class BaseNode(BaseModel, metaclass=NodeMetaclass):
     not children.
     """
 
-    #__metadata__: NodeMetadataDict
+    # __metadata__: NodeMetadataDict
 
     # Node fields
     #: Unique node-id (meta-attribute)
@@ -212,7 +212,7 @@ class BaseNode(BaseModel, metaclass=NodeMetaclass):
                 yield name, getattr(self, name)
 
     # todo(egparedes): disable since unused for now
-    #def select(self, *, kind: Optional[FieldKind] = None) -> Generator[Tuple[str, Any], None, None]:
+    # def select(self, *, kind: Optional[FieldKind] = None) -> Generator[Tuple[str, Any], None, None]:
     #    for name, _ in self.__fields__.items():
     #        if not (name.endswith(_EVE_NODE_ATTR_SUFFIX) or name.endswith(_EVE_NODE_IMPL_SUFFIX)):
     #            if kind and self.__metadata__.get("kind", None) == kind:
