@@ -6,6 +6,7 @@
 import os
 import sys
 
+import gt_frontend.gtscript
 from gt_frontend.frontend import GTScriptCompilationTask
 from gt_frontend.gtscript import (
     FORWARD,
@@ -14,9 +15,10 @@ from gt_frontend.gtscript import (
     Local,
     Mesh,
     Vertex,
-    cells,
     computation,
+    edges,
     location,
+    vertices,
 )
 
 from gtc.common import DataType
@@ -24,6 +26,8 @@ from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGen
 
 
 dtype = DataType.FLOAT64
+
+print(gt_frontend.gtscript._built_in_functions)
 
 
 def nabla(

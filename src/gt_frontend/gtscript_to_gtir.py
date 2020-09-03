@@ -254,7 +254,7 @@ class SymbolResolutionValidation(eve.NodeVisitor):
 
     def visit_Symbol(self, node: Symbol):
         # every symbol not yet parsed must be supplied externally
-        if not node.name in self.symbol_table:
+        if node.name not in self.symbol_table:
             raise ValueError("Reference to undefined symbol `{}`".format(node.name))
 
 
