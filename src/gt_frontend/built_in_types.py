@@ -14,8 +14,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from typing import List, Any
 
 class BuiltInTypeMeta(type):
+    class_name: str
+    namespace: str
+    args: List[Any]
+
     def __new__(cls, class_name, bases, namespace, args=None):
         assert bases == () or (len(bases) == 1 and issubclass(bases[0], BuiltInType))
         assert all(attr[0:2] == "__" for attr in namespace.keys())  # no custom attributes

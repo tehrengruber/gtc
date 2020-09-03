@@ -14,9 +14,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 import copy
+from typing import cast, List, Union
 
-from gt_frontend.gtscript import Field, Local, Location, Mesh, TemporaryField
-from gt_frontend.gtscript_ast import (
+from .gtscript import Field, Local, Location, Mesh, TemporaryField
+from .built_in_types import BuiltInTypeMeta
+from .gtscript_ast import (
     Argument,
     Assign,
     BinaryOp,
@@ -112,6 +114,7 @@ class NodeCanonicalizer(eve.NodeModifier):
             if all(isinstance(body_node, Stencil) for body_node in stencil.body):
                 # if we find a nested stencil flatten it
                 for nested_stencil in stencil.body:
+                    assert(isinstance(nested_stencil, Stencil))
                     # todo: validate iteration_spec otherwise the TemporaryFieldDeclExtractor fails
                     flattened_stencil = Stencil(
                         iteration_spec=self.generic_visit(stencil.iteration_spec)
@@ -173,6 +176,7 @@ class VarDeclExtractor(eve.NodeVisitor):
 
     def visit_LocationComprehension(self, node: LocationComprehension):
         assert node.iterator.func == "neighbors"
+        assert isinstance(node.iterator.args[-1], Symbol)
         location_type = self.symbol_table.materialize_constant(node.iterator.args[-1].name)
         self.symbol_table[node.target.name] = Location[location_type]
         self.generic_visit(node.iterator)
@@ -191,6 +195,9 @@ class VarDeclExtractor(eve.NodeVisitor):
 
 
 class TemporaryFieldDeclExtractor(eve.NodeVisitor):
+    symbol_table : SymbolTable
+    primary_location : Union[None, BuiltInTypeMeta] # todo: is there a way to tell mypy this is a Location
+
     # todo: enhance to support sparse dimension
     def __init__(self, symbol_table):
         self.symbol_table = symbol_table
@@ -212,6 +219,7 @@ class TemporaryFieldDeclExtractor(eve.NodeVisitor):
         assert isinstance(target, Symbol)
 
         if target.name not in self.symbol_table:
+            assert self.primary_location is not None
             location_type = self.primary_location.args[0]
             self.symbol_table[target.name] = TemporaryField[
                 location_type, self.symbol_table.materialize_constant("dtype")
@@ -247,6 +255,8 @@ class SymbolResolutionValidation(eve.NodeVisitor):
 
 
 class GTScriptToGTIR(eve.NodeTranslator):
+    # todo: the current way of passing the location_stack is tidious and error prone
+
     def __init__(self, symbol_table, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # new scope so copy everything
@@ -287,7 +297,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
     ) -> gtir.LocationComprehension:
         if not node.iterator.func == "neighbors":
             raise ValueError(
-                "Invalid neighbor specification. Expected a call to `neighbors`, but got ``".format(
+                "Invalid neighbor specification. Expected a call to `neighbors`, but got `{}`".format(
                     node.iterator.func
                 )
             )
@@ -298,12 +308,12 @@ class GTScriptToGTIR(eve.NodeTranslator):
 
         src_comprehension = location_stack[-1]
         assert src_comprehension.name == of.name
-        elements = [src_comprehension.chain.elements[-1]] + [
-            self.symbol_table.materialize_constant(
+        elements = [src_comprehension.chain.elements[-1]]
+        for loc_type in node.iterator.args[1:]:
+            assert(isinstance(loc_type, Symbol))
+            elements.append(self.symbol_table.materialize_constant(
                 loc_type.name, expected_type=gtir.common.LocationType
-            )
-            for loc_type in node.iterator.args[1:]
-        ]
+            ))
         chain = gtir.NeighborChain(elements=elements)
 
         return gtir.LocationComprehension(name=node.target.name, chain=chain, of=of)
@@ -348,7 +358,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
             float: common.DataType.FLOAT64,
         }
         return gtir.Literal(
-            value=str(node.value),
+            value=str(node.value), # type: ignore
             vtype=py_dtype_to_eve[type(node.value)],
             location_type=location_stack[-1].chain.elements[-1],
         )
@@ -359,7 +369,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
             self.symbol_table[node.name], TemporaryField
         ):
             return gtir.FieldAccess(
-                name=node.name,
+                name=node.name, # type: ignore
                 location_type=location_stack[-1].chain.elements[-1],
                 subscript=[gtir.LocationRef(name=location_stack[0].name)],
             )  # todo: just visit the subscript symbol
@@ -374,25 +384,29 @@ class GTScriptToGTIR(eve.NodeTranslator):
             self.symbol_table[node.value.name], TemporaryField
         ):
             assert all(
-                issubclass(self.symbol_table[index.name], Location) for index in node.indices
+                isinstance(index, Symbol) and issubclass(self.symbol_table[index.name], Location) for index in node.indices
             )
             # todo: just visit the index symbol
             return gtir.FieldAccess(
-                name=node.value.name,
-                subscript=[gtir.LocationRef(name=index.name) for index in node.indices],
+                name=node.value.name, # type: ignore
+                subscript=[gtir.LocationRef(name=index.name) for index in cast(List[Symbol], node.indices)],
                 location_type=location_stack[-1].chain.elements[-1],
             )
 
         raise ValueError()
 
-    def visit_Assign(self, node: Assign, **kwargs) -> gtir.AssignStmt:
+    def visit_Assign(self, node: Assign, *, location_stack, **kwargs) -> gtir.AssignStmt:
         return gtir.AssignStmt(
-            left=self.visit(node.target, **kwargs), right=self.visit(node.value, **kwargs)
+            left=self.visit(node.target, **{"location_stack": location_stack, **kwargs}),
+            right=self.visit(node.value, **{"location_stack": location_stack, **kwargs}),
+            location_type=location_stack[-1].chain.elements[-1]
         )
 
-    def visit_BinaryOp(self, node: BinaryOp, **kwargs):
+    def visit_BinaryOp(self, node: BinaryOp, location_stack, **kwargs):
         return gtir.BinaryOp(
-            op=node.op, left=self.visit(node.left, **kwargs), right=self.visit(node.right, **kwargs)
+            op=node.op, left=self.visit(node.left, **{"location_stack": location_stack, **kwargs}),
+            right=self.visit(node.right, **{"location_stack": location_stack, **kwargs}),
+            location_type=location_stack[-1].chain.elements[-1]
         )
 
     def visit_Stencil(self, node: Stencil, **kwargs) -> gtir.Stencil:
@@ -471,7 +485,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
                 temporary_field_decls.append(self._transform_field_type(name, type_))
 
         return gtir.Computation(
-            name=node.name,
+            name=node.name, # type: ignore
             params=field_args,
             stencils=self.visit(node.stencils),
             declarations=temporary_field_decls,

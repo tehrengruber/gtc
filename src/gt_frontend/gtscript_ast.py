@@ -13,7 +13,7 @@
 # distribution for a copy of the license or check <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-from typing import ForwardRef, List, Union
+from typing import List, Union
 
 import gtc.common as common
 from eve import Node
@@ -71,11 +71,11 @@ class IterationOrder(GTScriptAstNode):
 class Constant(Expr):
     # todo: use StrictStr, StrictInt, StrictFloat as pydantic automatically converts into the first
     #  type it occurs. As a result currently all integers become floats
-    value: Union[float, int, type(None), str]
+    value: Union[float, int, None, str]
 
 
 class Interval(GTScriptAstNode):
-    start: Constant  # todo: use Constant[Union[int, str, type(None)]]
+    start: Constant  # todo: use Constant[Union[int, str, None]]
     stop: Constant
 
 
@@ -94,12 +94,9 @@ class SubscriptSingle(Expr):
     index: str
 
 
-SubscriptMultiple = ForwardRef("SubscriptMultiple")
-
-
 class SubscriptMultiple(Expr):
     value: Symbol
-    indices: List[Union[Symbol, SubscriptSingle, SubscriptMultiple]]
+    indices: List[Union[Symbol, SubscriptSingle, "SubscriptMultiple"]]
 
 
 class BinaryOp(Expr):
@@ -135,12 +132,9 @@ class Assign(Statement):
     value: Expr
 
 
-Stencil = ForwardRef("Stencil")
-
-
 class Stencil(GTScriptAstNode):
     iteration_spec: List[Union[IterationOrder, LocationSpecification, Interval]]
-    body: List[Union[Statement, Stencil]]  # todo: stencil only allowed non-canonicalized
+    body: List[Union[Statement, "Stencil"]]  # todo: stencil only allowed non-canonicalized
 
 
 # class Attribute(GT4PyAstNode):

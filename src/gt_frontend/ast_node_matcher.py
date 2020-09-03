@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 import ast
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Union
 
 
 class Capture:
@@ -49,7 +49,7 @@ class _PlaceholderAst(ast.AST):
     pass
 
 
-def _get_placeholder_node(pattern_node):
+def _get_placeholder_node(pattern_node) -> Union[_Placeholder, _PlaceholderList, _PlaceholderAst]:
     if isinstance(pattern_node, List):
         return _PlaceholderList()
     elif isinstance(pattern_node, ast.AST):
@@ -58,7 +58,7 @@ def _get_placeholder_node(pattern_node):
     return _Placeholder()
 
 
-def _is_placeholder_for(node, pattern_node):
+def _is_placeholder_for(node, pattern_node) -> bool:
     """
     Is the given node a valid placeholder for the pattern node
     """
@@ -70,7 +70,7 @@ def _is_placeholder_for(node, pattern_node):
     return False
 
 
-def _check_optional(pattern_node, captures=None):
+def _check_optional(pattern_node, captures=None) -> bool:
     """
     Check if the given pattern node is optional and populate the `captures` dict with the default values stored
     in the `Capture` nodes.
@@ -86,7 +86,7 @@ def _check_optional(pattern_node, captures=None):
     return False
 
 
-def match(concrete_node, pattern_node, captures=None) -> Tuple[bool, Dict[str, ast.AST]]:
+def match(concrete_node, pattern_node, captures=None) -> bool:
     """
     Determine if `concrete_node` matches the `pattern_node` and capture values as specified in the pattern
     node into `captures`
@@ -127,7 +127,7 @@ def match(concrete_node, pattern_node, captures=None) -> Tuple[bool, Dict[str, a
                 if not match(getattr(concrete_node, fieldname), pattern_val, captures=captures):
                     return False
             else:
-                opt_captures = {}
+                opt_captures: Dict[str, Any] = {}
                 is_opt = _check_optional(pattern_val, opt_captures)
                 if is_opt:
                     # if the node is optional populate captures from the default values stored in the pattern node
