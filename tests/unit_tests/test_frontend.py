@@ -3,7 +3,11 @@ import ast
 import inspect
 import textwrap
 
+import pytest
 from gt_frontend import ast_node_matcher as anm
+from gt_frontend.frontend import GTScriptCompilationTask
+
+from . import stencil_definitions
 
 
 class TestAstNodeMatcher:
@@ -111,3 +115,12 @@ class TestAstNodeMatcher:
 
         assert matches
         assert captures["id"] == "some_default"
+
+
+@pytest.fixture(params=stencil_definitions.valid_stencils)
+def valid_stencil(request):
+    return getattr(stencil_definitions, request.param)
+
+
+def test_code_generation_for_valid_stencils(valid_stencil):
+    GTScriptCompilationTask(valid_stencil).generate()

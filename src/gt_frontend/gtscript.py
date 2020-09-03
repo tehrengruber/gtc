@@ -28,7 +28,15 @@ Cell = common.LocationType.Cell
 FORWARD = common.LoopOrder.FORWARD
 BACKWARD = common.LoopOrder.BACKWARD
 
-_built_in_functions = ["computation", "location", "neighbors", "vertices", "edges", "cells"]
+_built_in_functions = [
+    "computation",
+    "interval",
+    "location",
+    "neighbors",
+    "vertices",
+    "edges",
+    "cells",
+]
 
 __all__ = _built_in_functions + [
     "Field",

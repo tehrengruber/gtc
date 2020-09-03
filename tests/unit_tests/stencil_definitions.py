@@ -1,14 +1,29 @@
 # -*- coding: utf-8 -*-
-# ignore "local variable '...' is assigned to but never used" for the entire file
+#
+# Eve Toolchain - GT4Py Project - GridTools Framework
+#
+# Copyright (c) 2020, CSCS - Swiss National Supercomputing Center, ETH Zurich
+# All rights reserved.
+#
+# This file is part of the GT4Py project and the GridTools framework.
+# GT4Py is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or any later
+# version. See the LICENSE.txt file at the top-level directory of this
+# distribution for a copy of the license or check <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+# ignore flake8 error: local variable '...' is assigned to but never used
 # flake8: noqa: F841
-from gt_frontend.frontend import GTScriptCompilationTask
 from gt_frontend.gtscript import (
     FORWARD,
     Edge,
     Field,
+    Local,
     Mesh,
     Vertex,
     computation,
+    edges,
     interval,
     location,
     vertices,
@@ -19,13 +34,12 @@ from gtc import common
 
 dtype = common.DataType.FLOAT64
 
+valid_stencils = ["edge_reduction", "sparse_ex", "nested", "fvm_nabla"]
+
 
 def edge_reduction(mesh: Mesh, edge_field: Field[Edge, dtype], vertex_field: Field[Vertex, dtype]):
     with computation(FORWARD), interval(0, None), location(Edge) as e:
-        edge_field = sum(vertex_field[v] for v in vertices(e))
-        # edge_field = 0.5 * sum(vertex_field[v] for v in vertices(e))
-        # pass
-        # edge_field[e] = 0.5*sum(vertex_field[v] for v in vertices(e))
+        edge_field = 0.5 * sum(vertex_field[v] for v in vertices(e))
 
 
 def sparse_ex(
@@ -35,9 +49,7 @@ def sparse_ex(
         edge_field = sum(sparse_field[e, v] for v in vertices(e))
 
 
-def test_nested(
-    mesh: Mesh, f_1: Field[Edge, dtype], f_2: Field[Vertex, dtype], f_3: Field[Edge, dtype]
-):
+def nested(mesh: Mesh, f_1: Field[Edge, dtype], f_2: Field[Vertex, dtype], f_3: Field[Edge, dtype]):
     with computation(FORWARD), interval(0, None):
         with location(Edge) as e:
             f_1 = 1
@@ -47,7 +59,7 @@ def test_nested(
         f_3 = 3
 
 
-def fvm_nabla_stencil(
+def fvm_nabla(
     mesh: Mesh,
     S_MXX: Field[Edge, dtype],
     S_MYY: Field[Edge, dtype],
@@ -68,7 +80,3 @@ def fvm_nabla_stencil(
             pnabla_MYY = sum(zavgS_MYY[e] * sign[v, e] for e in edges(v))
             pnabla_MXX = pnabla_MXX / vol
             pnabla_MYY = pnabla_MYY / vol
-
-
-if __name__ == "__main__":
-    GTScriptCompilationTask(fvm_nabla_stencil).generate()
