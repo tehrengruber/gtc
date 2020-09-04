@@ -19,30 +19,24 @@ namespace gridtools {
                 return connectivity_neighbor_table(connectivity);
             };
 
-            // template <class Connectivity>
-            // using neighbor_table_type =
-            //     decltype(::gridtools::next::connectivity::neighbor_table(std::declval<Connectivity const &>()));
-
-            // template <class Connectivity>
-            // using max_neighbors_type = gridtools::integral_constant<int,
-            //     meta::second<meta::mp_find<
-            //         hymap::to_meta_map<gridtools::sid::upper_bounds_type<neighbor_table_type<Connectivity>>>,
-            //         neighbor>>>;
-
-            // TODO remove(after refactoring)
+            // TODO remove GT_FUNCTION after Code generator is updated to use the info struct or similar
             template <class Connectivity>
-            auto max_neighbors(Connectivity const &connectivity) -> decltype(connectivity_max_neighbors(connectivity)) {
+            GT_FUNCTION auto max_neighbors(Connectivity const &connectivity)
+                -> decltype(connectivity_max_neighbors(connectivity)) {
                 // return max_neighbors_type<Connectivity>::value;
                 return connectivity_max_neighbors(connectivity);
             }
 
+            // TODO remove GT_FUNCTION after Code generator is updated to use the info struct or similar
             template <class Connectivity>
-            std::size_t size(Connectivity const &connectivity) {
+            GT_FUNCTION std::size_t size(Connectivity const &connectivity) {
                 return connectivity_size(connectivity);
             }
 
+            // TODO remove GT_FUNCTION after Code generator is updated to use the info struct or similar
             template <class Connectivity>
-            auto skip_value(Connectivity const &connectivity) -> decltype(connectivity_skip_value(connectivity)) {
+            GT_FUNCTION auto skip_value(Connectivity const &connectivity)
+                -> decltype(connectivity_skip_value(connectivity)) {
                 return connectivity_skip_value(connectivity);
             }
 
