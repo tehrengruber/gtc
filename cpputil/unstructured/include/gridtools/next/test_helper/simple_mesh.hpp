@@ -85,20 +85,20 @@ namespace gridtools {
                     }
                 };
 
-                template <class Key, std::enable_if_t<std::is_same_v<Key, vertex>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<vertex>, simple_mesh const &) {
                     return primary_connectivity<vertex>{9};
                 }
-                template <class Key, std::enable_if_t<std::is_same_v<Key, edge>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<edge>, simple_mesh const &) {
                     return primary_connectivity<edge>{18};
                 }
-                template <class Key, std::enable_if_t<std::is_same_v<Key, cell>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<cell>, simple_mesh const &) {
                     return primary_connectivity<cell>{9};
                 }
-                template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<cell, cell>>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<cell, cell>, simple_mesh const &) {
                     return regular_connectivity<cell, 4>{{
                         {6, 1, 3, 2}, // 0
                         {7, 2, 4, 0}, // 1
@@ -111,8 +111,8 @@ namespace gridtools {
                         {5, 6, 2, 7}  // 8
                     }};
                 }
-                template <class Key, std::enable_if_t<std::is_same_v<Key, std::tuple<edge, vertex>>, int> = 0>
-                friend decltype(auto) mesh_connectivity(const simple_mesh &) {
+                template <template <class...> class L>
+                friend decltype(auto) mesh_connectivity(L<edge, vertex>, simple_mesh const &) {
                     return regular_connectivity<edge, 2>{{
                         {0, 1}, // 0
                         {1, 2},

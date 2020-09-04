@@ -4,6 +4,7 @@
 #include <atlas/field/Field.h>
 #include <atlas/functionspace.h>
 #include <gridtools/common/hymap.hpp>
+#include <gridtools/meta/first.hpp>
 #include <gridtools/next/atlas_array_view_adapter.hpp>
 #include <gridtools/sid/delegate.hpp>
 #include <gridtools/sid/rename_dimensions.hpp>
@@ -39,11 +40,7 @@ namespace gridtools::next::atlas_util {
 
     template <class... DimensionTags>
     struct as {
-        template <class First, class... Rest>
-        struct first_impl {
-            using type = First;
-        };
-        using first_t = typename first_impl<DimensionTags...>::type;
+        using first_t = meta::first<as>;
 
         // Atlas field dimensions order (TODO double check):
         // 1. unstructured dimension

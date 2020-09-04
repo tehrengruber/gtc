@@ -100,11 +100,7 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         """<%
             loc_strs = [_this_generator.LOCATION_TYPE_TO_STR[e] for e in _this_node.elements]
         %>
-        % if len(loc_strs) == 1:
-            ${ loc_strs[0] }
-        % else:
-            std::tuple<${ ','.join(loc_strs) }>
-        % endif
+        std::tuple<${ ','.join(loc_strs) }>
         """
     )
 
@@ -263,7 +259,7 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
     Temporary_template = mako_tpl.Template(
         """
         auto zavg_tmp = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
-            (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<${ loctype }>(mesh)), 1 /* TODO ksize */, tmp_alloc);"""
+            (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<${ loctype }>>(mesh)), 1 /* TODO ksize */, tmp_alloc);"""
     )
 
     @classmethod
