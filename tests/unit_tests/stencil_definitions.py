@@ -34,8 +34,11 @@ from gtc import common
 
 dtype = common.DataType.FLOAT64
 
-valid_stencils = ["edge_reduction", "sparse_ex", "nested", "fvm_nabla"]
+valid_stencils = ["edge_reduction", "sparse_ex", "nested", "fvm_nabla", "temporary_field"]
 
+def copy(mesh: Mesh, field_in: Field[Vertex, dtype], field_out: Field[Vertex, dtype]):
+    with computation(FORWARD), interval(0, None), location(Vertex) as v:
+        field_in = field_out
 
 def edge_reduction(mesh: Mesh, edge_field: Field[Edge, dtype], vertex_field: Field[Vertex, dtype]):
     with computation(FORWARD), interval(0, None), location(Edge) as e:
@@ -57,6 +60,13 @@ def nested(mesh: Mesh, f_1: Field[Edge, dtype], f_2: Field[Vertex, dtype], f_3: 
             f_2 = 2
     with computation(FORWARD), interval(0, None), location(Edge) as e:
         f_3 = 3
+
+
+def temporary_field(mesh: Mesh, out: Field[Vertex, dtype]):
+    with computation(FORWARD), interval(0, None), location(Vertex) as e:
+        tmp = 1
+    with computation(FORWARD), interval(0, None), location(Vertex) as v:
+        out = tmp
 
 
 def fvm_nabla(
