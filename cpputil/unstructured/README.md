@@ -62,7 +62,8 @@ is a SID with the following dimensions:
 
 ## Build instructions
 
-```export BASEPATH=`pwd`
+```
+export BASEPATH=`pwd`
 
 export ECBUILD_VERSION=3.3.2
 wget https://github.com/ecmwf/ecbuild/archive/${ECBUILD_VERSION}.tar.gz
@@ -81,11 +82,13 @@ popd
 
 export ATLAS_VERSION=0.20.1
 wget https://github.com/ecmwf/atlas/archive/${ATLAS_VERSION}.tar.gz
-tar xzf ${ATLAS_VERSION}.tar.gz
+if [ ! -f "atlas-${ATLAS_VERSION}" ]; then
+  tar xzf ${ATLAS_VERSION}.tar.gz
+fi
 cd atlas-${ATLAS_VERSION}
 mkdir build
 pushd build
-ecbuild -DECKIT_PATH="$BASEPATH/eckit-${ECKIT_VERSION}/build" .. 
+ecbuild -DECKIT_PATH="$BASEPATH/eckit-${ECKIT_VERSION}/build" ..
 make -j4
 popd
 ```
