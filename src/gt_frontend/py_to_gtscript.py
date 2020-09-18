@@ -154,6 +154,7 @@ class PyToGTScript:
         ast.Mult: gtc.common.BinaryOperator.MUL,
         ast.Add: gtc.common.BinaryOperator.ADD,
         ast.Div: gtc.common.BinaryOperator.DIV,
+        ast.Pass: gtscript_ast.Pass
     }
 
     def transform(self, node, eligible_node_types=None):
@@ -168,7 +169,7 @@ class PyToGTScript:
             if is_leaf_node:
                 if not type(node) in self.leaf_map:
                     raise ValueError(
-                        "Leaf node of type {} found in the python ast can not be mapped."
+                        "Leaf node of type {}, found in the python ast, can not be mapped.".format(type(node))
                     )
                 return self.leaf_map[type(node)]
             else:

@@ -34,6 +34,7 @@ from .gtscript_ast import (
     IterationOrder,
     LocationComprehension,
     LocationSpecification,
+    Pass,
     Stencil,
     SubscriptMultiple,
     SubscriptSingle,
@@ -500,3 +501,6 @@ class GTScriptToGTIR(eve.NodeTranslator):
             stencils=self.visit(node.stencils),
             declarations=temporary_field_decls,
         )
+
+    def visit_Pass(self, node : Pass):
+        raise RuntimeError("Not implemented.")

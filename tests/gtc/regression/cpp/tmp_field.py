@@ -16,10 +16,10 @@ dtype = DataType.FLOAT64
 
 
 def sten(mesh: Mesh, field_in: Field[Cell, dtype], field_out: Field[Cell, dtype]):
-    with computation(FORWARD), interval(0, None), location(Cell):
+    with computation(FORWARD), location(Cell):
         tmp = field_in
-    with computation(FORWARD), interval(0, None), location(Cell):
-        field_out = tmp
+    with computation(FORWARD), location(Cell):
+        field_out = tmp  # noqa: F841
 
 
 def main():
