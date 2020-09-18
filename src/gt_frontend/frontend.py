@@ -64,24 +64,30 @@ class GTScriptCompilationTask:
         for name, param in sig.parameters.items():
             self.symbol_table[name] = param.annotation
 
-    def generate(self, *, debug=False, code_generator=UsidGpuCodeGenerator):
+    def _generate_gtscript_ast(self):
         self._annotate_args()
         self.python_ast = ast.parse(inspect.getsource(self.definition)).body[0]
-        self.gt4py_ast = PyToGTScript().transform(self.python_ast)
+        self.gtscript_ast = PyToGTScript().transform(self.python_ast)
 
+        return self.gtscript_ast
+
+    def _generate_gtir(self):
         # Canonicalization
-        NodeCanonicalizer.apply(self.gt4py_ast)
+        NodeCanonicalizer.apply(self.gtscript_ast)
 
         # Populate symbol table
-        VarDeclExtractor.apply(self.symbol_table, self.gt4py_ast)
-        TemporaryFieldDeclExtractor.apply(self.symbol_table, self.gt4py_ast)
-        SymbolResolutionValidation.apply(self.symbol_table, self.gt4py_ast)
+        VarDeclExtractor.apply(self.symbol_table, self.gtscript_ast)
+        TemporaryFieldDeclExtractor.apply(self.symbol_table, self.gtscript_ast)
+        SymbolResolutionValidation.apply(self.symbol_table, self.gtscript_ast)
 
         # Transform into GTIR
-        gtir = GTScriptToGTIR.apply(self.symbol_table, self.gt4py_ast)
+        self.gtir = GTScriptToGTIR.apply(self.symbol_table, self.gtscript_ast)
 
+        return self.gtir
+
+    def _generate_cpp(self, *, debug=False, code_generator=UsidGpuCodeGenerator):
         # Code generation
-        nir_comp = GtirToNir().visit(gtir)
+        nir_comp = GtirToNir().visit(self.gtir)
         nir_comp = find_and_merge_horizontal_loops(nir_comp)
         usid_comp = NirToUsid().visit(nir_comp)
 
@@ -89,6 +95,16 @@ class GTScriptCompilationTask:
             devtools.debug(nir_comp)
             devtools.debug(usid_comp)
 
-        generated_code = code_generator.apply(usid_comp)
+        self.cpp_code = code_generator.apply(usid_comp)
 
-        return generated_code
+        return self.cpp_code
+
+    def generate(self, *, debug=False, code_generator=UsidGpuCodeGenerator):
+        """
+        Generate c++ code of the stencil
+        """
+        self._generate_gtscript_ast()
+        self._generate_gtir()
+        self._generate_cpp(debug=debug, code_generator=code_generator)
+
+        return self.cpp_code

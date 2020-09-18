@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from typing import Any, List
+from typing import Any, List, cast
 
 
 class BuiltInTypeMeta(type):
@@ -41,7 +41,9 @@ class BuiltInTypeMeta(type):
             return True
         return False
 
-    def __getitem__(self, args) -> "BuiltInTypeMeta":  # todo: evaluate using __class_getitem__ instead
+    def __getitem__(
+        self, args
+    ) -> "BuiltInTypeMeta":  # todo: evaluate using __class_getitem__ instead
         if not isinstance(args, tuple):
             args = (args,)
         return BuiltInTypeMeta(self.class_name, (), self.namespace, args=args)
@@ -52,7 +54,7 @@ class BuiltInTypeMeta(type):
 
     def __subclasscheck__(self, other) -> bool:
         # todo: enhance
-        return self == other
+        return cast(bool, self == other)
 
 
 class BuiltInType(metaclass=BuiltInTypeMeta):

@@ -6,7 +6,6 @@
 import os
 import sys
 
-import gt_frontend.gtscript
 from gt_frontend.frontend import GTScriptCompilationTask
 from gt_frontend.gtscript import (
     FORWARD,

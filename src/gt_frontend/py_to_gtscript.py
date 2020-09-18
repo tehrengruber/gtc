@@ -108,6 +108,7 @@ class PyToGTScript:
             )
         )
 
+        # todo: this needs to be a function, since the uid must be generated each time
         LocationSpecification = ast.withitem(
             context_expr=ast.Call(
                 func=ast.Name(id="location"), args=[ast.Name(id=Capture("location_type"))]

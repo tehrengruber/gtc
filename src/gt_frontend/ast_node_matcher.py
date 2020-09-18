@@ -15,9 +15,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import ast
 from typing import Any, Dict, List, Union
+
 import asdl
 
-python_grammar = asdl.ASDLParser().parse("""
+
+python_grammar = asdl.ASDLParser().parse(
+    """
 -- ASDL's 5 builtin types are:
 -- identifier, int, string, object, constant
 
@@ -147,11 +150,14 @@ module Python
 
     type_ignore = TypeIgnore(int lineno, string tag)
 }
-""")
+"""
+)
+
 
 def get_optional_fields(obj):
     assert isinstance(obj, asdl.Product) or isinstance(obj, asdl.Constructor)
     return {field.name: field.opt for field in obj.fields}
+
 
 # create a dict containing for each python ast node whether it is optional
 py_ast_opt_fields = {}
@@ -162,7 +168,8 @@ for name, obj in python_grammar.types.items():
         for c in obj.types:
             py_ast_opt_fields[c.name] = get_optional_fields(c)
     else:
-        assert False, "Invalid grammar. Type must either a product or a sum type."
+        raise AssertionError("Invalid grammar. Type must either a product or a sum type.")
+
 
 class Capture:
     """
@@ -273,7 +280,8 @@ def match(concrete_node, pattern_node, captures=None) -> bool:
         for fieldname, pattern_val in ast.iter_fields(pattern_node):
             is_opt_in_py_ast = py_ast_opt_fields[type(pattern_node).__name__][fieldname]
             if hasattr(concrete_node, fieldname) and (
-                not is_opt_in_py_ast or getattr(concrete_node, fieldname) is not None):
+                not is_opt_in_py_ast or getattr(concrete_node, fieldname) is not None
+            ):
                 if not match(getattr(concrete_node, fieldname), pattern_val, captures=captures):
                     return False
             else:
