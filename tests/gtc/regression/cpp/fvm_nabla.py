@@ -27,8 +27,6 @@ from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGen
 
 dtype = DataType.FLOAT64
 
-print(gt_frontend.gtscript._built_in_functions)
-
 
 def nabla(
     mesh: Mesh,

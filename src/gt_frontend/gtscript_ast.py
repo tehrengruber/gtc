@@ -109,7 +109,7 @@ class Call(Expr):
     args: List[Expr]
     func: str
 
-
+# todo: can be enabled as soon as eve_toolchain#58 lands
 # class Call(Generic[T]):
 #    name: str
 #    return_type: T
@@ -136,7 +136,7 @@ class Stencil(GTScriptAstNode):
     iteration_spec: List[Union[IterationOrder, LocationSpecification, Interval]]
     body: List[Union[Statement, "Stencil"]]  # todo: stencil only allowed non-canonicalized
 
-
+# todo: attributes are not supported yet. we need to decide on how to handle them first
 # class Attribute(GT4PyAstNode):
 #    attr: str
 #    value: Union[Attribute, Name]

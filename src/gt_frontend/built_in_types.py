@@ -32,25 +32,25 @@ class BuiltInTypeMeta(type):
         instance.args = args
         return instance
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if (
             isinstance(other, BuiltInTypeMeta)
             and self.namespace == other.namespace
             and self.class_name == other.class_name
-        ):
-            if self.args is None or self.args == other.args:
-                return True
+        ) and (self.args is None or self.args == other.args):
+            return True
         return False
 
-    def __getitem__(self, args):  # todo: evaluate using __class_getitem__ instead
+    def __getitem__(self, args) -> "BuiltInTypeMeta":  # todo: evaluate using __class_getitem__ instead
         if not isinstance(args, tuple):
             args = (args,)
         return BuiltInTypeMeta(self.class_name, (), self.namespace, args=args)
 
-    def __instancecheck__(self, instance):
-        raise RuntimeError()
+    def __instancecheck__(self, instance) -> bool:
+        # todo: implement
+        raise RuntimeError("not implemented")
 
-    def __subclasscheck__(self, other):
+    def __subclasscheck__(self, other) -> bool:
         # todo: enhance
         return self == other
 
