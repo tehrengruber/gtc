@@ -16,7 +16,7 @@
 
 import ast
 import inspect
-
+import textwrap
 import devtools
 from gt_frontend.gtscript_to_gtir import (
     GTScriptToGTIR,
@@ -66,7 +66,8 @@ class GTScriptCompilationTask:
 
     def _generate_gtscript_ast(self):
         self._annotate_args()
-        self.python_ast = ast.parse(inspect.getsource(self.definition)).body[0]
+        self.source = textwrap.dedent(inspect.getsource(self.definition))
+        self.python_ast = ast.parse(self.source).body[0]
         self.gtscript_ast = PyToGTScript().transform(self.python_ast)
 
         return self.gtscript_ast
