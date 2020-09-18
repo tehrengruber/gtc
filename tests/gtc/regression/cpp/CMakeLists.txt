@@ -90,5 +90,6 @@ if(BUILD_TESTING)
 
     add_regression_test(cell2cell)
     add_regression_test(vertex2edge)
+    add_regression_test(tmp_field)
     add_regression_test(fvm_nabla ADDITIONAL_LIBRARIES atlas eckit)
 endif()
