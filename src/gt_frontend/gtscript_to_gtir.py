@@ -502,5 +502,5 @@ class GTScriptToGTIR(eve.NodeTranslator):
             declarations=temporary_field_decls,
         )
 
-    def visit_Pass(self, node : Pass):
+    def visit_Pass(self, node: Pass):
         raise RuntimeError("Not implemented.")
