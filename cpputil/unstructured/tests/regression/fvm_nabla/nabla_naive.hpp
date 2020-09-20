@@ -44,9 +44,9 @@ void nabla(Mesh &&mesh,
     int k_size = 1; // TODO
     auto alloc = gridtools::sid::make_cached_allocator(&std::make_unique<char[]>);
     auto zavgS_MXX = gridtools::next::make_simple_tmp_storage<edge, double>(
-        (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<edge>(mesh)), k_size, alloc);
+        (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<edge>>(mesh)), k_size, alloc);
     auto zavgS_MYY = gridtools::next::make_simple_tmp_storage<edge, double>(
-        (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<edge>(mesh)), k_size, alloc);
+        (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<edge>>(mesh)), k_size, alloc);
 
     { // first edge loop (this is the fused version without temporary)
         // ===
