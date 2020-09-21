@@ -46,26 +46,26 @@ class _PlaceholderList(List):
     pass
 
 
-class _PlaceholderAst(ast.AST):
+class _PlaceholderAST(ast.AST):
     pass
 
 
-def _get_placeholder_node(pattern_node) -> Union[_Placeholder, _PlaceholderList, _PlaceholderAst]:
+def _get_placeholder_node(pattern_node) -> Union[_Placeholder, _PlaceholderList, _PlaceholderAST]:
     if isinstance(pattern_node, List):
         return _PlaceholderList()
     elif isinstance(pattern_node, ast.AST):
-        return _PlaceholderAst()
+        return _PlaceholderAST()
 
     return _Placeholder()
 
 
 def _is_placeholder_for(node, pattern_node) -> bool:
     """
-    Is the given node a valid placeholder for the pattern node
+    Is the given node a valid placeholder for the pattern node.
     """
     if isinstance(pattern_node, List) and isinstance(node, _PlaceholderList):
         return True
-    elif isinstance(pattern_node, ast.AST) and isinstance(node, _PlaceholderAst):
+    elif isinstance(pattern_node, ast.AST) and isinstance(node, _PlaceholderAST):
         return True
 
     return False
@@ -90,7 +90,7 @@ def _check_optional(pattern_node, captures=None) -> bool:
 def match(concrete_node, pattern_node, captures=None) -> bool:
     """
     Determine if `concrete_node` matches the `pattern_node` and capture values as specified in the pattern
-    node into `captures`
+    node into `captures`.
 
     Example
     -------
@@ -161,5 +161,5 @@ def match(concrete_node, pattern_node, captures=None) -> bool:
     return False
 
 
-# todo: pattern node ast.Name(bla=123) matches ast.Name(id="123") since bla is not an attribute
+# TODO(tehrengruber): pattern node ast.Name(bla=123) matches ast.Name(id="123") since bla is not an attribute
 #  this can lead to errors which are hard to track

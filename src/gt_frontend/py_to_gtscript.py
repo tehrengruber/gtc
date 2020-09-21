@@ -43,7 +43,7 @@ class PyToGTScript:
              - :class:`ForwardRef` (resolve the reference given the specified module and return its subclasses)
              - built-in python type: :class:`str`, :class:`int`, `type(None)` (return as is)
         """
-        if inspect.isclass(typ) and issubclass(typ, gtscript_ast.GTScriptAstNode):
+        if inspect.isclass(typ) and issubclass(typ, gtscript_ast.GTScriptASTNode):
             result = set()
             result.add(typ)
             result.update(typ.__subclasses__())
@@ -74,9 +74,7 @@ class PyToGTScript:
             type_name = typing_inspect.get_forward_arg(typ)
             if not hasattr(module, type_name):
                 raise ValueError(
-                    "Reference to type `{}` in `ForwardRef` not found in module {}".format(
-                        type_name, module.__name__
-                    )
+                    f"Reference to type `{type_name}` in `ForwardRef` not found in module {module.__name__}"
                 )
             return PyToGTScript._all_subclasses(getattr(module, type_name), module=module)
         elif typ in [
@@ -87,10 +85,10 @@ class PyToGTScript:
             int,
             float,
             type(None),
-        ]:  # todo: enhance
+        ]:  # TODO(tehrengruber): enhance
             return set([typ])
 
-        raise ValueError("Invalid field type {}".format(typ))
+        raise ValueError(f"Invalid field type {typ}")
 
     class Templates:
         """
@@ -116,7 +114,7 @@ class PyToGTScript:
             )
         )
 
-        # todo: this needs to be a function, since the uid must be generated each time
+        # TODO(tehrengruber): this needs to be a function, since the uid must be generated each time
         LocationSpecification = ast.withitem(
             context_expr=ast.Call(
                 func=ast.Name(id="location"), args=[ast.Name(id=Capture("location_type"))]
@@ -177,14 +175,12 @@ class PyToGTScript:
             if is_leaf_node:
                 if not type(node) in self.leaf_map:
                     raise ValueError(
-                        "Leaf node of type {}, found in the python ast, can not be mapped.".format(
-                            type(node)
-                        )
+                        f"Leaf node of type {type(node)}, found in the python ast, can not be mapped."
                     )
                 return self.leaf_map[type(node)]
             else:
                 # visit node fields and transform
-                # todo: check if multiple nodes match and throw an error in that case
+                # TODO(tehrengruber): check if multiple nodes match and throw an error in that case
                 # disadvantage: templates can be ambiguous
                 for node_type in eligible_node_types:
                     if not hasattr(self.Templates, node_type.__name__):
@@ -199,9 +195,7 @@ class PyToGTScript:
                     for name, capture in captures.items():
                         assert (
                             name in node_type.__annotations__
-                        ), "Invalid capture. No field named `{}` in `{}`".format(
-                            name, str(node_type)
-                        )
+                        ), f"Invalid capture. No field named `{name}` in `{str(node_type)}`"
                         field_type = node_type.__annotations__[name]
                         if typing_inspect.get_origin(field_type) == list:
                             # determine eligible capture types

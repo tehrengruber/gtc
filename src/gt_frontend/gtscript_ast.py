@@ -20,7 +20,7 @@ from eve import Node
 
 
 __all__ = [
-    "GTScriptAstNode",
+    "GTScriptASTNode",
     "Statement",
     "Expr",
     "Symbol",
@@ -42,15 +42,15 @@ __all__ = [
 ]
 
 
-class GTScriptAstNode(Node):
+class GTScriptASTNode(Node):
     pass
 
 
-class Statement(GTScriptAstNode):
+class Statement(GTScriptASTNode):
     pass
 
 
-class Expr(GTScriptAstNode):
+class Expr(GTScriptASTNode):
     pass
 
 
@@ -58,37 +58,37 @@ class Symbol(Expr):
     name: str
 
 
-class IterationOrder(GTScriptAstNode):
+class IterationOrder(GTScriptASTNode):
     order: str
 
 
-# todo: use type parameter see https://github.com/samuelcolvin/pydantic/pull/595
+# TODO(tehrengruber): use type parameter see https://github.com/samuelcolvin/pydantic/pull/595
 # T = TypeVar('T')
-# class Constant(GT4PyAstNode, Generic[T]):
+# class Constant(GTScriptASTNode, Generic[T]):
 #    value: T
 
 
 class Constant(Expr):
-    # todo: use StrictStr, StrictInt, StrictFloat as pydantic automatically converts into the first
+    # TODO(tehrengruber): use StrictStr, StrictInt, StrictFloat as pydantic automatically converts into the first
     #  type it occurs. As a result currently all integers become floats
     value: Union[float, int, None, str]
 
 
-class Interval(GTScriptAstNode):
-    start: Constant  # todo: use Constant[Union[int, str, None]]
+class Interval(GTScriptASTNode):
+    start: Constant  # TODO(tehrengruber): use Constant[Union[int, str, None]]
     stop: Constant
 
 
-# todo: allow interval(...) by introducing Optional(captures={...}) placeholder
+# TODO(tehrengruber): allow interval(...) by introducing Optional(captures={...}) placeholder
 # Optional(captures={start=0, end=None})
 
 
-class LocationSpecification(GTScriptAstNode):
+class LocationSpecification(GTScriptASTNode):
     name: Symbol
     location_type: str
 
 
-# todo: proper cannonicalization (CanBeCanonicalizedTo[Subscript] ?)
+# TODO(tehrengruber): proper cannonicalization (CanBeCanonicalizedTo[Subscript] ?)
 class SubscriptSingle(Expr):
     value: Symbol
     index: str
@@ -110,7 +110,7 @@ class Call(Expr):
     func: str
 
 
-# todo: can be enabled as soon as eve_toolchain#58 lands
+# TODO(tehrengruber): can be enabled as soon as eve_toolchain#58 lands
 # class Call(Generic[T]):
 #    name: str
 #    return_type: T
@@ -118,7 +118,7 @@ class Call(Expr):
 #    args: List[Expr]
 
 
-class LocationComprehension(GTScriptAstNode):
+class LocationComprehension(GTScriptASTNode):
     target: Symbol
     iterator: Call
 
@@ -133,12 +133,12 @@ class Assign(Statement):
     value: Expr
 
 
-class Stencil(GTScriptAstNode):
+class Stencil(GTScriptASTNode):
     iteration_spec: List[Union[IterationOrder, LocationSpecification, Interval]]
-    body: List[Union[Statement, "Stencil"]]  # todo: stencil only allowed non-canonicalized
+    body: List[Union[Statement, "Stencil"]]  # TODO(tehrengruber): stencil only allowed non-canonicalized
 
 
-# todo: attributes are not supported yet. we need to decide on how to handle them first
+# TODO(tehrengruber): attributes are not supported yet. we need to decide on how to handle them first
 # class Attribute(GT4PyAstNode):
 #    attr: str
 #    value: Union[Attribute, Name]
@@ -152,15 +152,15 @@ class Pass(Statement):
     pass
 
 
-class Argument(GTScriptAstNode):
+class Argument(GTScriptASTNode):
     name: str
     type_: Union[Symbol, Union[SubscriptMultiple, SubscriptSingle]]
     # is_keyword: bool
 
 
-class Computation(GTScriptAstNode):
+class Computation(GTScriptASTNode):
     name: str
     arguments: List[Argument]
     stencils: List[Stencil]
-    # todo: use the following as soon as nodes support type parameters:
+    # TODO(tehrengruber): use the following as soon as nodes support type parameters:
     #  stencils: List[Union[Stencil[Stencil[Statement]], Stencil[Statement]]]

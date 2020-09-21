@@ -15,5 +15,3 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """GTScript Frontend"""
-
-from eve.version import __version__, __versioninfo__  # noqa

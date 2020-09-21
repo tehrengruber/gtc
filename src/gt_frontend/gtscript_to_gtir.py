@@ -70,9 +70,9 @@ class SymbolTable:
         if item in self.types:
             if (
                 self.types[item] == val
-            ):  # todo: just a workaround. remove when symbol table has proper scope!
+            ):  # TODO(tehrengruber): just a workaround. remove when symbol table has proper scope!
                 return self.types[item]
-            raise ValueError("Symbol `{}` already in symbol table.".format(item))
+            raise ValueError(f"Symbol `{item}` already in symbol table.")
 
         self.types[item] = val
         return self.types[item]
@@ -89,15 +89,13 @@ class SymbolTable:
             self._materialize_constant("Vertex") == LocationType.Vertex
         """
         if name not in self.types:
-            raise ValueError("Symbol {} not found".format(name))
+            raise ValueError(f"Symbol {name} not found")
         if name not in self.constants:
-            raise ValueError("Symbol {} : {} is not a constant".format(name, self.types[name]))
+            raise ValueError(f"Symbol {name} : {self.types[name]} is not a constant")
         val = self.constants[name]
         if expected_type is not None and not isinstance(val, expected_type):
             raise ValueError(
-                "Expected a symbol {} of type {}, but got {}".format(
-                    name, expected_type, self.types[name]
-                )
+                f"Expected a symbol {name} of type {expected_type}, but got {self.types[name]}"
             )
         return val
 
@@ -108,7 +106,7 @@ class NodeCanonicalizer(eve.NodeModifier):
         return cls().visit(gt4py_ast)
 
     def visit_SubscriptSingle(self, node: SubscriptSingle):
-        # todo: do canonicalization properly. this should happen in the translation from python to gtscript
+        # TODO(tehrengruber): do canonicalization properly. this should happen in the translation from python to gtscript
         return self.visit(SubscriptMultiple(value=node.value, indices=[Symbol(name=node.index)]))
 
     def visit_Computation(self, node: Computation):
@@ -119,7 +117,7 @@ class NodeCanonicalizer(eve.NodeModifier):
                 # if we find a nested stencil flatten it
                 for nested_stencil in stencil.body:
                     assert isinstance(nested_stencil, Stencil)
-                    # todo: validate iteration_spec otherwise the TemporaryFieldDeclExtractor fails
+                    # TODO(tehrengruber): validate iteration_spec otherwise the TemporaryFieldDeclExtractor fails
                     flattened_stencil = Stencil(
                         iteration_spec=self.generic_visit(stencil.iteration_spec)
                         + self.generic_visit(nested_stencil.iteration_spec),
@@ -137,10 +135,10 @@ class NodeCanonicalizer(eve.NodeModifier):
         node.stencils = stencils
 
     def visit_Call(self, node: Call):
-        # todo: this could be done by the call inliner
+        # TODO(tehrengruber): this could be done by the call inliner
         # neighbor accessor canonicalization
         neighbor_selector_mapping = {
-            "vertices": Symbol(name="Vertex"),  # todo: common.LocationType.Vertex,
+            "vertices": Symbol(name="Vertex"),  # TODO(tehrengruber): common.LocationType.Vertex,
             "edges": Symbol(name="Edge"),  # common.LocationType.Edge,
             "cells": Symbol(name="Cell"),  # common. LocationType.Cell
         }
@@ -154,7 +152,7 @@ class NodeCanonicalizer(eve.NodeModifier):
 
 
 # poor mans variable declarations extractor
-# todo: first type inference, than symbol table population?
+# TODO(tehrengruber): first type inference, than symbol table population?
 class VarDeclExtractor(eve.NodeVisitor):
     """
     Extract all variable declarations and deduce their type.
@@ -171,6 +169,7 @@ class VarDeclExtractor(eve.NodeVisitor):
             field_1: Field[Edge, dtype]
             field_2: Field[Edge, dtype]
             field_3: Field[Edge, dtype]
+
     - :class:`TemporaryField`: - implicitly by assigning to a previously unknown variable
         .. code-block:: python
 
@@ -209,11 +208,12 @@ class TemporaryFieldDeclExtractor(eve.NodeVisitor):
     symbol_table: SymbolTable
     primary_location: Union[
         None, BuiltInTypeMeta
-    ]  # todo: is there a way to tell mypy this is a Location
+    ]  # TODO(tehrengruber): is there a way to tell mypy this is a Location
 
-    # todo: enhance to support sparse dimension
+    # TODO(tehrengruber): enhance to support sparse dimension
     def __init__(self, symbol_table):
         self.symbol_table = symbol_table
+        self.primary_location = None
 
     @classmethod
     def apply(cls, symbol_table, gt4py_ast: Computation):
@@ -264,11 +264,11 @@ class SymbolResolutionValidation(eve.NodeVisitor):
     def visit_Symbol(self, node: Symbol):
         # every symbol not yet parsed must be supplied externally
         if node.name not in self.symbol_table:
-            raise ValueError("Reference to undefined symbol `{}`".format(node.name))
+            raise ValueError(f"Reference to undefined symbol `{node.name}`")
 
 
 class GTScriptToGTIR(eve.NodeTranslator):
-    # todo: the current way of passing the location_stack is tidious and error prone
+    # TODO(tehrengruber): the current way of passing the location_stack is tidious and error prone
 
     def __init__(self, symbol_table, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -300,14 +300,12 @@ class GTScriptToGTIR(eve.NodeTranslator):
     ) -> gtir.LocationComprehension:
         if not node.iterator.func == "neighbors":
             raise ValueError(
-                "Invalid neighbor specification. Expected a call to `neighbors`, but got `{}`".format(
-                    node.iterator.func
-                )
+                f"Invalid neighbor specification. Expected a call to `neighbors`, but got `{node.iterator.func}`."
             )
 
         of = self.visit(node.iterator.args[0], location_stack=location_stack, **kwargs)
         if not isinstance(of, gtir.LocationRef):
-            raise ValueError("Expected a `LocationRef` node, but got `{}`".format(type(of)))
+            raise ValueError(f"Expected a `LocationRef` node, but got `{type(of)}`")
 
         src_comprehension = location_stack[-1]
         assert src_comprehension.name == of.name
@@ -324,17 +322,15 @@ class GTScriptToGTIR(eve.NodeTranslator):
         return gtir.LocationComprehension(name=node.target.name, chain=chain, of=of)
 
     def visit_Call(self, node: Call, *, location_stack, **kwargs):
-        # todo: all of this can be done with the symbol table and the call inliner
+        # TODO(tehrengruber): all of this can be done with the symbol table and the call inliner
         # reductions
         if node.func in _reduction_mapping:
             if not len(node.args):
                 raise ValueError(
-                    "Invalid number of arguments specified for function {}. Expected 1, but {} were given.".format(
-                        node.func, len(node.args)
-                    )
+                    f"Invalid number of arguments specified for function {node.func}. Expected 1, but {len(node.args)} were given."
                 )
             if not isinstance(node.args[0], Generator) or len(node.args[0].generators) != 1:
-                raise ValueError("Invalid argument to {}".format(node.func))
+                raise ValueError("Invalid argument to {node.func}")
 
             op = _reduction_mapping[node.func]
             neighbors = self.visit(
@@ -358,7 +354,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
         raise ValueError()
 
     def visit_Constant(self, node: Constant, *, location_stack, **kwargs):
-        py_dtype_to_eve = {  # todo: check
+        py_dtype_to_eve = {  # TODO(tehrengruber): check
             int: common.DataType.INT32,
             float: common.DataType.FLOAT64,
         }
@@ -377,7 +373,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
                 name=node.name,  # type: ignore
                 location_type=location_stack[-1].chain.elements[-1],
                 subscript=[gtir.LocationRef(name=location_stack[0].name)],
-            )  # todo: just visit the subscript symbol
+            )  # TODO(tehrengruber): just visit the subscript symbol
         elif issubclass(self.symbol_table[node.name], Location):
             return gtir.LocationRef(name=node.name)
 
@@ -392,7 +388,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
                 isinstance(index, Symbol) and issubclass(self.symbol_table[index.name], Location)
                 for index in node.indices
             )
-            # todo: just visit the index symbol
+            # TODO(tehrengruber): just visit the index symbol
             return gtir.FieldAccess(
                 name=node.value.name,  # type: ignore
                 subscript=[
@@ -428,14 +424,14 @@ class GTScriptToGTIR(eve.NodeTranslator):
                 assert primary_location is None
                 primary_location = self.visit(it_spec)
             elif isinstance(it_spec, Interval):
-                # todo: implement
+                # TODO(tehrengruber): implement
                 pass
             else:
                 raise ValueError()
         assert loop_order is not None
         assert primary_location is not None
 
-        location_stack = [primary_location]  # todo: we should store dimensions here
+        location_stack = [primary_location]  # TODO(tehrengruber): we should store dimensions here
 
         horizontal_loops = []
         for stmt in node.body:

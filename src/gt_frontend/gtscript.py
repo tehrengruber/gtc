@@ -52,8 +52,10 @@ __all__ = _built_in_functions + [
 
 # generate built-in function stubs
 class GTScriptBuiltInNotCallableFromPythonException(Exception):
+    message: str
+
     def __init__(self, name: str):
-        self.message = "GTScript built-in function `{}` not callable from python".format(name)
+        self.message = f"GTScript built-in function `{name}` not callable from python"
         super().__init__(self.message)
 
 

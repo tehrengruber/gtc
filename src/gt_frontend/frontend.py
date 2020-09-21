@@ -56,10 +56,15 @@ class GTScriptCompilationTask:
         )
 
         self.definition = definition
+        self.source = None
+        self.python_ast = None
+        self.gtscript_ast = None
+        self.gtir = None
+        self.cpp_code = None
 
     def _annotate_args(self):
         """
-        Populate symbol table by extracting the argument types from scope the function is embedded in
+        Populate symbol table by extracting the argument types from scope the function is embedded in.
         """
         sig = inspect.signature(self.definition)
         for name, param in sig.parameters.items():
@@ -103,7 +108,7 @@ class GTScriptCompilationTask:
 
     def generate(self, *, debug=False, code_generator=UsidGpuCodeGenerator):
         """
-        Generate c++ code of the stencil
+        Generate c++ code of the stencil.
         """
         self._generate_gtscript_ast()
         self._generate_gtir()

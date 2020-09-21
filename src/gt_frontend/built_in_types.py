@@ -32,7 +32,7 @@ class BuiltInTypeMeta(type):
     def __new__(cls, class_name, bases, namespace, args=None):
         assert bases == () or (len(bases) == 1 and issubclass(bases[0], BuiltInType))
         assert all(attr[0:2] == "__" for attr in namespace.keys())  # no custom attributes
-        # todo: there might be a better way to do this
+        # TODO(tehrengruber): there might be a better way to do this
         instance = type.__new__(cls, class_name, bases, namespace)
         instance.class_name = class_name
         instance.namespace = namespace
@@ -50,17 +50,17 @@ class BuiltInTypeMeta(type):
 
     def __getitem__(
         self, args
-    ) -> "BuiltInTypeMeta":  # todo: evaluate using __class_getitem__ instead
+    ) -> "BuiltInTypeMeta":  # TODO(tehrengruber): evaluate using __class_getitem__ instead
         if not isinstance(args, tuple):
             args = (args,)
         return BuiltInTypeMeta(self.class_name, (), self.namespace, args=args)
 
     def __instancecheck__(self, instance) -> bool:
-        # todo: implement
+        # TODO(tehrengruber): implement
         raise RuntimeError("not implemented")
 
     def __subclasscheck__(self, other) -> bool:
-        # todo: enhance
+        # TODO(tehrengruber): enhance
         return cast(bool, self == other)
 
 
@@ -76,7 +76,7 @@ class Field(BuiltInType):
     pass
 
 
-class TemporaryField(BuiltInType):  # todo: make this a subtype of Field
+class TemporaryField(BuiltInType):  # TODO(tehrengruber): make this a subtype of Field
     pass
 
 
