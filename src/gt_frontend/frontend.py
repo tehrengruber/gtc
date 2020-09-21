@@ -35,6 +35,7 @@ from gtc.unstructured.nir_passes.merge_horizontal_loops import find_and_merge_ho
 from gtc.unstructured.nir_to_usid import NirToUsid
 from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator
 
+
 # todo(tehrengruber): the frontend as written here will disappear at some point as the `PassManager` in Eve and
 #  build stages in GT4Py provide most of the functionality here. Please keep this class as reduced as possible in
 #  the meantime.

@@ -19,6 +19,7 @@ from typing import List, Union
 import gtc.common as common
 from eve import Node
 
+
 __all__ = [
     "GTScriptASTNode",
     "Statement",
@@ -78,6 +79,7 @@ class Interval(GTScriptASTNode):
     """
     Interval [start, stop[
     """
+
     start: Constant  # TODO(tehrengruber): use Constant[Union[int, str, None]]
     stop: Constant
 
