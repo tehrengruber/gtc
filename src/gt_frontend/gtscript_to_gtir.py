@@ -77,11 +77,13 @@ class SymbolTable:
         self.types[item] = val
         return self.types[item]
 
+    # todo(tehrengruber): decide on constant folding: what, when, how?
     def materialize_constant(self, name, expected_type=None):
         """
         Materialize constant symbol with name `name`, i.e. return the value of that symbol.
 
-        Currently the only constants are types.
+        Currently the only constants are types, but this is currently the place where constant folding would happen,
+        hence the name.
 
         Example:
         .. code-block:: python
@@ -100,7 +102,7 @@ class SymbolTable:
         return val
 
 
-class NodeCanonicalizer(eve.NodeModifier):
+class NodeCanonicalizer(eve.NodeTranslator):
     @classmethod
     def apply(cls, gt4py_ast: Computation):
         return cls().visit(gt4py_ast)
@@ -132,7 +134,10 @@ class NodeCanonicalizer(eve.NodeModifier):
             else:
                 raise ValueError("Mixing nested and unnested stencils not allowed.")
 
+        # write back changes to node
         node.stencils = stencils
+
+        return node
 
     def visit_Call(self, node: Call):
         # TODO(tehrengruber): this could be done by the call inliner

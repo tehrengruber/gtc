@@ -13,11 +13,11 @@
 # distribution for a copy of the license or check <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
+# todo(tehrengruber): document nodes
 from typing import List, Union
 
 import gtc.common as common
 from eve import Node
-
 
 __all__ = [
     "GTScriptASTNode",
@@ -75,6 +75,9 @@ class Constant(Expr):
 
 
 class Interval(GTScriptASTNode):
+    """
+    Interval [start, stop[
+    """
     start: Constant  # TODO(tehrengruber): use Constant[Union[int, str, None]]
     stop: Constant
 

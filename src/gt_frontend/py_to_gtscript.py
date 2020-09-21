@@ -90,11 +90,11 @@ class PyToGTScript:
 
         raise ValueError(f"Invalid field type {typ}")
 
-    class Templates:
+    class Patterns:
         """
-        Stores the templates / pattern nodes to be used extracting information from the Python ast.
+        Stores the pattern nodes / templates to be used extracting information from the Python ast.
 
-        Templates are a 1-to-1 mapping from context and Python ast node to GTScript ast node. Context is encoded in the
+        Patterns are a 1-to-1 mapping from context and Python ast node to GTScript ast node. Context is encoded in the
         field types and all understood sementic is encoded in the structure.
         """
 
@@ -163,6 +163,7 @@ class PyToGTScript:
         ast.Pass: gtscript_ast.Pass,
     }
 
+    # todo(tehrengruber): enhance docstring describing the algorithm
     def transform(self, node, eligible_node_types=None):
         """
         Transform python ast into GTScript ast recursively.
@@ -183,11 +184,11 @@ class PyToGTScript:
                 # TODO(tehrengruber): check if multiple nodes match and throw an error in that case
                 # disadvantage: templates can be ambiguous
                 for node_type in eligible_node_types:
-                    if not hasattr(self.Templates, node_type.__name__):
+                    if not hasattr(self.Patterns, node_type.__name__):
                         continue
                     captures = {}
                     if not anm.match(
-                        node, getattr(self.Templates, node_type.__name__), captures=captures
+                        node, getattr(self.Patterns, node_type.__name__), captures=captures
                     ):
                         continue
                     module = sys.modules[node_type.__module__]
