@@ -65,10 +65,7 @@ class PyToGTScript:
             assert issubclass(typ, enum.Enum)
             return {typ}
         elif typing_inspect.is_union_type(typ):
-            result = set()
-            for el_cls in typing_inspect.get_args(typ):
-                result.update(PyToGTScript._all_subclasses(el_cls, module=module))
-            return result
+            return {typ for el_cls in typing_inspect.get_args(typ) for PyToGTScript._all_subclasses(el_cls, module=module)}
         elif isinstance(typ, typing.ForwardRef):
             type_name = typing_inspect.get_forward_arg(typ)
             if not hasattr(module, type_name):
