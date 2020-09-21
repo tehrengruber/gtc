@@ -44,11 +44,10 @@ class PyToGTScript:
              - built-in python type: :class:`str`, :class:`int`, `type(None)` (return as is)
         """
         if inspect.isclass(typ) and issubclass(typ, gtscript_ast.GTScriptAstNode):
-            result = set()
-            result.add(typ)
-            result.update(typ.__subclasses__())
-            result.update(
-                [
+            result = {
+                typ,
+                *typ.__subclasses__(),
+                *[
                     s
                     for c in typ.__subclasses__()
                     for s in PyToGTScript._all_subclasses(c)
