@@ -135,7 +135,9 @@ class Assign(Statement):
 
 class Stencil(GTScriptASTNode):
     iteration_spec: List[Union[IterationOrder, LocationSpecification, Interval]]
-    body: List[Union[Statement, "Stencil"]]  # TODO(tehrengruber): stencil only allowed non-canonicalized
+    body: List[
+        Union[Statement, "Stencil"]
+    ]  # TODO(tehrengruber): stencil only allowed non-canonicalized
 
 
 # TODO(tehrengruber): attributes are not supported yet. we need to decide on how to handle them first

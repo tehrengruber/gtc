@@ -52,7 +52,7 @@ class PyToGTScript:
                     for c in typ.__subclasses__()
                     for s in PyToGTScript._all_subclasses(c)
                     if not inspect.isabstract(c)
-                ]
+                ],
             }
             return result
         elif inspect.isclass(typ) and typ in [
@@ -65,7 +65,11 @@ class PyToGTScript:
             assert issubclass(typ, enum.Enum)
             return {typ}
         elif typing_inspect.is_union_type(typ):
-            return {typ for el_cls in typing_inspect.get_args(typ) for PyToGTScript._all_subclasses(el_cls, module=module)}
+            return {
+                sub_cls
+                for el_cls in typing_inspect.get_args(typ)
+                for sub_cls in PyToGTScript._all_subclasses(el_cls, module=module)
+            }
         elif isinstance(typ, typing.ForwardRef):
             type_name = typing_inspect.get_forward_arg(typ)
             if not hasattr(module, type_name):
