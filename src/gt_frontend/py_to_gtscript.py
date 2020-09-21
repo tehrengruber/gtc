@@ -63,7 +63,7 @@ class PyToGTScript:
             # note: other types in gtc.common, e.g. gtc.common.DataType are not valid leaf nodes here as they
             #  map to symbols in the gtscript ast and are resolved there
             assert issubclass(typ, enum.Enum)
-            return set([typ])
+            return {typ}
         elif typing_inspect.is_union_type(typ):
             result = set()
             for el_cls in typing_inspect.get_args(typ):
