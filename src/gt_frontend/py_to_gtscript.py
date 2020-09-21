@@ -99,6 +99,7 @@ class PyToGTScript:
         Templates are a 1-to-1 mapping from context and Python ast node to GTScript ast node. Context is encoded in the
         field types and all understood sementic is encoded in the structure.
         """
+
         Symbol = ast.Name(id=Capture("name"))
 
         IterationOrder = ast.withitem(

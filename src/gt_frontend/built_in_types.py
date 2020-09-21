@@ -16,6 +16,7 @@
 
 from typing import Any, List, cast
 
+
 class BuiltInTypeMeta(type):
     """
     Metaclass representing types used inside GTScript code.
@@ -23,6 +24,7 @@ class BuiltInTypeMeta(type):
     For now only a bare minimum of operations on these types is supported, i.e. (pseudo) subclass checks and extraction
     of type arguments.
     """
+
     class_name: str
     namespace: str
     args: List[Any]
@@ -86,4 +88,5 @@ class Local(BuiltInType):
     """
     Used as a type argument to :class:`.Field` representing a Local dimension.
     """
+
     pass
