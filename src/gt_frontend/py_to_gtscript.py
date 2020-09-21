@@ -84,7 +84,7 @@ class PyToGTScript:
             float,
             type(None),
         ]:  # todo: enhance
-            return set([typ])
+            return {typ}
 
         raise ValueError("Invalid field type {}".format(typ))
 
