@@ -44,17 +44,16 @@ class PyToGTScript:
              - built-in python type: :class:`str`, :class:`int`, `type(None)` (return as is)
         """
         if inspect.isclass(typ) and issubclass(typ, gtscript_ast.GTScriptASTNode):
-            result = set()
-            result.add(typ)
-            result.update(typ.__subclasses__())
-            result.update(
-                [
+            result = {
+                typ,
+                *typ.__subclasses__(),
+                *[
                     s
                     for c in typ.__subclasses__()
                     for s in PyToGTScript._all_subclasses(c)
                     if not inspect.isabstract(c)
                 ]
-            )
+            }
             return result
         elif inspect.isclass(typ) and typ in [
             gtc.common.AssignmentKind,
@@ -64,12 +63,9 @@ class PyToGTScript:
             # note: other types in gtc.common, e.g. gtc.common.DataType are not valid leaf nodes here as they
             #  map to symbols in the gtscript ast and are resolved there
             assert issubclass(typ, enum.Enum)
-            return set([typ])
+            return {typ}
         elif typing_inspect.is_union_type(typ):
-            result = set()
-            for el_cls in typing_inspect.get_args(typ):
-                result.update(PyToGTScript._all_subclasses(el_cls, module=module))
-            return result
+            return {typ for el_cls in typing_inspect.get_args(typ) for PyToGTScript._all_subclasses(el_cls, module=module)}
         elif isinstance(typ, typing.ForwardRef):
             type_name = typing_inspect.get_forward_arg(typ)
             if not hasattr(module, type_name):
@@ -86,7 +82,7 @@ class PyToGTScript:
             float,
             type(None),
         ]:  # TODO(tehrengruber): enhance
-            return set([typ])
+            return {typ}
 
         raise ValueError(f"Invalid field type {typ}")
 
