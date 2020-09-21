@@ -16,8 +16,13 @@
 
 from typing import Any, List, cast
 
-
 class BuiltInTypeMeta(type):
+    """
+    Metaclass representing types used inside GTScript code.
+
+    For now only a bare minimum of operations on these types is supported, i.e. (pseudo) subclass checks and extraction
+    of type arguments.
+    """
     class_name: str
     namespace: str
     args: List[Any]
@@ -25,7 +30,7 @@ class BuiltInTypeMeta(type):
     def __new__(cls, class_name, bases, namespace, args=None):
         assert bases == () or (len(bases) == 1 and issubclass(bases[0], BuiltInType))
         assert all(attr[0:2] == "__" for attr in namespace.keys())  # no custom attributes
-        # tülülü
+        # todo: there might be a better way to do this
         instance = type.__new__(cls, class_name, bases, namespace)
         instance.class_name = class_name
         instance.namespace = namespace
@@ -77,6 +82,8 @@ class Location(BuiltInType):
     pass
 
 
-# LocalDimension
 class Local(BuiltInType):
+    """
+    Used as a type argument to :class:`.Field` representing a Local dimension.
+    """
     pass

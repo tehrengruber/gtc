@@ -79,13 +79,14 @@ class SymbolTable:
 
     def materialize_constant(self, name, expected_type=None):
         """
-        Materialize constant symbol with name `name`, i.e. return the value of that symbol. Currently the only constants
-        are types.
+        Materialize constant symbol with name `name`, i.e. return the value of that symbol.
+
+        Currently the only constants are types.
 
         Example:
-        ```
-        self._materialize_constant("Vertex") == LocationType.Vertex
-        ```
+        .. code-block:: python
+
+            self._materialize_constant("Vertex") == LocationType.Vertex
         """
         if name not in self.types:
             raise ValueError("Symbol {} not found".format(name))
@@ -158,15 +159,22 @@ class VarDeclExtractor(eve.NodeVisitor):
     """
     Extract all variable declarations and deduce their type.
 
-     - Location - in location comprehensions and stencil iteration specifications
-        `... for v in vertices(e)`
-        `with Location(Vertex) as e: ...`
-    - Field - in the stencils arguments
-        `field_1: Field[Edge, dtype]`
-        `field_2: Field[Edge, dtype]`
-        `field_3: Field[Edge, dtype]`
-    - Temporary Fields: - implicitly by assigning to a previously unknown variable
-        `field_3 = field_1+field_2`
+     - :class:`Location` - in location comprehensions and stencil iteration specifications
+        .. code-block:: python
+
+            ... for v in vertices(e)
+            with Location(Vertex) as e: ...
+
+    - :class:`Field` - in the stencils arguments
+        .. code-block:: python
+
+            field_1: Field[Edge, dtype]
+            field_2: Field[Edge, dtype]
+            field_3: Field[Edge, dtype]
+    - :class:`TemporaryField`: - implicitly by assigning to a previously unknown variable
+        .. code-block:: python
+
+            field_3 = field_1+field_2
     """
 
     def __init__(self, symbol_table, *args, **kwargs):
@@ -238,7 +246,7 @@ class TemporaryFieldDeclExtractor(eve.NodeVisitor):
 
 class SymbolResolutionValidation(eve.NodeVisitor):
     """
-    Ensure all occurring symbols are in the symbol table
+    Ensure all occurring symbols are in the symbol table.
     """
 
     def __init__(self, symbol_table):
@@ -270,16 +278,6 @@ class GTScriptToGTIR(eve.NodeTranslator):
     @classmethod
     def apply(cls, symbol_table, gt4py_ast: Computation):
         return cls(symbol_table).visit(gt4py_ast)
-
-    # def _get_location_type_by_symbol(self, location_stack, location):
-    #    if not issubclass(self.symbol_table[location], Location):
-    #        raise ValueError("`{}` is not a location.".format(location))
-    #    for location_compr in location_stack:
-    #        location_compr : gtir.LocationComprehension
-    #        if location_compr.name == location:
-    #            return location_compr.chain[-1]
-    #
-    #    raise ValueError("No location with name ``{} found.".format(location))
 
     def visit_IterationOrder(self, node: IterationOrder) -> gtir.common.LoopOrder:
         return gtir.common.LoopOrder[node.order]

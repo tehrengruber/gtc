@@ -34,11 +34,14 @@ class PyToGTScript:
     @staticmethod
     def _all_subclasses(typ, *, module=None):
         """
-            Return all subclasses of a given type. The type must be one of
-             - GT4PyAstNode (returns all subclasses of the given class)
-             - Union (return the subclasses of the united)
-             - ForwardRef (resolve the reference given the specified module and return its subclasses)
-             - built-in python type: str, int, type(None) (return as is)
+            Return all subclasses of a given type.
+
+            The type must be one of
+
+             - :class:`GTScriptAstNode` (returns all subclasses of the given class)
+             - :class:`Union` (return the subclasses of the united)
+             - :class:`ForwardRef` (resolve the reference given the specified module and return its subclasses)
+             - built-in python type: :class:`str`, :class:`int`, `type(None)` (return as is)
         """
         if inspect.isclass(typ) and issubclass(typ, gtscript_ast.GTScriptAstNode):
             result = set()
@@ -89,9 +92,13 @@ class PyToGTScript:
 
         raise ValueError("Invalid field type {}".format(typ))
 
-    # template is a 1-to-1 mapping from context and python ast node to gt4py ast node. context is encoded in the field types
-    # all understood sementic is encoded in the structure
     class Templates:
+        """
+        Stores the templates / pattern nodes to be used extracting information from the Python ast.
+
+        Templates are a 1-to-1 mapping from context and Python ast node to GTScript ast node. Context is encoded in the
+        field types and all understood sementic is encoded in the structure.
+        """
         Symbol = ast.Name(id=Capture("name"))
 
         IterationOrder = ast.withitem(

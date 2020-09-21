@@ -162,4 +162,5 @@ class Computation(GTScriptAstNode):
     name: str
     arguments: List[Argument]
     stencils: List[Stencil]
-    # stencils: List[Union[Stencil[Stencil[Statement]], Stencil[Statement]]]
+    # todo: use the following as soon as nodes support type parameters:
+    #  stencils: List[Union[Stencil[Stencil[Statement]], Stencil[Statement]]]
