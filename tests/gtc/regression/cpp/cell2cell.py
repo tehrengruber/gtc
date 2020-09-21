@@ -11,104 +11,32 @@
 import os
 import sys
 
-from devtools import debug
+from gt_frontend.frontend import GTScriptCompilationTask
+from gt_frontend.gtscript import FORWARD, Cell, Field, Mesh, cells, computation, location
 
-from gtc.common import BinaryOperator, DataType, LocationType, LoopOrder
-from gtc.unstructured import gtir
-from gtc.unstructured.gtir import (
-    AssignStmt,
-    BinaryOp,
-    Dimensions,
-    Domain,
-    FieldAccess,
-    HorizontalDimension,
-    HorizontalLoop,
-    LocationComprehension,
-    LocationRef,
-    NeighborChain,
-    NeighborReduce,
-    ReduceOperator,
-    Stencil,
-    UField,
-    VerticalLoop,
-)
-from gtc.unstructured.gtir_to_nir import GtirToNir
-from gtc.unstructured.nir_to_usid import NirToUsid
+from gtc.common import DataType
 from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGenerator
 
 
-field_in = UField(
-    name="field_in",
-    dimensions=Dimensions(horizontal=HorizontalDimension(primary=LocationType.Cell)),
-    vtype=DataType.FLOAT64,
-)
-field_out = UField(
-    name="field_out",
-    dimensions=Dimensions(horizontal=HorizontalDimension(primary=LocationType.Cell)),
-    vtype=DataType.FLOAT64,
-)
-
-red_operand = BinaryOp(
-    op=BinaryOperator.ADD,
-    location_type=LocationType.Cell,
-    left=FieldAccess(
-        name="field_in", location_type=LocationType.Cell, subscript=[LocationRef(name="c1")]
-    ),
-    right=FieldAccess(
-        name="field_in", location_type=LocationType.Cell, subscript=[LocationRef(name="c2")]
-    ),
-)
-
-red_c2c = NeighborReduce(
-    op=ReduceOperator.ADD,
-    operand=red_operand,
-    neighbors=LocationComprehension(
-        name="c2",
-        chain=NeighborChain(elements=[LocationType.Cell, LocationType.Cell]),
-        of=LocationRef(name="c1"),
-    ),
-    location_type=LocationType.Cell,
-)
-
-assign_c2c_red = AssignStmt(
-    left=FieldAccess(
-        name="field_out", subscript=[LocationRef(name="c1")], location_type=LocationType.Cell
-    ),
-    right=red_c2c,
-)
+dtype = DataType.FLOAT64
 
 
-sten = Stencil(
-    vertical_loops=[
-        VerticalLoop(
-            loop_order=LoopOrder.FORWARD,
-            horizontal_loops=[
-                HorizontalLoop(
-                    location=LocationComprehension(
-                        name="c1", chain=NeighborChain(elements=[LocationType.Cell]), of=Domain()
-                    ),
-                    stmt=assign_c2c_red,
-                )
-            ],
-        )
-    ],
-)
+def sten(mesh: Mesh, field_in: Field[Cell, dtype], field_out: Field[Cell, dtype]):
+    with computation(FORWARD), location(Cell) as c1:
+        field_out[c1] = sum(field_in[c1] + field_in[c2] for c2 in cells(c1))
 
 
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "unaive"
 
-    comp = gtir.Computation(name="sten", params=[field_in, field_out], stencils=[sten])
-    nir_comp = GtirToNir().visit(comp)
-    debug(nir_comp)
-    usid_comp = NirToUsid().visit(nir_comp)
-    debug(usid_comp)
-
     if mode == "unaive":
-        generated_code = UsidNaiveCodeGenerator.apply(usid_comp)
-
+        code_generator = UsidNaiveCodeGenerator
     else:  # 'ugpu':
-        generated_code = UsidGpuCodeGenerator.apply(usid_comp)
+        code_generator = UsidGpuCodeGenerator
+
+    generated_code = GTScriptCompilationTask(sten).generate(
+        debug=True, code_generator=code_generator
+    )
 
     print(generated_code)
     output_file = (

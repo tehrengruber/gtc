@@ -94,6 +94,8 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         "<gridtools/sid/composite.hpp>",
     ]
 
+    preface = ""
+
     Connectivity_template = "auto {name} = gridtools::next::mesh::connectivity<{chain}>(mesh);"
 
     NeighborChain_template = mako_tpl.Template(
@@ -114,7 +116,6 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         """
         auto ${ _this_node.field_name } = tu::make<gridtools::sid::composite::keys<${ ','.join([t.tag_name for t in _this_node.entries]) }>::values>(
         ${ ','.join(entries)});
-        static_assert(gridtools::is_sid<decltype(${ _this_node.field_name })>{});
         """
     )
 
@@ -228,7 +229,8 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         )
 
     Computation_template = mako_tpl.Template(
-        """${ '\\n'.join('#include ' + header for header in _this_generator.headers) }
+        """${_this_generator.preface}
+        ${ '\\n'.join('#include ' + header for header in _this_generator.headers) }
 
         namespace ${ name }_impl_ {
             ${ ''.join(sid_tags) }
@@ -258,7 +260,7 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
 
     Temporary_template = mako_tpl.Template(
         """
-        auto zavg_tmp = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
+        auto ${ name } = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
             (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<${ loctype }>>(mesh)), 1 /* TODO ksize */, tmp_alloc);"""
     )
 
@@ -280,6 +282,15 @@ class UsidGpuCodeGenerator(UsidCodeGenerator):
         "<gridtools/next/cuda_util.hpp>",
         "<gridtools/common/cuda_util.hpp>",
     ]
+
+    preface = (
+        UsidCodeGenerator.preface
+        + """
+        #ifndef __CUDACC__
+        #error "Tried to compile CUDA code with a regular C++ compiler."
+        #endif
+    """
+    )
 
     KernelCall_template = mako_tpl.Template(
         """

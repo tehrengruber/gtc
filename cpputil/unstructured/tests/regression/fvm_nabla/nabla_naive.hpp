@@ -1,5 +1,8 @@
 #pragma once
 
+#include <gridtools/next/tmp_storage.hpp>
+#include <gridtools/sid/allocator.hpp>
+
 struct connectivity_tag;
 struct S_MXX_tag;
 struct S_MYY_tag;
@@ -14,8 +17,6 @@ struct sign_tag;
 template <class Mesh,
     class S_MXX_t,
     class S_MYY_t,
-    class zavgS_MXX_t,
-    class zavgS_MYY_t,
     class pp_t,
     class pnabla_MXX_t,
     class pnabla_MYY_t,
@@ -24,8 +25,6 @@ template <class Mesh,
 void nabla(Mesh &&mesh,
     S_MXX_t &&S_MXX,
     S_MYY_t &&S_MYY,
-    zavgS_MXX_t &&zavgS_MXX,
-    zavgS_MYY_t &&zavgS_MYY,
     pp_t &&pp,
     pnabla_MXX_t &&pnabla_MXX,
     pnabla_MYY_t &&pnabla_MYY,
@@ -35,13 +34,19 @@ void nabla(Mesh &&mesh,
 
     static_assert(gridtools::is_sid<S_MXX_t>{});
     static_assert(gridtools::is_sid<S_MYY_t>{});
-    static_assert(gridtools::is_sid<zavgS_MXX_t>{});
-    static_assert(gridtools::is_sid<zavgS_MYY_t>{});
     static_assert(gridtools::is_sid<pp_t>{});
     static_assert(gridtools::is_sid<pnabla_MXX_t>{});
     static_assert(gridtools::is_sid<pnabla_MYY_t>{});
     static_assert(gridtools::is_sid<vol_t>{});
     static_assert(gridtools::is_sid<sign_t>{});
+
+    // allocate temporary field storage
+    int k_size = 1; // TODO
+    auto alloc = gridtools::sid::make_cached_allocator(&std::make_unique<char[]>);
+    auto zavgS_MXX = gridtools::next::make_simple_tmp_storage<edge, double>(
+        (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<edge>>(mesh)), k_size, alloc);
+    auto zavgS_MYY = gridtools::next::make_simple_tmp_storage<edge, double>(
+        (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<edge>>(mesh)), k_size, alloc);
 
     { // first edge loop (this is the fused version without temporary)
         // ===

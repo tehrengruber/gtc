@@ -9,38 +9,35 @@ namespace {
 
 using namespace gridtools::next;
 
-TEST(regression, cell2cell) {
+TEST(regression, temporary) {
   test_helper::simple_mesh mesh;
-
-  auto c2c = mesh::connectivity<std::tuple<cell, cell>>(mesh);
 
   auto in = test_helper::make_field<double, cell>(mesh);
 
   // TODO discuss with anstaf what an unstructured field should be, here I steal
   // the data_store from a SID
   auto view = in.m_impl->host_view();
-  // 1 1 1
-  // 1 2 1
-  // 1 1 1
+  //  1   2   3
+  //  4   5   6
+  //  7   8   9
   for (std::size_t i = 0; i < 9; ++i)
-    view(i) = 1;
-  view(4) = 2;
+    view(i) = i;
 
   auto out = test_helper::make_field<double, cell>(mesh);
   sten(mesh, in, out);
 
-  // 8  9  8
-  // 9 12  9
-  // 8  9  8
+  //  1   2   3
+  //  4   5   6
+  //  7   8   9
   auto out_view = out.m_impl->const_host_view();
-  EXPECT_DOUBLE_EQ(8, out_view(0));
-  EXPECT_DOUBLE_EQ(9, out_view(1));
-  EXPECT_DOUBLE_EQ(8, out_view(2));
-  EXPECT_DOUBLE_EQ(9, out_view(3));
-  EXPECT_DOUBLE_EQ(12, out_view(4));
-  EXPECT_DOUBLE_EQ(9, out_view(5));
-  EXPECT_DOUBLE_EQ(8, out_view(6));
-  EXPECT_DOUBLE_EQ(9, out_view(7));
+  EXPECT_DOUBLE_EQ(0, out_view(0));
+  EXPECT_DOUBLE_EQ(1, out_view(1));
+  EXPECT_DOUBLE_EQ(2, out_view(2));
+  EXPECT_DOUBLE_EQ(3, out_view(3));
+  EXPECT_DOUBLE_EQ(4, out_view(4));
+  EXPECT_DOUBLE_EQ(5, out_view(5));
+  EXPECT_DOUBLE_EQ(6, out_view(6));
+  EXPECT_DOUBLE_EQ(7, out_view(7));
   EXPECT_DOUBLE_EQ(8, out_view(8));
 }
 } // namespace

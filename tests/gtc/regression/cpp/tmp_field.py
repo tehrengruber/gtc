@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 #
-# Simple vertex to edge reduction.
-#
-# ```python
-# for e in edges(mesh):
-#     out = sum(in[v] for v in vertices(e))
-# ```
+# Copy stencil with temporary field
 
 import os
 import sys
 
 from gt_frontend.frontend import GTScriptCompilationTask
-from gt_frontend.gtscript import FORWARD, Edge, Field, Mesh, Vertex, computation, location, vertices
+from gt_frontend.gtscript import FORWARD, Cell, Field, Mesh, computation, location
 
 from gtc.common import DataType
 from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGenerator
@@ -20,9 +15,11 @@ from gtc.unstructured.usid_codegen import UsidGpuCodeGenerator, UsidNaiveCodeGen
 dtype = DataType.FLOAT64
 
 
-def sten(mesh: Mesh, field_in: Field[Vertex, dtype], field_out: Field[Edge, dtype]):
-    with computation(FORWARD), location(Edge) as e:
-        field_out[e] = sum(field_in[v] for v in vertices(e))
+def sten(mesh: Mesh, field_in: Field[Cell, dtype], field_out: Field[Cell, dtype]):
+    with computation(FORWARD), location(Cell):
+        tmp = field_in
+    with computation(FORWARD), location(Cell):
+        field_out = tmp  # noqa: F841
 
 
 def main():
@@ -39,7 +36,7 @@ def main():
 
     print(generated_code)
     output_file = (
-        os.path.dirname(os.path.realpath(__file__)) + "/generated_vertex2edge_" + mode + ".hpp"
+        os.path.dirname(os.path.realpath(__file__)) + "/generated_tmp_field_" + mode + ".hpp"
     )
     with open(output_file, "w+") as output:
         output.write(generated_code)
