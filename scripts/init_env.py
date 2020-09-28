@@ -29,9 +29,9 @@ class VenvManager:
     def install(venv_path: str, requirements: str) -> None:
         try:
             if requirements == "run":
-                cmd = f"{venv_path}/bin/pip3 install -e {REPO_ROOT}"
+                cmd = f"{venv_path}/bin/pip3 install -e {REPO_ROOT}[cpp]"
             elif requirements == "develop":
-                cmd = f"{venv_path}/bin/pip3 install -e {REPO_ROOT} -r {REPO_ROOT}/requirements_dev.txt"
+                cmd = f"{venv_path}/bin/pip3 install -e {REPO_ROOT}[cpp] -r {REPO_ROOT}/requirements_dev.txt"
             print(f"{cmd}")
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
@@ -70,9 +70,9 @@ class CondaManager:
     def install(venv_path: str, requirements: str) -> None:
         try:
             if requirements == "run":
-                cmd = f"conda run -p {venv_path} pip3 install -e {REPO_ROOT}"
+                cmd = f"conda run -p {venv_path} pip3 install -e {REPO_ROOT}[cpp]"
             elif requirements == "develop":
-                cmd = f"conda run -p {venv_path} pip3 install -e {REPO_ROOT} -r {REPO_ROOT}/requirements_dev.txt"
+                cmd = f"conda run -p {venv_path} pip3 install -e {REPO_ROOT}[cpp] -r {REPO_ROOT}/requirements_dev.txt"
             print(f"{cmd}")
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
@@ -122,7 +122,7 @@ for key in sorted(vars(args)):
     print(f"    {key}: {getattr(args, key)}")
 print("")
 
-if not re.match("3.\d\d?(\.\d\d?)?$", args.python):
+if not re.match(r"3.\d\d?(\.\d\d?)?$", args.python):
     print(f"\nError: invalid Python version specification ('{args.python}')\n")
     exit(-1)
 
