@@ -19,10 +19,10 @@ class VenvManager:
         print(f"{cmd}")
         try:
             subprocess.check_call(cmd.split())
-            cmd = f"{parent_dir}/{name}/bin/pip3 install --upgrade wheel pip setuptools"
+            cmd = f"{venv_path}/bin/pip3 install --upgrade wheel pip setuptools"
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
-            print("ERROR!\n{e}")
+            print(f"ERROR!\n{e}")
             exit(-10)
 
     @staticmethod
@@ -35,7 +35,7 @@ class VenvManager:
             print(f"{cmd}")
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
-            print("ERROR!\n{e}")
+            print(f"ERROR!\n{e}")
             exit(-10)
 
 
@@ -48,7 +48,7 @@ class VirtualenvManager:
         try:
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
-            print("ERROR!\n{e}")
+            print(f"ERROR!\n{e}")
             exit(-10)
 
     install = VenvManager.install
@@ -63,7 +63,7 @@ class CondaManager:
         try:
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
-            print("ERROR!\n{e}")
+            print(f"ERROR!\n{e}")
             exit(-10)
 
     @staticmethod
@@ -76,7 +76,7 @@ class CondaManager:
             print(f"{cmd}")
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
-            print("ERROR!\n{e}")
+            print(f"ERROR!\n{e}")
             exit(-10)
 
 
