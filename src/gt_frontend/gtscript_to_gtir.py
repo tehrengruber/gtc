@@ -49,38 +49,37 @@ _reduction_mapping = {
     "max": gtir.ReduceOperator.MAX,
 }
 
-# Types
-#  - BuiltInType
-#  - LocationType
-#  - DataType
-
-
 class SymbolTable:
-    def __init__(self, types, constants):
+    """
+    A simple symbol table containing all the types of all symbols and potentially their values if known at compile
+    time
+    """
+    def __init__(self, types : Dict[str, Any], constants : Dict[str, Any]):
+        # Currently supported types: BuiltInType, LocationType, DataType
         self.types = types
         self.constants = constants
 
-    def __contains__(self, key):
-        return key in self.types
+    def __contains__(self, symbol : str) -> bool:
+        return symbol in self.types
 
-    def __getitem__(self, item):
-        return self.types[item]
+    def __getitem__(self, symbol : str) -> Any:
+        return self.types[symbol]
 
-    def __setitem__(self, item, val):
+    def __setitem__(self, symbol : str, val : Any):
         if item in self.types:
             if (
-                self.types[item] == val
+                self.types[symbol] == val
             ):  # TODO(tehrengruber): just a workaround. remove when symbol table has proper scope!
-                return self.types[item]
-            raise ValueError(f"Symbol `{item}` already in symbol table.")
+                return self.types[symbol]
+            raise ValueError(f"Symbol `{symbol}` already in symbol table.")
 
-        self.types[item] = val
-        return self.types[item]
+        self.types[symbol] = val
+        return self.types[symbol]
 
     # todo(tehrengruber): decide on constant folding: what, when, how?
-    def materialize_constant(self, name, expected_type=None):
+    def materialize_constant(self, symbol : str, expected_type=None):
         """
-        Materialize constant symbol with name `name`, i.e. return the value of that symbol.
+        Materialize constant `symbol`, i.e. return the value of that symbol.
 
         Currently the only constants are types, but this is currently the place where constant folding would happen,
         hence the name.
@@ -90,14 +89,14 @@ class SymbolTable:
 
             self._materialize_constant("Vertex") == LocationType.Vertex
         """
-        if name not in self.types:
-            raise ValueError(f"Symbol {name} not found")
-        if name not in self.constants:
-            raise ValueError(f"Symbol {name} : {self.types[name]} is not a constant")
+        if symbol not in self.types:
+            raise ValueError(f"Symbol {symbol} not found")
+        if symbol not in self.constants:
+            raise ValueError(f"Symbol {symbol} : {self.types[symbol]} is not a constant")
         val = self.constants[name]
         if expected_type is not None and not isinstance(val, expected_type):
             raise ValueError(
-                f"Expected a symbol {name} of type {expected_type}, but got {self.types[name]}"
+                f"Expected a symbol {symbol} of type {expected_type}, but got {self.types[symbol]}"
             )
         return val
 
@@ -181,12 +180,12 @@ class VarDeclExtractor(eve.NodeVisitor):
             field_3 = field_1+field_2
     """
 
-    def __init__(self, symbol_table, *args, **kwargs):
+    def __init__(self, symbol_table : SymbolTable, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.symbol_table = symbol_table
 
     @classmethod
-    def apply(cls, symbol_table, gt4py_ast: Computation):
+    def apply(cls, symbol_table : SymbolTable, gt4py_ast: Computation):
         return cls(symbol_table).visit(gt4py_ast)
 
     def visit_LocationComprehension(self, node: LocationComprehension):
