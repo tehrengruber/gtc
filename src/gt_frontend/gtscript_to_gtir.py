@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 import copy
-from typing import List, Union, cast
+from typing import Any, Dict, List, Union, cast
 
 import eve
 import gtc.common as common
@@ -49,24 +49,26 @@ _reduction_mapping = {
     "max": gtir.ReduceOperator.MAX,
 }
 
+
 class SymbolTable:
     """
     A simple symbol table containing all the types of all symbols and potentially their values if known at compile
     time
     """
-    def __init__(self, types : Dict[str, Any], constants : Dict[str, Any]):
+
+    def __init__(self, types: Dict[str, Any], constants: Dict[str, Any]):
         # Currently supported types: BuiltInType, LocationType, DataType
         self.types = types
         self.constants = constants
 
-    def __contains__(self, symbol : str) -> bool:
+    def __contains__(self, symbol: str) -> bool:
         return symbol in self.types
 
-    def __getitem__(self, symbol : str) -> Any:
+    def __getitem__(self, symbol: str) -> Any:
         return self.types[symbol]
 
-    def __setitem__(self, symbol : str, val : Any):
-        if item in self.types:
+    def __setitem__(self, symbol: str, val: Any):
+        if symbol in self.types:
             if (
                 self.types[symbol] == val
             ):  # TODO(tehrengruber): just a workaround. remove when symbol table has proper scope!
@@ -77,7 +79,7 @@ class SymbolTable:
         return self.types[symbol]
 
     # todo(tehrengruber): decide on constant folding: what, when, how?
-    def materialize_constant(self, symbol : str, expected_type=None):
+    def materialize_constant(self, symbol: str, expected_type=None):
         """
         Materialize constant `symbol`, i.e. return the value of that symbol.
 
@@ -93,7 +95,7 @@ class SymbolTable:
             raise ValueError(f"Symbol {symbol} not found")
         if symbol not in self.constants:
             raise ValueError(f"Symbol {symbol} : {self.types[symbol]} is not a constant")
-        val = self.constants[name]
+        val = self.constants[symbol]
         if expected_type is not None and not isinstance(val, expected_type):
             raise ValueError(
                 f"Expected a symbol {symbol} of type {expected_type}, but got {self.types[symbol]}"
@@ -180,12 +182,11 @@ class VarDeclExtractor(eve.NodeVisitor):
             field_3 = field_1+field_2
     """
 
-    def __init__(self, symbol_table : SymbolTable, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, symbol_table: SymbolTable, *args, **kwargs):
         self.symbol_table = symbol_table
 
     @classmethod
-    def apply(cls, symbol_table : SymbolTable, gt4py_ast: Computation):
+    def apply(cls, symbol_table: SymbolTable, gt4py_ast: Computation):
         return cls(symbol_table).visit(gt4py_ast)
 
     def visit_LocationComprehension(self, node: LocationComprehension):
