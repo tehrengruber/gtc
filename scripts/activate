@@ -1,30 +1,47 @@
 # This file should be sourced from a Bash-compatible shell
 
-EVE_PYTHON_CMD=${EVE_PYTHON_CMD:-python3}
-EVE_VENV_NAME=${EVE_VENV_NAME:-".eve.venv"}
+REPO_ROOT=$(dirname $(dirname "$(readlink -e $BASH_SOURCE)"))
+VENVS_ROOT=${GTC_VENVS_ROOT:-${REPO_ROOT}/.venvs}
+DEFAULT_VENV_NAME="gtc"
 
-EVE_ROOT=$(dirname $(dirname "$(readlink -e $BASH_SOURCE)"))
-EVE_VENV_PATH=${EVE_ROOT}/${EVE_VENV_NAME}
+usage() {
+    echo -e "\nUsage: source ${BASH_SOURCE} [venv_name]"
+    echo -e ""
+    echo -e " Args:"
+    echo -e "   env_name : name of the venv (default: 'eve')"
+    echo -e ""
+    echo -e " Env vars:"
+    echo -e "   GTC_VENVS_ROOT : venvs folder (default: '${REPO_ROOT}/.venvs}'"
+    echo -e ""
+}
 
 if [ "$0" = ${BASH_SOURCE} ]; then
     echo "Error: this script needs to be sourced!"
-    echo "    $> source ${BASH_SOURCE}"
+    usage
     exit -1
 fi
 
-# If a virtual env is active, deactivate it first
-deactivate >/dev/null 2>/dev/null
+# Parse options
+if [ $# -gt 1 ]; then
+    echo -e "\nError: wrong number of arguments"
+    usage
+else
+    VENV_NAME=${1:-${DEFAULT_VENV_NAME}}
+    VENV_PATH=${VENVS_ROOT}/${VENV_NAME}
 
-if [ ! -f ${EVE_VENV_PATH}/bin/activate ]; then
-    ${EVE_ROOT}/scripts/init_env.sh
-    if [ "$?" != "0" ]; then
-        echo "venv activation failed!"
-        return -1
+    # If a virtual env is active, deactivate it first
+    deactivate >/dev/null 2>/dev/null
+    conda deactivate >/dev/null 2>/dev/null
+
+    if [ -d ${VENV_PATH}/conda-meta ]; then
+        conda activate ${VENV_PATH}
+        echo -e "\nDeactivate by:"
+        echo -e "    $> conda deactivate"
+    elif [ -f ${VENV_PATH}/bin/activate ]; then
+        source ${VENV_PATH}/bin/activate
+        echo -e "\nDeactivate by:"
+        echo -e "    $> deactivate"
     fi
+    unset REPO_ROOT VENVS_ROOT DEFAULT_VENV_NAME
 fi
-source ${EVE_VENV_PATH}/bin/activate
 
-unset EVE_ROOT EVE_VENV_PATH
-
-echo -e "\nDeactivate by:"
-echo -e "    $> deactivate"
