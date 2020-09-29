@@ -44,7 +44,7 @@ class VManager(abc.ABC):
                 subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
             print(f"ERROR!\n{e}")
-            exit(-10)
+            exit(exit_code)
 
 
 class VenvManager(VManager):
