@@ -18,37 +18,23 @@
 
 
 import collections.abc
+import enum
+import re
 
 import xxhash
 from boltons.iterutils import flatten, flatten_iter  # noqa: F401
 from boltons.strutils import (  # noqa: F401
     a10n,
-    args2cmd,
-    args2sh,
     asciify,
-    bytes2human,
-    camel2under,
-    cardinalize,
-    escape_shell_args,
-    find_hashtags,
     format_int_list,
-    is_ascii,
-    is_uuid,
     iter_splitlines,
-    ordinalize,
     parse_int_list,
-    pluralize,
-    singularize,
     slugify,
-    split_punct_ws,
-    strip_ansi,
-    under2camel,
-    unit_len,
     unwrap_text,
 )
 
 from . import typing
-from .typing import Any, Callable, Iterable, Optional, Union
+from .typing import Any, Callable, Iterable, List, Optional, Union
 
 
 class _NOTHING_TYPE:
@@ -71,34 +57,93 @@ def call_all(funcs_iterable: Iterable[Callable]) -> Callable:
 AnyWordsIterable = Union[str, Iterable[str]]
 
 
-def join_canonical_cased(words: AnyWordsIterable) -> str:
-    words = [words] if isinstance(words, str) else words
-    return (" ".join(words)).lower()
+class CaseStyleConverter:
+    class CASE_STYLE(enum.Enum):
+        CONCATENATED = "concatenated"
+        CANONICAL = "canonical"
+        CAMEL = "camel"
+        PASCAL = "pascal"
+        SNAKE = "snake"
+        KEBAB = "kebab"
 
+    @classmethod
+    def split(cls, name: str, case_style: CASE_STYLE) -> List[str]:
+        assert isinstance(case_style, cls.CASE_STYLE)
+        if case_style == cls.CASE_STYLE.CONCATENATED:
+            raise ValueError("Impossible to split a simply concatenated string")
 
-def join_concatcased(words: AnyWordsIterable) -> str:
-    words = [words] if isinstance(words, str) else words
-    return "".join(word.lower() for word in words)
+        splitter: Callable[[str], List[str]] = getattr(cls, f"split_{case_style.value}_case")
+        return splitter(name)
 
+    @classmethod
+    def join(cls, words: AnyWordsIterable, case_style: CASE_STYLE) -> str:
+        assert isinstance(case_style, cls.CASE_STYLE)
+        if isinstance(words, str):
+            words = [words]
+        if not isinstance(words, collections.abc.Iterable):
+            raise TypeError(f"'{words}' type is not a valid sequence of words")
 
-def join_camelCased(words: AnyWordsIterable) -> str:
-    words = [words] if isinstance(words, str) else list(words)
-    return words[0].lower() + "".join(word.title() for word in words[1:])
+        joiner: Callable[[AnyWordsIterable], str] = getattr(cls, f"join_{case_style.value}_case")
+        return joiner(words)
 
+    @classmethod
+    def convert(cls, name: str, source_style: CASE_STYLE, target_style: CASE_STYLE) -> str:
+        return cls.join(cls.split(name, source_style), target_style)
 
-def join_PascalCased(words: AnyWordsIterable) -> str:
-    words = [words] if isinstance(words, str) else words
-    return "".join(word.title() for word in words)
+    # Following `join_...`` functions are based on:
+    #    https://blog.kangz.net/posts/2016/08/31/code-generation-the-easier-way/
+    #
+    @staticmethod
+    def join_concatenated_case(words: AnyWordsIterable) -> str:
+        words = [words] if isinstance(words, str) else words
+        return "".join(word.lower() for word in words)
 
+    @staticmethod
+    def join_canonical_case(words: AnyWordsIterable) -> str:
+        words = [words] if isinstance(words, str) else words
+        return (" ".join(words)).lower()
 
-def join_snake_cased(words: AnyWordsIterable) -> str:
-    words = [words] if isinstance(words, str) else words
-    return "_".join(words).lower()
+    @staticmethod
+    def join_camel_case(words: AnyWordsIterable) -> str:
+        words = [words] if isinstance(words, str) else list(words)
+        return words[0].lower() + "".join(word.title() for word in words[1:])
 
+    @staticmethod
+    def join_pascal_case(words: AnyWordsIterable) -> str:
+        words = [words] if isinstance(words, str) else words
+        return "".join(word.title() for word in words)
 
-def join_kebab_cased(words: AnyWordsIterable) -> str:
-    words = [words] if isinstance(words, str) else words
-    return "-".join(words).lower()
+    @staticmethod
+    def join_snake_case(words: AnyWordsIterable) -> str:
+        words = [words] if isinstance(words, str) else words
+        return "_".join(words).lower()
+
+    @staticmethod
+    def join_kebab_case(words: AnyWordsIterable) -> str:
+        words = [words] if isinstance(words, str) else words
+        return "-".join(words).lower()
+
+    # Following `split_...`` functions are based on:
+    #    https://stackoverflow.com/a/29920015/7232525
+    #
+    @staticmethod
+    def split_canonical_case(name: str) -> List[str]:
+        return name.split()
+
+    @staticmethod
+    def split_camel_case(name: str) -> List[str]:
+        matches = re.finditer(".+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)", name)
+        return [m.group(0) for m in matches]
+
+    split_pascal_case = split_camel_case
+
+    @staticmethod
+    def split_snake_case(name: str) -> List[str]:
+        return name.split("_")
+
+    @staticmethod
+    def split_kebab_case(name: str) -> List[str]:
+        return name.split("-")
 
 
 def shash(*args: Any, hash_algorithm: Optional[Any] = None, str_encoding: str = "utf-8") -> str:

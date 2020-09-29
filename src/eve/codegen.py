@@ -17,15 +17,19 @@
 """Tools for code generation."""
 
 
+import abc
 import collections.abc
 import contextlib
 import os
+import re
 import string
 import sys
 import textwrap
+import types
 from subprocess import PIPE, Popen
 
 import black
+import boltons.iterutils as bo_iterutils
 import jinja2
 from mako import template as mako_tpl
 
@@ -33,6 +37,7 @@ from . import typing, utils
 from .concepts import Node
 from .typing import (
     Any,
+    Callable,
     ClassVar,
     Collection,
     Dict,
@@ -45,6 +50,7 @@ from .typing import (
     Set,
     Tuple,
     Type,
+    TypeVar,
     Union,
 )
 from .visitors import AnyTreeNode, NodeVisitor
@@ -59,21 +65,51 @@ except ImportError:
     _CLANG_FORMAT_AVAILABLE = False
 
 
-class Formatter(Protocol):
-    """Type annotation for callables formatting source code.
+SourceFormatter = Callable[[str], str]
 
-    To be reachable by the general `format_source` function, objects this protocol
-    should be defined in this module with a specific name pattern:
-        `format_{language}_source`
+SOURCE_FORMATTERS: Dict[str, SourceFormatter] = {}
 
-    """
 
-    def __call__(self, source: str, **kwargs: Any) -> str:
-        ...
+def register_formatter(language: str,) -> Callable[[SourceFormatter], SourceFormatter]:
+    def _decorator(formatter: SourceFormatter) -> SourceFormatter:
+        if language in SOURCE_FORMATTERS:
+            raise ValueError(f"Another formatter for language '{language}' already exists")
+
+        assert callable(formatter)
+        SOURCE_FORMATTERS[language] = formatter
+
+        return formatter
+
+    return _decorator
+
+
+@register_formatter("python")
+def format_python_source(
+    source: str,
+    *,
+    line_length: int = 100,
+    target_versions: Optional[Set[str]] = None,
+    string_normalization: bool = True,
+) -> str:
+    target_versions = target_versions or f"{sys.version_info.major}{sys.version_info.minor}"
+    target_versions = set(black.TargetVersion[f"PY{v.replace('.', '')}"] for v in target_versions)
+
+    formatted_source = black.format_str(
+        source,
+        mode=black.FileMode(
+            line_length=line_length,
+            target_versions=target_versions,
+            string_normalization=string_normalization,
+        ),
+    )
+    assert isinstance(formatted_source, str)
+
+    return formatted_source
 
 
 if _CLANG_FORMAT_AVAILABLE:
 
+    @register_formatter("cpp")
     def format_cpp_source(
         source: str,
         *,
@@ -90,86 +126,55 @@ if _CLANG_FORMAT_AVAILABLE:
             args.append("--sort-includes")
 
         p = Popen(args, stdout=PIPE, stdin=PIPE, encoding="utf8")
-        formatted_code, _ = p.communicate(input=source)
+        formatted_source, _ = p.communicate(input=source)
+        assert isinstance(formatted_source, str)
 
-        return formatted_code
-
-
-def format_python_source(
-    source: str,
-    *,
-    line_length: int = 100,
-    target_versions: Optional[Set[str]] = None,
-    string_normalization: bool = True,
-) -> str:
-    target_versions = target_versions or f"{sys.version_info.major}{sys.version_info.minor}"
-    target_versions = set(black.TargetVersion[f"PY{v.replace('.', '')}"] for v in target_versions)
-
-    return typing.cast(
-        str,
-        black.format_str(
-            source,
-            mode=black.FileMode(
-                line_length=line_length,
-                target_versions=target_versions,
-                string_normalization=string_normalization,
-            ),
-        ),
-    )
+        return formatted_source
 
 
 def format_source(language: str, source: str, *, skip_errors: bool = True, **kwargs: Any) -> str:
-    formatter = typing.cast(Formatter, globals().get(f"format_{language.lower()}_source", None))
+    formatter = SOURCE_FORMATTERS.get(language, None)
     try:
-        return formatter(source, **kwargs)
-    except Exception:
+        if formatter:
+            return formatter(source, **kwargs)  # type: ignore # Callable does not support **kwargs
+        else:
+            raise RuntimeError(f"Missing formatter for '{language}' language")
+    except Exception as e:
         if skip_errors:
             return source
         else:
             raise RuntimeError(
-                f"Something went wrong when trying to format '{language}' source code!"
-            )
+                f"Something went wrong when trying to format '{language}' source code"
+            ) from e
 
 
 class Name:
-    """Text string representing a symbol name in a programming language.
+    """Text string representing a symbol name in a programming language."""
 
-    Partially based on code from:
-        https://blog.kangz.net/posts/2016/08/31/code-generation-the-easier-way/
+    words: List[str]
 
-    """
+    @classmethod
+    def from_string(cls, name: str, case_style: utils.CaseStyleConverter.CASE_STYLE) -> "Name":
+        return cls(utils.CaseStyleConverter.split(name, case_style))
 
     def __init__(self, words: utils.AnyWordsIterable) -> None:
-        if isinstance(words, collections.abc.Sequence):
-            if not all(isinstance(item, str) for item in words):
-                raise TypeError(
-                    f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
-                )
-            self.words = words
-        elif isinstance(words, str):
-            self.words = [words]
-        else:
+        if isinstance(words, str):
+            words = [words]
+        if not isinstance(words, collections.abc.Iterable):
             raise TypeError(
-                f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
+                f"Identifier definition ('{words}') type is not a valid sequence of words"
             )
 
-    def as_canonical_cased(self) -> str:
-        return utils.join_canonical_cased(self.words)
+        words = [*words]
+        if not all(isinstance(item, str) for item in words):
+            raise TypeError(
+                f"Identifier definition ('{words}') type is not a valid sequence of words"
+            )
 
-    def as_concatcased(self) -> str:
-        return utils.join_concatcased(self.words)
+        self.words = words
 
-    def as_camelCased(self) -> str:
-        return utils.join_camelCased(self.words)
-
-    def as_PascalCased(self) -> str:
-        return utils.join_PascalCased(self.words)
-
-    def as_snake_cased(self) -> str:
-        return utils.join_snake_cased(self.words)
-
-    def as_SNAKE_CASE(self) -> str:
-        return utils.join_snake_cased(self.words).upper()
+    def as_case(self, case_style: utils.CaseStyleConverter.CASE_STYLE) -> str:
+        return utils.CaseStyleConverter.join(self.words, case_style)
 
 
 AnyTextSequence = Union[Sequence[str], "TextBlock"]
@@ -275,7 +280,65 @@ class TextBlock:
         return self.text
 
 
-class Template:
+def _compile_str_format_re() -> re.Pattern:
+    prefix = r"((?:[^\^]|\^\^)*)"
+    fmt_spec = "(.*)"
+
+    joiner = "((?:[^:]|::)*)"
+    item_fmt_spec = r"((?:[^\]]|\]\])*)"
+    sequence = f"{joiner}(?::{item_fmt_spec})?"
+
+    spec = rf"(?:{prefix}\^)?(?:\[{sequence}\])?:{fmt_spec}"
+
+    return re.compile(spec)
+
+
+class StringFormatter(string.Formatter):
+    """StringFormatter
+
+    s = "prefix^[joiner:item_fmt]:fmt"
+    """
+
+    __FORMAT_RE = _compile_str_format_re()
+
+    def format_field(self, value: Any, format_spec: str) -> Any:
+        m = self.__FORMAT_RE.match(format_spec)
+        if not m:
+            return super().format_field(value, format_spec)
+
+        prefix = m[1]
+        joiner = m[2]
+        item_format_spec = m[3]
+        format_spec = m[4]
+
+        if joiner is not None:
+            joiner = joiner.replace("::", ":")
+            if not bo_iterutils.is_collection(value):
+                raise ValueError(f"Collection formatting used with a scalar value {value}")
+
+            sequence = value
+            item_format_spec = item_format_spec.replace("]]", "]") if item_format_spec else ""
+            formatted = joiner.join(
+                super().format_field(item, item_format_spec) for item in sequence
+            )
+        else:
+            formatted = value
+
+        if format_spec:
+            formatted = super().format_field(formatted, format_spec)
+
+        if prefix:
+            prefix = prefix.replace("^^", "^")
+            formatted = textwrap.indent(formatted, prefix)
+
+        return formatted
+
+
+TemplateT = TypeVar("TemplateT", bound="Template")
+
+
+@typing.runtime_checkable
+class Template(Protocol):
     """Master Template class (to be subclasssed).
 
     Subclassess must implement the `__init__` (with a type annotation for `definition`)
@@ -283,45 +346,14 @@ class Template:
 
     """
 
-    _DEFINITION_TYPES: ClassVar[Dict[Type, Type["Template"]]] = {}
-
     @classmethod
-    def __init_subclass__(cls) -> None:
-        if "__init__" not in cls.__dict__ or not callable(cls.__dict__["__init__"]):
-            raise TypeError(
-                "Template implementations must define an annotated `__init__(self, definition, **kwargs)` method"
-            )
-        if "_render" not in cls.__dict__ or not callable(cls.__dict__["_render"]):
-            raise TypeError(
-                "Template implementations must define a `_render(self, **kwargs)` method"
-            )
-        init_annotations = cls.__init__.__annotations__
-        if "definition" not in init_annotations:
-            raise TypeError(f"Missing 'definition' annotation in '{cls.__name__}'.__init__()")
-
-        definition_cls = init_annotations["definition"]
-        assert isinstance(definition_cls, type)
-        assert definition_cls not in Template._DEFINITION_TYPES
-        Template._DEFINITION_TYPES[definition_cls] = cls
-
-    def __new__(cls, definition: Any, **kwargs: Any) -> "Template":
-        template_cls = Template._DEFINITION_TYPES.get(type(definition), None)
-        if not template_cls:
-            raise TypeError(f"Invalid template definition ({type(definition)}):\n{definition}")
-
-        return typing.cast("Template", super().__new__(template_cls))
-
-    @classmethod
-    def from_file(cls, file_path: Union[str, os.PathLike]) -> "Template":
+    def from_file(cls: Type[TemplateT], file_path: Union[str, os.PathLike]) -> "Template":
         if cls is Template:
             raise RuntimeError("This method can only be called in concrete Template subclasses")
 
         with open(file_path, "r") as f:
             definition = f.read()
         return cls(definition)
-
-    def __init__(self, definition: Any, **kwargs: Any) -> None:
-        raise NotImplementedError("__init__() must be implemented in concrete Template subclasses")
 
     def render(self, mapping: Optional[Mapping[str, str]] = None, **kwargs: Any) -> str:
         """Render the template.
@@ -338,20 +370,27 @@ class Template:
         if kwargs:
             mapping = {**mapping, **kwargs}
 
-        return self._render(**mapping)
+        return self.render_template(**mapping)
 
-    def _render(self, **kwargs: Any) -> str:
-        raise NotImplementedError("_render() must be implemented in specific Template subclasses")
+    @abc.abstractmethod
+    def __init__(self, definition: Any, **kwargs: Any) -> None:
+        pass
+
+    @abc.abstractmethod
+    def render_template(self, **kwargs: Any) -> str:
+        pass
 
 
 class StrFormatTemplate(Template):
     definition: str
 
+    _formatter_: ClassVar[StringFormatter] = StringFormatter()
+
     def __init__(self, definition: str, **kwargs: Any) -> None:
         self.definition = definition
 
-    def _render(self, **kwargs: Any) -> str:
-        return self.definition.format(**kwargs)
+    def render_template(self, **kwargs: Any) -> str:
+        return self._formatter_.format(self.definition, **kwargs)
 
 
 class StringTemplate(Template):
@@ -360,7 +399,7 @@ class StringTemplate(Template):
     def __init__(self, definition: string.Template, **kwargs: Any) -> None:
         self.definition = definition
 
-    def _render(self, **kwargs: Any) -> str:
+    def render_template(self, **kwargs: Any) -> str:
         return self.definition.substitute(**kwargs)
 
 
@@ -370,7 +409,7 @@ class JinjaTemplate(Template):
     def __init__(self, definition: jinja2.Template, **kwargs: Any) -> None:
         self.definition = definition
 
-    def _render(self, **kwargs: Any) -> str:
+    def render_template(self, **kwargs: Any) -> str:
         return self.definition.render(**kwargs)
 
 
@@ -380,24 +419,39 @@ class MakoTemplate(Template):
     def __init__(self, definition: mako_tpl.Template, **kwargs: Any) -> None:
         self.definition = definition
 
-    def _render(self, **kwargs: Any) -> str:
-        return typing.cast(str, self.definition.render(**kwargs))
+    def render_template(self, **kwargs: Any) -> str:
+        result = self.definition.render(**kwargs)
+        assert isinstance(result, str)
+        return result
 
 
 class TemplatedGenerator(NodeVisitor):
     """A code generator visitor using :class:`TextTemplate` s."""
 
-    _TEMPLATES: ClassVar[Dict[str, Template]]
+    _templates_: ClassVar[Mapping[str, Template]]
 
     @classmethod
-    def __init_subclass__(cls) -> None:
-        cls_dict = {attr: getattr(cls, attr) for attr in dir(cls)}
-        cls._TEMPLATES = {
-            key[:-9]: value if isinstance(value, Template) else Template(value)
-            for key, value in cls_dict.items()
-            if key.endswith("_template")
-            and (isinstance(value, Template) or type(value) in Template._DEFINITION_TYPES)
-        }
+    def __init_subclass__(cls, *, inherit_templates: bool = True, **kwargs: Any) -> None:
+        # mypy has troubles with __init_subclass__: https://github.com/python/mypy/issues/4660
+        super().__init_subclass__(**kwargs)  # type: ignore
+        if "_templates_" in cls.__dict__:
+            raise TypeError(f"Invalid '_templates_' member in class {cls}")
+
+        templates: Dict[str, Template] = {}
+        if inherit_templates:
+            for templated_gen_class in reversed(cls.__mro__):
+                if isinstance(templated_gen_class, TemplatedGenerator):
+                    templates.update(templated_gen_class._templates_)
+
+        templates.update(
+            {
+                key: value
+                for key, value in cls.__dict__.items()
+                if isinstance(value, Template) and not key.startswith("_")
+            }
+        )
+
+        cls._templates_ = types.MappingProxyType(templates)
 
     @classmethod
     def apply(cls, root: AnyTreeNode, **kwargs: Any) -> Union[str, Collection[str]]:
@@ -482,7 +536,7 @@ class TemplatedGenerator(NodeVisitor):
         if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
                 template_key = node_class.__name__
-                template = self._TEMPLATES.get(template_key, None)
+                template = self._templates_.get(template_key, None)
                 if template is not None or node_class is Node:
                     break
 
