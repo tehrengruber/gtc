@@ -1,10 +1,12 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import argparse
 import os
 import re
 import subprocess
 from typing import Optional
+
 
 DEFAULT_MANAGER = "venv"
 DEFAULT_NAME = "gtc"
