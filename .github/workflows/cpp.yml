@@ -20,7 +20,7 @@ jobs:
             - name: Install eve and dependencies
               run: |
                   python3 -m pip install .
-                  python3 -m pip install -r requirements_all.txt # TODO remove (once we don't include debugtools)
+                  python3 -m pip install -r requirements_dev.txt # TODO remove (once we don't include debugtools)
             - name: Test cpputil
               run: |
                   cd cpputil/unstructured
@@ -31,7 +31,7 @@ jobs:
                   ctest --output-on-failure
             - name: Test gtc cpp regression
               run: |
-                  cd tests/gtc/regression/cpp
+                  cd tests/tests_gtc/regression/cpp
                   mkdir build && cd build
                   cmake .. \
                     -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}

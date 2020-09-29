@@ -21,7 +21,8 @@ jobs:
                   python-version: ${{ matrix.python-version }}
             - name: Install eve and dependencies
               run: |
-                  ./scripts/init_env.sh -i
+                  python3 -m pip install .
+                  python3 -m pip install -r requirements_dev.txt # TODO remove (once we don't include debugtools)
             - name: Run checks
               run: |
                   pre-commit run --all
