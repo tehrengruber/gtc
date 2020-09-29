@@ -1,5 +1,6 @@
 # Custom project ignores
 _local/
+.venvs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

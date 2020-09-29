@@ -13,15 +13,3 @@
 # distribution for a copy of the license or check <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-
-import subprocess
-from pathlib import Path
-
-import pytest
-
-
-@pytest.mark.lit_suite
-def test_lit_codegen_suite():
-    lit_suite_path = Path(__file__).parent / "lit_codegen_suite"
-    proc = subprocess.run(["lit", lit_suite_path])
-    assert proc.returncode == 0, "lit test suite did not pass without errors"

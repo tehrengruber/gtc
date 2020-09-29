@@ -16,7 +16,7 @@
 
 # --- LLVM-lit test definition
 #
-# RUN: python -u %s | filecheck %s
+# RUN: python3 -u %s | filecheck %s
 # ---
 
 from eve import codegen
@@ -30,7 +30,7 @@ from gtc.unstructured.naive_codegen import NaiveCodeGenerator
 #   This will produce output:
 #     <node>[.test_name]
 #     <generated_code>
-# - Test the generated code with filecheck by using the following pattern (replace "!" with ":")\
+# - Test the generated code with filecheck by using the following pattern (replace "!" with ":")
 #     CHECK! <node>[.test_name]
 #     CHECK-NEXT! <pattern to test>
 #     CHECK-NEXT! etc...
@@ -40,7 +40,7 @@ from gtc.unstructured.naive_codegen import NaiveCodeGenerator
 def make_test(node, test_name="", **kwargs):
     print(
         "{test_name}\n{generated_code}".format(
-            test_name=".".join(filter(None, [node.__class__.__name__, test_name])),
+            test_name=".".join(item for item in [node.__class__.__name__, test_name] if item),
             generated_code=codegen.format_source(
                 "cpp", NaiveCodeGenerator().visit(node, **kwargs), style="LLVM"
             ),
