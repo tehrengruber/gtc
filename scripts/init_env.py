@@ -4,7 +4,7 @@ import argparse
 import os
 import re
 import subprocess
-
+from typing import Optional
 
 DEFAULT_MANAGER = "venv"
 DEFAULT_NAME = "gtc"
@@ -13,7 +13,7 @@ REPO_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 
 class VenvManager:
     @staticmethod
-    def create(venv_path: str, py_version: str) -> None:
+    def create(py_version: str, venv_path: str) -> None:
         cmd = f"python{py_version} -m venv {venv_path}"
         print(f"Creating virtual environment at '{os.path.abspath(venv_path)}' ...")
         print(f"{cmd}")
@@ -26,12 +26,15 @@ class VenvManager:
             exit(-10)
 
     @staticmethod
-    def install(venv_path: str, requirements: str) -> None:
+    def install(requirements: str, venv_path: Optional[str] = None) -> None:
+        pip_prefix = f"{venv_path}/bin/pip3" if venv_path else "pip3"
         try:
             if requirements == "run":
-                cmd = f"{venv_path}/bin/pip3 install -e {REPO_ROOT}[cpp]"
+                cmd = f"{pip_prefix} install -e {REPO_ROOT}[cpp]"
             elif requirements == "develop":
-                cmd = f"{venv_path}/bin/pip3 install -e {REPO_ROOT}[cpp] -r {REPO_ROOT}/requirements_dev.txt"
+                cmd = (
+                    f"{pip_prefix} install -e {REPO_ROOT}[cpp] -r {REPO_ROOT}/requirements_dev.txt"
+                )
             print(f"{cmd}")
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
@@ -41,7 +44,7 @@ class VenvManager:
 
 class VirtualenvManager:
     @staticmethod
-    def create(venv_path: str, py_version: str) -> None:
+    def create(py_version: str, venv_path: str) -> None:
         cmd = f"virtualenv -p python{py_version} {venv_path}"
         print(f"Creating virtual environment at '{os.path.abspath(venv_path)}' ...")
         print(f"{cmd}")
@@ -56,7 +59,7 @@ class VirtualenvManager:
 
 class CondaManager:
     @staticmethod
-    def create(venv_path: str, py_version: str) -> None:
+    def create(py_version: str, venv_path: str) -> None:
         cmd = f"conda create -p {venv_path} -y python={py_version}"
         print(f"Creating virtual environment at '{os.path.abspath(venv_path)}' ...")
         print(f"{cmd}")
@@ -67,12 +70,15 @@ class CondaManager:
             exit(-10)
 
     @staticmethod
-    def install(venv_path: str, requirements: str) -> None:
+    def install(requirements: str, venv_path: Optional[str] = None) -> None:
+        pip_prefix = f"conda run -p {venv_path} pip3" if venv_path else "pip3"
         try:
             if requirements == "run":
-                cmd = f"conda run -p {venv_path} pip3 install -e {REPO_ROOT}[cpp]"
+                cmd = f"{pip_prefix} install -e {REPO_ROOT}[cpp]"
             elif requirements == "develop":
-                cmd = f"conda run -p {venv_path} pip3 install -e {REPO_ROOT}[cpp] -r {REPO_ROOT}/requirements_dev.txt"
+                cmd = (
+                    f"{pip_prefix} install -e {REPO_ROOT}[cpp] -r {REPO_ROOT}/requirements_dev.txt"
+                )
             print(f"{cmd}")
             subprocess.check_call(cmd.split())
         except subprocess.CalledProcessError as e:
@@ -128,12 +134,13 @@ if not re.match(r"3.\d\d?(\.\d\d?)?$", args.python):
 
 # -- Install
 manager = MANAGERS[args.manager]
-venv_path = f"{args.dir}/{args.name}"
+venv_path = None
 
 if not args.install_only:
-    manager.create(venv_path, args.python)
+    venv_path = f"{args.dir}/{args.name}"
+    manager.create(args.python, venv_path)
 
 if args.requirements != "none":
-    manager.install(venv_path, args.requirements)
+    manager.install(args.requirements, venv_path)
 
 print("Done")
