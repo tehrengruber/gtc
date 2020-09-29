@@ -128,9 +128,9 @@ if not re.match(r"3.\d\d?(\.\d\d?)?$", args.python):
 
 # -- Install
 manager = MANAGERS[args.manager]
+venv_path = f"{args.dir}/{args.name}"
 
 if not args.install_only:
-    venv_path = f"{args.dir}/{args.name}"
     manager.create(venv_path, args.python)
 
 if args.requirements != "none":
