@@ -23,5 +23,5 @@ import pytest
 @pytest.mark.lit_suite
 def test_lit_codegen_suite():
     lit_suite_path = Path(__file__).parent / "lit_codegen_suite"
-    proc = subprocess.run(["lit", lit_suite_path])
-    assert proc.returncode == 0, "lit test suite did not pass without errors"
+    subprocess.run(["lit", lit_suite_path], capture_output=True, check=True)
+    # assert proc.returncode == 0, "lit test suite did not pass without errors"

@@ -16,7 +16,7 @@
 
 # --- LLVM-lit test definition
 #
-# RUN: python -u %s | filecheck %s
+# RUN: python3 -u %s | filecheck %s
 # ---
 
 from eve import codegen
