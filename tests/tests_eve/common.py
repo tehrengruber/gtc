@@ -242,8 +242,8 @@ class FrozenSimpleNode(FrozenNode):
 
 
 # -- Maker functions --
-def make_source_location(randomize: bool = True) -> SourceLocation:
-    factories = RandomFactories if randomize else Factories
+def make_source_location(fixed: bool = False) -> SourceLocation:
+    factories = Factories if fixed else RandomFactories
     line = factories.make_pos_int()
     column = factories.make_pos_int()
     str_value = factories.make_str()
@@ -252,23 +252,23 @@ def make_source_location(randomize: bool = True) -> SourceLocation:
     return SourceLocation(line=line, column=column, source=source)
 
 
-def make_empty_node(randomize: bool = True) -> LocationNode:
+def make_empty_node(fixed: bool = False) -> LocationNode:
     return EmptyNode()
 
 
-def make_location_node(randomize: bool = True) -> LocationNode:
-    return LocationNode(loc=make_source_location(randomize))
+def make_location_node(fixed: bool = False) -> LocationNode:
+    return LocationNode(loc=make_source_location(fixed))
 
 
-def make_simple_node(randomize: bool = True) -> SimpleNode:
-    factories = RandomFactories if randomize else Factories
+def make_simple_node(fixed: bool = False) -> SimpleNode:
+    factories = Factories if fixed else RandomFactories
     bool_value = factories.make_bool()
     int_value = factories.make_int()
     float_value = factories.make_float()
     str_value = factories.make_str()
     bytes_value = factories.make_str().encode()
-    int_kind = factories.make_member([*IntKind]) if randomize else IntKind.PLUS
-    str_kind = factories.make_member([*StrKind]) if randomize else StrKind.BLA
+    int_kind = IntKind.PLUS if fixed else factories.make_member([*IntKind])
+    str_kind = StrKind.BLA if fixed else factories.make_member([*StrKind])
 
     return SimpleNode(
         bool_value=bool_value,
@@ -281,16 +281,16 @@ def make_simple_node(randomize: bool = True) -> SimpleNode:
     )
 
 
-def make_simple_node_with_optionals(randomize: bool = True) -> SimpleNodeWithOptionals:
-    factories = RandomFactories if randomize else Factories
+def make_simple_node_with_optionals(fixed: bool = False) -> SimpleNodeWithOptionals:
+    factories = Factories if fixed else RandomFactories
     int_value = factories.make_int()
     float_value = factories.make_float()
 
     return SimpleNodeWithOptionals(int_value=int_value, float_value=float_value)
 
 
-def make_simple_node_with_hidden_members(randomize: bool = True) -> SimpleNodeWithHiddenMembers:
-    factories = RandomFactories if randomize else Factories
+def make_simple_node_with_hidden_members(fixed: bool = False) -> SimpleNodeWithHiddenMembers:
+    factories = Factories if fixed else RandomFactories
     int_value = factories.make_int()
 
     return SimpleNodeWithHiddenMembers(
@@ -298,24 +298,24 @@ def make_simple_node_with_hidden_members(randomize: bool = True) -> SimpleNodeWi
     )
 
 
-def make_simple_node_with_loc(randomize: bool = True) -> SimpleNodeWithLoc:
-    factories = RandomFactories if randomize else Factories
+def make_simple_node_with_loc(fixed: bool = False) -> SimpleNodeWithLoc:
+    factories = Factories if fixed else RandomFactories
     int_value = factories.make_int()
     float_value = factories.make_float()
     str_value = factories.make_str()
-    loc = make_source_location(randomize)
+    loc = make_source_location(fixed)
 
     return SimpleNodeWithLoc(
         int_value=int_value, float_value=float_value, str_value=str_value, loc=loc
     )
 
 
-def make_simple_node_with_collections(randomize: bool = True) -> SimpleNodeWithCollections:
-    factories = RandomFactories if randomize else Factories
+def make_simple_node_with_collections(fixed: bool = False) -> SimpleNodeWithCollections:
+    factories = Factories if fixed else RandomFactories
     int_list = factories.make_collection(int, length=3)
     str_set = factories.make_collection(str, set, length=3)
     str_to_int_dict = factories.make_mapping(key_type=str, value_type=int, length=3)
-    loc = make_source_location(randomize)
+    loc = make_source_location(fixed)
 
     return SimpleNodeWithCollections(
         int_list=int_list, str_set=str_set, str_to_int_dict=str_to_int_dict, loc=loc
@@ -323,9 +323,9 @@ def make_simple_node_with_collections(randomize: bool = True) -> SimpleNodeWithC
 
 
 def make_simple_node_with_abstractcollections(
-    randomize: bool = True,
+    fixed: bool = False,
 ) -> SimpleNodeWithAbstractCollections:
-    factories = RandomFactories if randomize else Factories
+    factories = Factories if fixed else RandomFactories
     int_sequence = factories.make_collection(int, collection_type=tuple, length=3)
     str_set = factories.make_collection(str, set, length=3)
     str_to_int_mapping = factories.make_mapping(key_type=str, value_type=int, length=3)
@@ -335,7 +335,7 @@ def make_simple_node_with_abstractcollections(
     )
 
 
-def make_compound_node(randomize: bool = True) -> CompoundNode:
+def make_compound_node(fixed: bool = False) -> CompoundNode:
     return CompoundNode(
         location=make_location_node(),
         simple=make_simple_node(),
@@ -345,15 +345,15 @@ def make_compound_node(randomize: bool = True) -> CompoundNode:
     )
 
 
-def make_frozen_simple_node(randomize: bool = True) -> FrozenSimpleNode:
-    factories = RandomFactories if randomize else Factories
+def make_frozen_simple_node(fixed: bool = False) -> FrozenSimpleNode:
+    factories = Factories if fixed else RandomFactories
     bool_value = factories.make_bool()
     int_value = factories.make_int()
     float_value = factories.make_float()
     str_value = factories.make_str()
     bytes_value = factories.make_str().encode()
-    int_kind = factories.make_member([*IntKind]) if randomize else IntKind.PLUS
-    str_kind = factories.make_member([*StrKind]) if randomize else StrKind.BLA
+    int_kind = IntKind.PLUS if fixed else factories.make_member([*IntKind])
+    str_kind = StrKind.BLA if fixed else factories.make_member([*StrKind])
 
     return FrozenSimpleNode(
         bool_value=bool_value,
@@ -367,19 +367,19 @@ def make_frozen_simple_node(randomize: bool = True) -> FrozenSimpleNode:
 
 
 # -- Makers of invalid nodes --
-def make_invalid_location_node(randomize: bool = True) -> LocationNode:
+def make_invalid_location_node(fixed: bool = False) -> LocationNode:
     return LocationNode(loc=SourceLocation(line=0, column=-1, source="<str>"))
 
 
-def make_invalid_at_int_simple_node(randomize: bool = True) -> SimpleNode:
-    factories = RandomFactories if randomize else Factories
+def make_invalid_at_int_simple_node(fixed: bool = False) -> SimpleNode:
+    factories = Factories if fixed else RandomFactories
     bool_value = factories.make_bool()
     int_value = factories.make_float()
     float_value = factories.make_float()
     bytes_value = factories.make_str().encode()
     str_value = factories.make_str()
-    int_kind = factories.make_member([*IntKind]) if randomize else IntKind.PLUS
-    str_kind = factories.make_member([*StrKind]) if randomize else StrKind.BLA
+    int_kind = IntKind.PLUS if fixed else factories.make_member([*IntKind])
+    str_kind = StrKind.BLA if fixed else factories.make_member([*StrKind])
 
     return SimpleNode(
         bool_value=bool_value,
@@ -392,15 +392,15 @@ def make_invalid_at_int_simple_node(randomize: bool = True) -> SimpleNode:
     )
 
 
-def make_invalid_at_float_simple_node(randomize: bool = True) -> SimpleNode:
-    factories = RandomFactories if randomize else Factories
+def make_invalid_at_float_simple_node(fixed: bool = False) -> SimpleNode:
+    factories = Factories if fixed else RandomFactories
     bool_value = factories.make_bool()
     int_value = factories.make_int()
     float_value = factories.make_int()
     str_value = factories.make_str()
     bytes_value = factories.make_str().encode()
-    int_kind = factories.make_member([*IntKind]) if randomize else IntKind.PLUS
-    str_kind = factories.make_member([*StrKind]) if randomize else StrKind.BLA
+    int_kind = IntKind.PLUS if fixed else factories.make_member([*IntKind])
+    str_kind = StrKind.BLA if fixed else factories.make_member([*StrKind])
 
     return SimpleNode(
         bool_value=bool_value,
@@ -413,15 +413,15 @@ def make_invalid_at_float_simple_node(randomize: bool = True) -> SimpleNode:
     )
 
 
-def make_invalid_at_str_simple_node(randomize: bool = True) -> SimpleNode:
-    factories = RandomFactories if randomize else Factories
+def make_invalid_at_str_simple_node(fixed: bool = False) -> SimpleNode:
+    factories = Factories if fixed else RandomFactories
     bool_value = factories.make_bool()
     int_value = factories.make_int()
     float_value = factories.make_float()
     str_value = factories.make_float()
     bytes_value = factories.make_str().encode()
-    int_kind = factories.make_member([*IntKind]) if randomize else IntKind.PLUS
-    str_kind = factories.make_member([*StrKind]) if randomize else StrKind.BLA
+    int_kind = IntKind.PLUS if fixed else factories.make_member([*IntKind])
+    str_kind = StrKind.BLA if fixed else factories.make_member([*StrKind])
 
     return SimpleNode(
         bool_value=bool_value,
@@ -434,15 +434,15 @@ def make_invalid_at_str_simple_node(randomize: bool = True) -> SimpleNode:
     )
 
 
-def make_invalid_at_bytes_simple_node(randomize: bool = True) -> SimpleNode:
-    factories = RandomFactories if randomize else Factories
+def make_invalid_at_bytes_simple_node(fixed: bool = False) -> SimpleNode:
+    factories = Factories if fixed else RandomFactories
     bool_value = factories.make_bool()
     int_value = factories.make_int()
     float_value = factories.make_float()
     str_value = factories.make_float()
     bytes_value = [1, "2", (3, 4)]
-    int_kind = factories.make_member([*IntKind]) if randomize else IntKind.PLUS
-    str_kind = factories.make_member([*StrKind]) if randomize else StrKind.BLA
+    int_kind = IntKind.PLUS if fixed else factories.make_member([*IntKind])
+    str_kind = StrKind.BLA if fixed else factories.make_member([*StrKind])
 
     return SimpleNode(
         bool_value=bool_value,
@@ -455,15 +455,15 @@ def make_invalid_at_bytes_simple_node(randomize: bool = True) -> SimpleNode:
     )
 
 
-def make_invalid_at_enum_simple_node(randomize: bool = True) -> SimpleNode:
-    factories = RandomFactories if randomize else Factories
+def make_invalid_at_enum_simple_node(fixed: bool = False) -> SimpleNode:
+    factories = Factories if fixed else RandomFactories
     bool_value = factories.make_bool()
     int_value = factories.make_int()
     float_value = factories.make_float()
     str_value = factories.make_float()
     bytes_value = factories.make_str().encode()
-    int_kind = factories.make_member([*StrKind]) if randomize else IntKind.PLUS
-    str_kind = factories.make_member([*StrKind]) if randomize else StrKind.BLA
+    int_kind = IntKind.PLUS if fixed else factories.make_member([*IntKind])
+    str_kind = StrKind.BLA if fixed else factories.make_member([*StrKind])
 
     return SimpleNode(
         bool_value=bool_value,
