@@ -19,7 +19,6 @@
 # flake8: noqa
 from .version import __version__, __versioninfo__  # isort:skip
 
-from . import codegen, concepts, exceptions, traits, types, typing, utils
 from .concepts import (
     FieldKind,
     FrozenModel,
