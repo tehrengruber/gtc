@@ -96,7 +96,7 @@ class CaseStyleConverter:
     @staticmethod
     def join_concatenated_case(words: AnyWordsIterable) -> str:
         words = [words] if isinstance(words, str) else words
-        return "".join(word.lower() for word in words)
+        return "".join(words).lower()
 
     @staticmethod
     def join_canonical_case(words: AnyWordsIterable) -> str:
