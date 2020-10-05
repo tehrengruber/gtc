@@ -548,7 +548,7 @@ class TemplatedGenerator(NodeVisitor):
             {
                 key: value
                 for key, value in cls.__dict__.items()
-                if isinstance(value, Template) and not key.startswith("_")
+                if isinstance(value, Template) and not key.startswith("_") and not key.endswith("_")
             }
         )
 

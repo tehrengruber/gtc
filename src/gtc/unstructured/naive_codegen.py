@@ -19,15 +19,14 @@ from types import MappingProxyType
 from typing import ClassVar, Mapping
 
 from eve import codegen
+from eve.codegen import FormatTemplate as as_fmt
+from eve.codegen import MakoTemplate as as_mako
 from gtc import common
 
 from .naive import LocationType
 
 
 class NaiveCodeGenerator(codegen.TemplatedGenerator):
-    as_fmt = codegen.FormatTemplate
-    as_mako = codegen.MakoTemplate
-
     DATA_TYPE_TO_STR: ClassVar[Mapping[common.DataType, str]] = MappingProxyType(
         {
             common.DataType.BOOLEAN: "bool",
@@ -62,7 +61,7 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
 
     UnstructuredField = as_mako(
         """<%
-loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"]
+loc_type = location_type["singular"]
 sparseloc = "sparse_" if _this_node.sparse_location_type else ""
 %>
 dawn::${ sparseloc }${ loc_type }_field_t<LibTag, ${ data_type }>& ${ name };"""
@@ -87,7 +86,7 @@ field_acc_itervar = outer_iter_var if _this_node.is_sparse else iter_var
 
     TemporaryFieldDeclStmt = as_mako(
         """using dawn::allocateEdgeField;
-        auto ${ name } = allocate${ _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['singular'].capitalize() }Field<${ data_type] }>(mesh);"""
+        auto ${ name } = allocate${ location_type['singular'].capitalize() }Field<${ data_type }>(mesh);"""
     )
 
     ForK = as_mako(
@@ -107,7 +106,7 @@ ${ "".join(horizontal_loops) }\n}"""
 
     HorizontalLoop = as_mako(
         """<%
-loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['plural'].title()
+loc_type = location_type['plural'].title()
 %>for(auto const & t: get${ loc_type }(LibTag{}, mesh)) ${ ast }"""
     )
 
@@ -118,8 +117,8 @@ loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['plura
 
     ReduceOverNeighbourExpr = as_mako(
         """<%
-right_loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.right_location_type]["singular"].title()
-loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"].title()
+right_loc_type = right_location_type["singular"].title()
+loc_type = location_type["singular"].title()
 %>(m_sparse_dimension_idx=0,reduce${ right_loc_type }To${ loc_type }(mesh, ${ outer_iter_var }, ${ init }, [&](auto& lhs, auto const& ${ iter_var }) {
 lhs ${ operation }= ${ right };
 m_sparse_dimension_idx++;
@@ -150,7 +149,7 @@ ${ "".join(k_loops) }
 stencil_calls = '\\n'.join("{name}();".format(name=s.name) for s in _this_node.stencils)
 ctor_field_params = ', '.join(
     'dawn::{sparse_loc}{loc_type}_field_t<LibTag, {data_type}>& {name}'.format(
-        loc_type=_this_generator.LOCATION_TYPE_TO_STR[p.location_type]['singular'],
+        loc_type=_this_generator.LOCATION_TYPE_TO_STR_MAP[p.location_type]['singular'],
         name=p.name,
         data_type=_this_generator.DATA_TYPE_TO_STR[p.data_type],
         sparse_loc="sparse_" if p.sparse_location_type else ""
