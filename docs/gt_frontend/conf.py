@@ -17,9 +17,8 @@
 import os
 import sys
 
-import sphinx_material
-
 import gt_frontend
+import sphinx_material
 
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -44,6 +43,7 @@ extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -256,7 +256,15 @@ htmlhelp_basename = "gt_frontend_doc"
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
-latex_documents = [("index", "gt_frontend.tex", "GridTools Prototype Frontend Documentation", "ETH Zurich", "manual")]
+latex_documents = [
+    (
+        "index",
+        "gt_frontend.tex",
+        "GridTools Prototype Frontend Documentation",
+        "ETH Zurich",
+        "manual",
+    )
+]
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
@@ -283,7 +291,9 @@ latex_documents = [("index", "gt_frontend.tex", "GridTools Prototype Frontend Do
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [("index", "gt_frontend", "GridTools Prototype Frontend Documentation", ["ETH Zurich"], 1)]
+man_pages = [
+    ("index", "gt_frontend", "GridTools Prototype Frontend Documentation", ["ETH Zurich"], 1)
+]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
@@ -317,3 +327,5 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 # texinfo_no_detailmenu = False
+
+intersphinx_mapping = {"gtc": ("../gtc/_build/html", None), "eve": ("../eve/_build/html", None)}
