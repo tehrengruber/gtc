@@ -18,8 +18,6 @@
 from types import MappingProxyType
 from typing import ClassVar, Mapping
 
-from mako import template as mako_tpl
-
 from eve import codegen
 from gtc import common
 
@@ -27,15 +25,10 @@ from .naive import LocationType
 
 
 class NaiveCodeGenerator(codegen.TemplatedGenerator):
-    LOCATION_TYPE_TO_STR: ClassVar[Mapping[LocationType, Mapping[str, str]]] = MappingProxyType(
-        {
-            LocationType.Node: MappingProxyType({"singular": "vertex", "plural": "vertices"}),
-            LocationType.Edge: MappingProxyType({"singular": "edge", "plural": "edges"}),
-            LocationType.Face: MappingProxyType({"singular": "cell", "plural": "cells"}),
-        }
-    )
+    as_fmt = codegen.FormatTemplate
+    as_mako = codegen.MakoTemplate
 
-    DATA_TYPE_TO_STR: ClassVar[Mapping[LocationType, str]] = MappingProxyType(
+    DATA_TYPE_TO_STR: ClassVar[Mapping[common.DataType, str]] = MappingProxyType(
         {
             common.DataType.BOOLEAN: "bool",
             common.DataType.INT32: "int",
@@ -45,44 +38,59 @@ class NaiveCodeGenerator(codegen.TemplatedGenerator):
         }
     )
 
-    Node_template = mako_tpl.Template(
-        "${_this_node.__class__.__name__.upper()}"
-    )  # only for testing
+    LOCATION_TYPE_TO_STR_MAP: ClassVar[Mapping[LocationType, Mapping[str, str]]] = MappingProxyType(
+        {
+            LocationType.Node: MappingProxyType({"singular": "vertex", "plural": "vertices"}),
+            LocationType.Edge: MappingProxyType({"singular": "edge", "plural": "edges"}),
+            LocationType.Face: MappingProxyType({"singular": "cell", "plural": "cells"}),
+        }
+    )
 
-    UnstructuredField_template = mako_tpl.Template(
+    @classmethod
+    def apply(cls, root, **kwargs) -> str:
+        generated_code = super().apply(root, **kwargs)
+        formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
+        return formatted_code
+
+    def visit_DataType(self, node, **kwargs) -> str:
+        return self.DATA_TYPE_TO_STR[node]
+
+    def visit_LocationType(self, node, **kwargs) -> Mapping[str, str]:
+        return self.LOCATION_TYPE_TO_STR_MAP[node]
+
+    Node = as_mako("${_this_node.__class__.__name__.upper()}")  # only for testing
+
+    UnstructuredField = as_mako(
         """<%
 loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"]
-data_type = _this_generator.DATA_TYPE_TO_STR[_this_node.data_type]
 sparseloc = "sparse_" if _this_node.sparse_location_type else ""
 %>
 dawn::${ sparseloc }${ loc_type }_field_t<LibTag, ${ data_type }>& ${ name };"""
     )
 
-    FieldAccessExpr_template = mako_tpl.Template(
+    FieldAccessExpr = as_mako(
         """<%
 sparse_index = "m_sparse_dimension_idx, " if _this_node.is_sparse else ""
 field_acc_itervar = outer_iter_var if _this_node.is_sparse else iter_var
 %>${ name }(deref(LibTag{}, ${ field_acc_itervar }), ${ sparse_index } k)"""
     )
 
-    AssignmentExpr_template = "{left} = {right}"
+    AssignmentExpr = as_fmt("{left} = {right}")
 
-    VarAccessExpr_template = "{name}"
+    VarAccessExpr = as_fmt("{name}")
 
-    BinaryOp_template = "{left} {op} {right}"
+    BinaryOp = as_fmt("{left} {op} {right}")
 
-    ExprStmt_template = "\n{expr};"
+    ExprStmt = as_fmt("\n{expr};")
 
-    VarDeclStmt_template = mako_tpl.Template(
-        "\n${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] } ${ name };"
-    )
+    VarDeclStmt = as_fmt("\n{data_type} {name};")
 
-    TemporaryFieldDeclStmt_template = mako_tpl.Template(
+    TemporaryFieldDeclStmt = as_mako(
         """using dawn::allocateEdgeField;
-        auto ${ name } = allocate${ _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['singular'].capitalize() }Field<${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] }>(mesh);"""
+        auto ${ name } = allocate${ _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['singular'].capitalize() }Field<${ data_type] }>(mesh);"""
     )
 
-    ForK_template = mako_tpl.Template(
+    ForK = as_mako(
         """<%
 if _this_node.loop_order == _this_module.common.LoopOrder.FORWARD:
     k_init = '0'
@@ -97,15 +105,18 @@ int m_sparse_dimension_idx;
 ${ "".join(horizontal_loops) }\n}"""
     )
 
-    HorizontalLoop_template = mako_tpl.Template(
+    HorizontalLoop = as_mako(
         """<%
 loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]['plural'].title()
 %>for(auto const & t: get${ loc_type }(LibTag{}, mesh)) ${ ast }"""
     )
 
-    BlockStmt_template = mako_tpl.Template("{${ ''.join(statements) }\n}")
+    def visit_HorizontalLoop(self, node, **kwargs) -> str:
+        return self.generic_visit(node, iter_var="t", **kwargs)
 
-    ReduceOverNeighbourExpr_template = mako_tpl.Template(
+    BlockStmt = as_mako("{${ ''.join(statements) }\n}")
+
+    ReduceOverNeighbourExpr = as_mako(
         """<%
 right_loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.right_location_type]["singular"].title()
 loc_type = _this_generator.LOCATION_TYPE_TO_STR[_this_node.location_type]["singular"].title()
@@ -116,11 +127,13 @@ return lhs;
 }))"""
     )
 
-    LiteralExpr_template = mako_tpl.Template(
-        "(${ _this_generator.DATA_TYPE_TO_STR[_this_node.data_type] })${ value }"
-    )
+    def visit_ReduceOverNeighbourExpr(self, node, *, iter_var, **kwargs) -> str:
+        outer_iter_var = iter_var
+        return self.generic_visit(node, outer_iter_var=outer_iter_var, iter_var="redIdx", **kwargs,)
 
-    Stencil_template = mako_tpl.Template(
+    LiteralExpr = as_fmt("({data_type}){value}")
+
+    Stencil = as_mako(
         """
 void ${name}() {
 using dawn::deref;
@@ -132,7 +145,7 @@ ${ "".join(k_loops) }
 """
     )
 
-    Computation_template = mako_tpl.Template(
+    Computation = as_mako(
         """<%
 stencil_calls = '\\n'.join("{name}();".format(name=s.name) for s in _this_node.stencils)
 ctor_field_params = ', '.join(
@@ -173,16 +186,3 @@ ${ stencil_calls }
 
 """
     )
-
-    @classmethod
-    def apply(cls, root, **kwargs) -> str:
-        generated_code = super().apply(root, **kwargs)
-        formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
-        return formatted_code
-
-    def visit_HorizontalLoop(self, node, **kwargs) -> str:
-        return self.generic_visit(node, iter_var="t", **kwargs)
-
-    def visit_ReduceOverNeighbourExpr(self, node, *, iter_var, **kwargs) -> str:
-        outer_iter_var = iter_var
-        return self.generic_visit(node, outer_iter_var=outer_iter_var, iter_var="redIdx", **kwargs,)

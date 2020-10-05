@@ -431,7 +431,7 @@ class Template(abc.ABC):
         pass
 
 
-class StrFormatTemplate(Template):
+class FormatTemplate(Template):
     """Template adapter for :class:`StringFormatter`."""
 
     definition: str

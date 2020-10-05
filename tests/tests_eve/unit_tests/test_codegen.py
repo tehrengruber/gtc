@@ -115,7 +115,7 @@ class TestStringFormatter:
 # -- Template tests --
 def fmt_tpl_maker(skeleton, keys):
     transformed_keys = {k: "{{{}}}".format(k) for k in keys}
-    return eve.codegen.StrFormatTemplate(skeleton.format(**transformed_keys))
+    return eve.codegen.FormatTemplate(skeleton.format(**transformed_keys))
 
 
 def string_tpl_maker(skeleton, keys):
@@ -156,7 +156,7 @@ class _BaseTestGenerator(eve.codegen.TemplatedGenerator):
     def visit_SourceLocation(self, node, **kwargs):
         return f"SourceLocation<line:{node.line}, column:{node.column}, source: {node.source}>"
 
-    LocationNode = eve.codegen.StrFormatTemplate("LocationNode {{{loc}}}")
+    LocationNode = eve.codegen.FormatTemplate("LocationNode {{{loc}}}")
 
     SimpleNode = eve.codegen.JinjaTemplate(
         "|{{ bool_value }}, {{ int_value }}, {{ float_value }}, {{ str_value }}, {{ bytes_value }}, "
