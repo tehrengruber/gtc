@@ -15,3 +15,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """GTScript Frontend"""
+
+# as long as gt_frontend and eve live in the same repository they share the same version
+#  for now this is only used as a version number in the documentation
+from eve.version import __version__, __versioninfo__  # noqa
