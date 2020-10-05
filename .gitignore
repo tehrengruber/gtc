@@ -105,6 +105,8 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
+docs/eve/_build/
+docs/gtc/_build/
 
 # mkdocs documentation
 /site

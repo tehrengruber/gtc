@@ -322,11 +322,11 @@ class StringFormatter(string.Formatter):
 
     The format specification is expanded by adding an extra
     intermediate specification. If the normal string specification is:
-        ``'{data:fmt_spec}'.format(data=[...])``
+    ``'{data:fmt_spec}'.format(data=[...])``
     using this class, it gets expanded as:
-        ``'{data:joiner^[item_fmt_spec]:fmt_spec}'.format(data=...)``
+    ``'{data:joiner^[item_fmt_spec]:fmt_spec}'.format(data=...)``
     with the following meaning:
-        ``'{data:fmt_spec}'.format(data=joiner.join(item_fmt_spec.format(item) for item in data))``
+    ``'{data:fmt_spec}'.format(data=joiner.join(item_fmt_spec.format(item) for item in data))``
 
     Both `joiner` and `item_fmt_spec` are optional (with `''` and `{}` as respective defaults).
     Note that inside `item_fmt_spec`, `{}` need to be escaped with duplicates.
