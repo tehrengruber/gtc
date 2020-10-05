@@ -147,7 +147,7 @@ html_context = sphinx_material.get_html_context()
 # Material theme options (see theme.conf for more information)
 html_theme_options = {
     # Set the name of the project to appear in the navigation.
-    "nav_title": "Eve Toolchain",
+    "nav_title": "GridTools Prototype Frontend",
     # Set the color and the accent color
     "color_primary": "blue",
     "color_accent": "light-blue",
@@ -240,7 +240,7 @@ html_theme_options = {
 # -- Options for HTML Help output ---------------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "evedoc"
+htmlhelp_basename = "gt_frontend_doc"
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -256,7 +256,7 @@ htmlhelp_basename = "evedoc"
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
-latex_documents = [("index", "eve.tex", "Eve Documentation", "ETH Zurich", "manual")]
+latex_documents = [("index", "gt_frontend.tex", "GridTools Prototype Frontend Documentation", "ETH Zurich", "manual")]
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
@@ -283,7 +283,7 @@ latex_documents = [("index", "eve.tex", "Eve Documentation", "ETH Zurich", "manu
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [("index", "eve", "Eve Documentation", ["ETH Zurich"], 1)]
+man_pages = [("index", "gt_frontend", "GridTools Prototype Frontend Documentation", ["ETH Zurich"], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
