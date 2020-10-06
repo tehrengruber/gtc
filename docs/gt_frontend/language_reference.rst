@@ -232,9 +232,9 @@ Only boolean and numeric literals are allowed. The precision of numeric literals
   # booleans are always of type bool
   True
   False
-  # integer of type dtypes["int"]
+  # integer are of type dtypes["int"]
   3
-  # float of type dtypes["float"]
+  # float are of type dtypes["float"]
   3.
 
 The user may for example use 32 bit float and integer values for all literals of a stencil as follows:
