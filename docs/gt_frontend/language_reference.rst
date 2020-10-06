@@ -225,22 +225,49 @@ Expressions
 Literals / Constants
 --------------------
 
-All literals are required to be of type :code:`gtc.common.DataType`, e.g. :code:`bool`, :code:`int32`, :code:`float32`, :code:`float64`. The user may explicitly specify the type of a literal using regular instantiation syntax, e.g. :code:`float32(3.141)` for a float with 32 bits of precision. In case no type has been specified the default precision is machine-independent and may be overridden by the user by specifying the :code:`dtype` stencil decorator argument.
+Only boolean and numeric literals are allowed. The precision of numeric literals is contrary to python by default machine-independent, but may be overridden by the user by specifying the :code:`dtype` stencil decorator argument.
 
 .. code-block:: python
 
-  # Booleans
-  True      # bool
-  False     # bool
+  # booleans are always of type bool
+  True
+  False
+  # integer of type dtypes["int"]
+  3
+  # float of type dtypes["float"]
+  3.
+
+The user may for example use 32 bit float and integer values for all literals of a stencil as follows:
+
+.. code-block:: python
+
+  @gtscript.stencil(dtypes={"float": np.float32, "int": np.int32})
+  def my_stencil(mesh: gtscript.Mesh):
+    with location(Vertex) as v:
+        my_field = my_field + 1.1 # 32 bit approximation of 1.1 used
+        my_field = my_field + 1   # 32 bit integer with value 1 used
+
+The user may further explicitly specify the type of a literal using regular instantiation syntax, e.g. :code:`float32("1.1")` for a float with 32 bits of precision.
+
+.. code-block:: python
+
   # Integer
-  3         # dtypes["int"]
-  uint32("3")
-  uint64("3")
+  uint32("1")
+  uint64("1")
+  int32("1")
+  int64("1")
   # Floating point
-  3.        # dtypes["float"]
-  3.141     # dtypes["float"]
-  float32("3.141")
-  float64("3.141")
+  float32(1.1)
+  float64(1.1)
+
+This allows for usage of literals with mixed precision.
+
+.. code-block:: python
+
+  @gtscript.stencil(dtypes={"float": np.float32})
+  def my_stencil(mesh: gtscript.Mesh):
+    with location(Vertex) as v:
+        my_field = my_field + 1.1 + float64("1.1")
 
 Field access
 ------------
@@ -268,7 +295,7 @@ Arithmetic operators on values of type :code:`gtc.common.DataType` follow the re
 Neighbor reductions
 --------------------
 
-Reductions over neighbors are composed of a reduction function, a list comprehension, representing a set of values on the neighboring locations, and a neighbor selector, specifying the neighbors to be reduced over. GTScript supports four reduction functions :code:`sum`, :code:`product`, :code:`min`, :code:`max`, computing the sum, product, mimimum and maximum, respectively, of its arguments. The argument to a reduction function is a list comprehension with the following syntax
+Reductions over neighbors are composed of a reduction function, a generator expression, representing a set of values on the neighboring locations, and a neighbor selector, specifying the neighbors to be reduced over. GTScript supports four reduction functions :code:`sum`, :code:`product`, :code:`min`, :code:`max`, computing the sum, product, mimimum and maximum, respectively, of its arguments. The argument to a reduction function is a generator expression with the following syntax:
 
 .. code-block:: python
 
