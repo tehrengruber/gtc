@@ -65,7 +65,7 @@ The entry point into GTScript code is a stencil, giving the user a local perspec
 
 **Computations**
 
-The stencils body is composed of one or more computations specifying the iteration domain, a vertical iteration policy and a set of statements to be executed on each of the specified locations. The iteration domain is of 2-dimensional nature with one unstructured dimension representing the geometrically 2-dimensional horizontal plane and one structured dimension, the `K`-dimension, representing the layers in the vertical spatial dimension. The horizontal iteration policy is always parallel. Statements are executed as specified in the `GTScript parallel model`_
+The stencils body is composed of one or more computations specifying the iteration domain. The iteration domain is split into horizontal and vertical iteration domains. The vertical iteration domain, which is 1D, can have different policies: FORWARD, BACKWARD and PARALLEL, indicating the order constraints of the iteration. The horizontal iteration domain is of 2-dimensional nature with one unstructured dimension representing the geometrically 2-dimensional horizontal plane. There is only one horizontal iteration policy and it is always PARALLEL, so it is not specified. Statements are executed as specified in the `GTScript parallel model`_
 
 .. _GTScript Parallel Model: https://github.com/GridTools/concepts/wiki/GTScript-Parallel-model
 
@@ -108,7 +108,7 @@ The skeleton of a stencil :code:`my_stencil` with a single field argument :code:
 
   @gtscript.stencil
   def my_stencil(mesh: Mesh):
-    with computation(PARALLEL), interval(0, None), location(Vertex):
+    with computation(PARALLEL), location(Vertex), interval(0, None):
       # ...
 
 The iteration specifications may also be nested as long as their order is :code:`computation`, :code:`location`, :code:`interval`.
