@@ -5,6 +5,8 @@
 
 .. comment include:: ../README.rst
 
+
+
 Contents:
 =========
 
@@ -14,6 +16,7 @@ Contents:
 
    apiref
    indices
+   language_reference
    license
    quickstart
 
