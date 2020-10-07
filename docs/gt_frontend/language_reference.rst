@@ -257,8 +257,8 @@ The user may further explicitly specify the type of a literal using regular inst
   int32("1")
   int64("1")
   # Floating point
-  float32(1.1)
-  float64(1.1)
+  float32("1.1")
+  float64("1.1")
 
 This allows for usage of literals with mixed precision.
 
