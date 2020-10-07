@@ -14,34 +14,16 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import string
-
-import numpy as np
 import pytest
 
 import eve
 import eve.codegen
 
+from .test_utils import name_with_cases  # noqa: F401
+
 
 # -- Name tests --
-@pytest.fixture
-def name_with_cases():
-    from eve.utils import CaseStyleConverter
-
-    cases = {
-        "words": ["first", "second", "UPPER", "Title"],
-        CaseStyleConverter.CASE_STYLE.CONCATENATED: "firstseconduppertitle",
-        CaseStyleConverter.CASE_STYLE.CANONICAL: "first second upper title",
-        CaseStyleConverter.CASE_STYLE.CAMEL: "firstSecondUpperTitle",
-        CaseStyleConverter.CASE_STYLE.PASCAL: "FirstSecondUpperTitle",
-        CaseStyleConverter.CASE_STYLE.SNAKE: "first_second_upper_title",
-        CaseStyleConverter.CASE_STYLE.KEBAB: "first-second-upper-title",
-    }
-
-    yield cases
-
-
-def test_name(name_with_cases):
+def test_name(name_with_cases):  # noqa: F811  # pytest fixture not detected
     name = eve.codegen.Name(name_with_cases.pop("words"))
     for case, cased_string in name_with_cases.items():
         assert name.as_case(case) == cased_string
@@ -53,63 +35,6 @@ def test_name(name_with_cases):
             else:
                 other_name = eve.codegen.Name.from_string(other_cased_string, other_case)
                 assert other_name.as_case(case) == cased_string
-
-
-# -- StringFormatter tests --
-@pytest.fixture(params=[(), (0.12345, -1.12345, 2.12345, -3.12345, 4.12345), np.random.rand(5)])
-def collection(request):
-    yield request.param
-
-
-@pytest.fixture(params=["", ",", " ", "[", "]", "::", "^^", "[[", "]]"])
-def joiner(request):
-    yield request.param
-
-
-@pytest.fixture(params=[None, "", "{{}}", "{{:.5}}", "{{:*^5.3}}"])
-def item_template(request):
-    yield request.param
-
-
-@pytest.fixture(params=["", "*^5", "*^5", "*^50"])
-def collection_fmt(request):
-    yield request.param
-
-
-class TestStringFormatter:
-    def test_without_extras(self, collection):
-        fmt = eve.codegen.StringFormatter()
-        std_fmt = string.Formatter()
-
-        assert fmt.format("aA") == std_fmt.format("aA")
-        assert fmt.format("a{}A", 0) == std_fmt.format("a{}A", 0)
-        assert fmt.format("a{:*^5}A", 0) == std_fmt.format("a{:*^5}A", 0)
-        assert fmt.format("a{:*^5.3}A", 0.12345) == std_fmt.format("a{:*^5.3}A", 0.12345)
-        assert fmt.format("{data}", data=collection) == std_fmt.format("{data}", data=collection)
-        assert fmt.format("{data:}", data=collection) == std_fmt.format("{data:}", data=collection)
-
-    def test_collection(self, collection, joiner, item_template, collection_fmt):
-        fmt = eve.codegen.StringFormatter()
-        std_fmt = string.Formatter()
-
-        std_joiner = joiner.replace("^^", "^").replace("::", ":")
-        if item_template is None:
-            spec = "{data:" + joiner + ":" + collection_fmt + "}"
-            std_item_template = "{}"
-        else:
-            spec = "{data:" + joiner + "^[" + item_template + "]:" + collection_fmt + "}"
-            std_item_template = item_template.replace("{{", "{").replace("}}", "}")
-
-        std_spec = "{data:" + collection_fmt + "}"
-
-        assert fmt.format(spec, data=collection) == std_fmt.format(
-            std_spec, data=std_joiner.join(std_item_template.format(d) for d in collection)
-        )
-
-    def test_wrong_collection(self):
-        fmt = eve.codegen.StringFormatter()
-        with pytest.raises(ValueError, match="scalar value"):
-            fmt.format("{data::}", data=1.34)
 
 
 # -- Template tests --

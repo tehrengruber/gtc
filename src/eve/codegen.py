@@ -21,7 +21,6 @@ import abc
 import collections.abc
 import contextlib
 import os
-import re
 import string
 import sys
 import textwrap
@@ -29,7 +28,6 @@ import types
 from subprocess import PIPE, Popen
 
 import black
-import boltons.iterutils as bo_iterutils
 import jinja2
 from mako import template as mako_tpl
 
@@ -70,7 +68,7 @@ SourceFormatter = Callable[[str], str]
 SOURCE_FORMATTERS: Dict[str, SourceFormatter] = {}
 
 
-def register_formatter(language: str,) -> Callable[[SourceFormatter], SourceFormatter]:
+def register_formatter(language: str) -> Callable[[SourceFormatter], SourceFormatter]:
     """Decorator to register source code formatters for specific languages."""
 
     def _decorator(formatter: SourceFormatter) -> SourceFormatter:
@@ -298,92 +296,17 @@ class TextBlock:
         """Indentation string for new lines (in the current state)."""
         return self.indent_char * (self.indent_level * self.indent_size)
 
-    def __iadd__(self, source_line: str) -> "TextBlock":
-        return self.append(source_line)
+    def __iadd__(self, source_line: Union[str, AnyTextSequence]) -> "TextBlock":
+        if isinstance(source_line, str):
+            return self.append(source_line)
+        else:
+            return self.extend(source_line)
 
     def __len__(self) -> int:
         return len(self.lines)
 
     def __str__(self) -> str:
         return self.text
-
-
-def _compile_str_format_re() -> re.Pattern:
-    fmt_spec = "(.*)"
-    joiner = r"((?:[^\^:]|\^\^|::)*)"
-    item_template = r"((?:[^\]]|\]\])*)"
-    spec = rf"{joiner}(?:\^\[{item_template}\])?:{fmt_spec}"
-
-    return re.compile(spec)
-
-
-class StringFormatter(string.Formatter):
-    """Custom string formatter expanding `str.format()` spec for collections.
-
-    The format specification is expanded by adding an extra
-    intermediate specification. If the normal string specification is:
-    ``'{data:fmt_spec}'.format(data=[...])``
-    using this class, it gets expanded as:
-    ``'{data:joiner^[item_fmt_spec]:fmt_spec}'.format(data=...)``
-    with the following meaning:
-    ``'{data:fmt_spec}'.format(data=joiner.join(item_fmt_spec.format(item) for item in data))``
-
-    Both `joiner` and `item_fmt_spec` are optional (with `''` and `{}` as respective defaults).
-    Note that inside `item_fmt_spec`, `{}` need to be escaped with duplicates.
-
-    Examples:
-        >>> fmt = StringFormatter()
-        >>> data = [1.1, 2.22, 3.333, 4.444]
-
-        >>> fmt.format("{:/:}", data)
-        '1.1/2.22/3.333/4.444'
-
-        >>> fmt.format("{::}", data)
-        '1.12.223.3334.444'
-
-        >>> fmt.format("{:}", data)  # regular format without extensions
-        '[1.1, 2.22, 3.333, 4.444]'
-
-        >>> fmt.format("{:/:*^25}", data)
-        '**1.1/2.22/3.333/4.444***'
-
-        >>> fmt.format("{:/^[X]:}", data)
-        'X/X/X/X'
-
-        >>> fmt.format("{:/^[_{{:.2}}_]:}", data)
-        '_1.1_/_2.2_/_3.3_/_4.4_'
-
-        >>> fmt.format("{:/^[{{{{ {{:.2}} }}}}]:}", data)
-        '{ 1.1 }/{ 2.2 }/{ 3.3 }/{ 4.4 }'
-
-    """
-
-    __FORMAT_RE = _compile_str_format_re()
-
-    def format_field(self, value: Any, format_spec: str) -> Any:
-        m = self.__FORMAT_RE.match(format_spec)
-        if not m:
-            return super().format_field(value, format_spec)
-
-        joiner = m[1]
-        item_spec = m[2]
-        final_format_spec = m[3]
-
-        if not bo_iterutils.is_collection(value):
-            raise ValueError(f"Collection formatting used with a scalar value {value}")
-
-        joiner = joiner.replace("^^", "^").replace("::", ":")
-        if item_spec is None:
-            item_spec = "{}"
-        format_spec = format_spec.replace("[[", "[").replace("]]", "]") if format_spec else ""
-        formatted = joiner.join(
-            super(StringFormatter, self).format(item_spec, item) for item in value
-        )
-
-        if final_format_spec:
-            formatted = super(StringFormatter, self).format_field(formatted, final_format_spec)
-
-        return formatted
 
 
 TemplateT = TypeVar("TemplateT", bound="Template")
@@ -436,7 +359,7 @@ class FormatTemplate(Template):
 
     definition: str
 
-    _formatter_: ClassVar[StringFormatter] = StringFormatter()
+    _formatter_: ClassVar[string.Formatter] = utils.XStringFormatter()
 
     def __init__(self, definition: str, **kwargs: Any) -> None:
         self.definition = definition

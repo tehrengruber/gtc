@@ -20,6 +20,7 @@
 import collections.abc
 import enum
 import re
+import string
 
 import xxhash
 from boltons.iterutils import flatten, flatten_iter  # noqa: F401
@@ -34,7 +35,7 @@ from boltons.strutils import (  # noqa: F401
 )
 
 from . import typing
-from .typing import Any, Callable, Iterable, List, Optional, Union
+from .typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 
 class _NOTHING_TYPE:
@@ -47,6 +48,8 @@ NOTHING = _NOTHING_TYPE()
 
 
 def call_all(funcs_iterable: Iterable[Callable]) -> Callable:
+    """Function call composition."""
+
     def _caller(*args: Any, **kwargs: Any) -> None:
         for f in funcs_iterable:
             f(*args, **kwargs)
@@ -54,10 +57,45 @@ def call_all(funcs_iterable: Iterable[Callable]) -> Callable:
     return _caller
 
 
+def shash(*args: Any, hash_algorithm: Optional[Any] = None, str_encoding: str = "utf-8") -> str:
+    """Stable hash function.
+
+    Args:
+        hash_algorithm: object implementing the `hash algorithm` interface
+            from :mod:`hashlib`.
+        str_encoding: encoding use by :func:`str.encode()` to generate a
+            :obj:`bytes` object for hashing.
+
+    """
+    if hash_algorithm is None:
+        hash_algorithm = xxhash.xxh64()
+
+    for item in args:
+        if not isinstance(item, bytes):
+            if not isinstance(item, str):
+                if isinstance(item, collections.abc.Iterable):
+                    item = flatten(item)
+                elif isinstance(item, collections.abc.Mapping):
+                    item = flatten(item.items())
+                item = repr(item)
+
+            item = item.encode(str_encoding)
+
+        hash_algorithm.update(item)
+
+    return typing.cast(str, hash_algorithm.hexdigest())
+
+
 AnyWordsIterable = Union[str, Iterable[str]]
 
 
 class CaseStyleConverter:
+    """Utility class to convert name strings to different case styles.
+
+    Functionality exposed through :meth:`split()`, :meth:`join()` and
+    :meth:`convert()` methods.
+    """
+
     class CASE_STYLE(enum.Enum):
         CONCATENATED = "concatenated"
         CANONICAL = "canonical"
@@ -146,21 +184,171 @@ class CaseStyleConverter:
         return name.split("-")
 
 
-def shash(*args: Any, hash_algorithm: Optional[Any] = None, str_encoding: str = "utf-8") -> str:
-    if hash_algorithm is None:
-        hash_algorithm = xxhash.xxh64()
+# def _compile_str_format_re() -> re.Pattern:
+#     fmt_spec = "(.*)"
+#     joiner = r"((?:[^\^:]|\^\^|::)*)"
+#     item_template = r"((?:[^\]]|\]\])*)"
+#     spec = rf"{joiner}(?:\^\[{item_template}\])?:{fmt_spec}"
 
-    for item in args:
-        if not isinstance(item, bytes):
-            if not isinstance(item, str):
-                if isinstance(item, collections.abc.Iterable):
-                    item = flatten(item)
-                elif isinstance(item, collections.abc.Mapping):
-                    item = flatten(item.items())
-                item = repr(item)
+#     return re.compile(spec)
 
-            item = item.encode(str_encoding)
 
-        hash_algorithm.update(item)
+class XStringFormatter(string.Formatter):
+    """Custom :class:`string.Formatter` implementation with f-string-like functionality.
 
-    return typing.cast(str, hash_algorithm.hexdigest())
+    Implementation is slightly more complicated than needed to preserve
+    compatibility with the standard :class:`string.Formatter`, in case
+    it needs to be extended.
+
+    """
+
+    class __DictLogger(dict):
+        """Dumb :class:`dict` subclass logging the accessed args."""
+
+        def __getitem__(self, key: Any) -> Any:
+            self.used_args = getattr(self, "used_args", set())
+            if key in self:
+                self.used_args.add(key)
+            return super().__getitem__(key)
+
+    def vformat(self, format_string: str, args: Sequence, kwargs: Mapping) -> str:
+        used_args: Set[Union[int, str]] = set()
+        result, _ = self._vformat(format_string, args, kwargs, used_args, 2)
+        self.check_unused_args(used_args, args, kwargs)  # type: ignore  # likely wrong 'used_args' type in stdlib
+        return result
+
+    def _vformat(
+        self,
+        format_string: str,
+        args: Sequence,
+        kwargs: Mapping,
+        used_args: Set,
+        recursion_depth: int,
+        auto_arg_index: int = 0,
+    ) -> Tuple[str, int]:
+        if recursion_depth < 0:
+            raise ValueError("Max string recursion exceeded")
+
+        result = []
+        _kwargs = self.__DictLogger({**kwargs, "__formatter_args__": args})
+        _kwargs.used_args = used_args
+        for literal_text, field_name, format_spec, conversion in self.parse(format_string):
+            # output the literal text
+            if literal_text:
+                result.append(literal_text)
+
+            # if there's a field, output it
+            if field_name is not None:
+                # this is some markup, find the object and do
+                #  the formatting
+
+                # handle arg indexing when empty field_names are given.
+                if field_name == "":
+                    if auto_arg_index is False:
+                        raise ValueError(
+                            "cannot switch from manual field "
+                            "specification to automatic field "
+                            "numbering"
+                        )
+                    field_name = str(auto_arg_index)
+                    auto_arg_index += 1
+                elif field_name.isdigit():
+                    if auto_arg_index:
+                        raise ValueError(
+                            "cannot switch from manual field "
+                            "specification to automatic field "
+                            "numbering"
+                        )
+                    # disable auto arg incrementing, if it gets
+                    # used later on, then an exception will be raised
+                    auto_arg_index = False
+
+                # given the field_name or expression, get the actual formatted value
+                # if a valid arg_used is returned, add it to the used_args set (only for subclasses)
+                obj, arg_used = self.get_field(field_name, args, _kwargs)
+                if arg_used is not None:
+                    used_args.add(arg_used)
+
+                # do any conversion on the resulting object
+                obj = self.convert_field(obj, conversion)  # type: ignore  # wrong 'conversion' type in stdlib
+
+                # expand the format spec, if needed
+                format_spec, auto_arg_index = self._vformat(
+                    format_spec,  # type: ignore  # wrong 'format_spec' type in stdlib
+                    args,
+                    kwargs,
+                    used_args,
+                    recursion_depth - 1,
+                    auto_arg_index=auto_arg_index,
+                )
+
+                # format the object and append to the result
+                result.append(self.format_field(obj, format_spec))
+
+        used_args -= {"__formatter_args__"}
+
+        return "".join(result), auto_arg_index
+
+    def get_value(self, key: Union[int, str], args: Sequence, kwargs: Mapping) -> Any:
+        assert isinstance(key, str)
+        result = eval(key, {}, kwargs)
+        return result
+
+    def format_field(self, value: Any, format_spec: str) -> str:
+        return format(value, format_spec)
+
+    # given a field_name, find the object it references.
+    #  field_name:   the field being looked up or a python expression
+    #  args, kwargs: as passed in to vformat
+    def get_field(self, field_name: str, args: Sequence, kwargs: Mapping) -> Any:
+        used_arg = None
+        if field_name.isdigit():
+            used_arg = int(field_name)
+            field_name = f"__formatter_args__[{field_name}]"
+
+        obj = self.get_value(field_name, args, kwargs)
+        return obj, used_arg
+
+
+# class StringFormatter(string.Formatter):
+#     """Custom :class:`string.Formatter` implementation with f-string-like functionality.
+
+#     The format specification is expanded by adding an extra
+#     intermediate specification. If the normal string specification is:
+#     ``'{data:fmt_spec}'.format(data=[...])``
+#     using this class, it gets expanded as:
+#     ``'{data:joiner^[item_fmt_spec]:fmt_spec}'.format(data=...)``
+#     with the following meaning:
+#     ``'{data:fmt_spec}'.format(data=joiner.join(item_fmt_spec.format(item) for item in data))``
+
+#     Both `joiner` and `item_fmt_spec` are optional (with `''` and `{}` as respective defaults).
+#     Note that inside `item_fmt_spec`, `{}` need to be escaped with duplicates.
+
+#     Examples:
+#         >>> fmt = StringFormatter()
+#         >>> data = [1.1, 2.22, 3.333, 4.444]
+
+#         >>> fmt.format("{:/:}", data)
+#         '1.1/2.22/3.333/4.444'
+
+#         >>> fmt.format("{::}", data)
+#         '1.12.223.3334.444'
+
+#         >>> fmt.format("{:}", data)  # regular format without extensions
+#         '[1.1, 2.22, 3.333, 4.444]'
+
+#         >>> fmt.format("{:/:*^25}", data)
+#         '**1.1/2.22/3.333/4.444***'
+
+#         >>> fmt.format("{:/^[X]:}", data)
+#         'X/X/X/X'
+
+#         >>> fmt.format("{:/^[_{{:.2}}_]:}", data)
+#         '_1.1_/_2.2_/_3.3_/_4.4_'
+
+#         >>> fmt.format("{:/^[{{{{ {{:.2}} }}}}]:}", data)
+#         '{ 1.1 }/{ 2.2 }/{ 3.3 }/{ 4.4 }'
+
+#     """
+
+#     __FORMAT_RE = _compile_str_format_re()
