@@ -14,15 +14,17 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tools for code generation."""
+"""Tools for source code generation."""
 
 
+import abc
 import collections.abc
 import contextlib
 import os
 import string
 import sys
 import textwrap
+import types
 from subprocess import PIPE, Popen
 
 import black
@@ -33,6 +35,7 @@ from . import typing, utils
 from .concepts import Node
 from .typing import (
     Any,
+    Callable,
     ClassVar,
     Collection,
     Dict,
@@ -40,11 +43,11 @@ from .typing import (
     List,
     Mapping,
     Optional,
-    Protocol,
     Sequence,
     Set,
     Tuple,
     Type,
+    TypeVar,
     Union,
 )
 from .visitors import AnyTreeNode, NodeVisitor
@@ -59,21 +62,56 @@ except ImportError:
     _CLANG_FORMAT_AVAILABLE = False
 
 
-class Formatter(Protocol):
-    """Type annotation for callables formatting source code.
+SourceFormatter = Callable[[str], str]
 
-    To be reachable by the general `format_source` function, objects this protocol
-    should be defined in this module with a specific name pattern:
-        `format_{language}_source`
+#: Global dict storing registered formatters
+SOURCE_FORMATTERS: Dict[str, SourceFormatter] = {}
 
-    """
 
-    def __call__(self, source: str, **kwargs: Any) -> str:
-        ...
+def register_formatter(language: str) -> Callable[[SourceFormatter], SourceFormatter]:
+    """Decorator to register source code formatters for specific languages."""
+
+    def _decorator(formatter: SourceFormatter) -> SourceFormatter:
+        if language in SOURCE_FORMATTERS:
+            raise ValueError(f"Another formatter for language '{language}' already exists")
+
+        assert callable(formatter)
+        SOURCE_FORMATTERS[language] = formatter
+
+        return formatter
+
+    return _decorator
+
+
+@register_formatter("python")
+def format_python_source(
+    source: str,
+    *,
+    line_length: int = 100,
+    target_versions: Optional[Set[str]] = None,
+    string_normalization: bool = True,
+) -> str:
+    """Format Python source code using black formatter."""
+
+    target_versions = target_versions or f"{sys.version_info.major}{sys.version_info.minor}"
+    target_versions = set(black.TargetVersion[f"PY{v.replace('.', '')}"] for v in target_versions)
+
+    formatted_source = black.format_str(
+        source,
+        mode=black.FileMode(
+            line_length=line_length,
+            target_versions=target_versions,
+            string_normalization=string_normalization,
+        ),
+    )
+    assert isinstance(formatted_source, str)
+
+    return formatted_source
 
 
 if _CLANG_FORMAT_AVAILABLE:
 
+    @register_formatter("cpp")
     def format_cpp_source(
         source: str,
         *,
@@ -81,6 +119,8 @@ if _CLANG_FORMAT_AVAILABLE:
         fallback_style: Optional[str] = None,
         sort_includes: bool = False,
     ) -> str:
+        """Format C++ source code using clang-format."""
+
         args = ["clang-format"]
         if style:
             args.append(f"--style={style}")
@@ -90,86 +130,57 @@ if _CLANG_FORMAT_AVAILABLE:
             args.append("--sort-includes")
 
         p = Popen(args, stdout=PIPE, stdin=PIPE, encoding="utf8")
-        formatted_code, _ = p.communicate(input=source)
+        formatted_source, _ = p.communicate(input=source)
+        assert isinstance(formatted_source, str)
 
-        return formatted_code
-
-
-def format_python_source(
-    source: str,
-    *,
-    line_length: int = 100,
-    target_versions: Optional[Set[str]] = None,
-    string_normalization: bool = True,
-) -> str:
-    target_versions = target_versions or f"{sys.version_info.major}{sys.version_info.minor}"
-    target_versions = set(black.TargetVersion[f"PY{v.replace('.', '')}"] for v in target_versions)
-
-    return typing.cast(
-        str,
-        black.format_str(
-            source,
-            mode=black.FileMode(
-                line_length=line_length,
-                target_versions=target_versions,
-                string_normalization=string_normalization,
-            ),
-        ),
-    )
+        return formatted_source
 
 
 def format_source(language: str, source: str, *, skip_errors: bool = True, **kwargs: Any) -> str:
-    formatter = typing.cast(Formatter, globals().get(f"format_{language.lower()}_source", None))
+    """Format source code if a formatter exists for the specific language."""
+
+    formatter = SOURCE_FORMATTERS.get(language, None)
     try:
-        return formatter(source, **kwargs)
-    except Exception:
+        if formatter:
+            return formatter(source, **kwargs)  # type: ignore # Callable does not support **kwargs
+        else:
+            raise RuntimeError(f"Missing formatter for '{language}' language")
+    except Exception as e:
         if skip_errors:
             return source
         else:
             raise RuntimeError(
-                f"Something went wrong when trying to format '{language}' source code!"
-            )
+                f"Something went wrong when trying to format '{language}' source code"
+            ) from e
 
 
 class Name:
-    """Text string representing a symbol name in a programming language.
+    """Text formatter with different case styles for symbol names in source code."""
 
-    Partially based on code from:
-        https://blog.kangz.net/posts/2016/08/31/code-generation-the-easier-way/
+    words: List[str]
 
-    """
+    @classmethod
+    def from_string(cls, name: str, case_style: utils.CaseStyleConverter.CASE_STYLE) -> "Name":
+        return cls(utils.CaseStyleConverter.split(name, case_style))
 
     def __init__(self, words: utils.AnyWordsIterable) -> None:
-        if isinstance(words, collections.abc.Sequence):
-            if not all(isinstance(item, str) for item in words):
-                raise TypeError(
-                    f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
-                )
-            self.words = words
-        elif isinstance(words, str):
-            self.words = [words]
-        else:
+        if isinstance(words, str):
+            words = [words]
+        if not isinstance(words, collections.abc.Iterable):
             raise TypeError(
-                f"Identifier definition ('{words}') type is not 'Union[str, Sequence[str]]'"
+                f"Identifier definition ('{words}') type is not a valid sequence of words"
             )
 
-    def as_canonical_cased(self) -> str:
-        return utils.join_canonical_cased(self.words)
+        words = [*words]
+        if not all(isinstance(item, str) for item in words):
+            raise TypeError(
+                f"Identifier definition ('{words}') type is not a valid sequence of words"
+            )
 
-    def as_concatcased(self) -> str:
-        return utils.join_concatcased(self.words)
+        self.words = words
 
-    def as_camelCased(self) -> str:
-        return utils.join_camelCased(self.words)
-
-    def as_PascalCased(self) -> str:
-        return utils.join_PascalCased(self.words)
-
-    def as_snake_cased(self) -> str:
-        return utils.join_snake_cased(self.words)
-
-    def as_SNAKE_CASE(self) -> str:
-        return utils.join_snake_cased(self.words).upper()
+    def as_case(self, case_style: utils.CaseStyleConverter.CASE_STYLE) -> str:
+        return utils.CaseStyleConverter.join(self.words, case_style)
 
 
 AnyTextSequence = Union[Sequence[str], "TextBlock"]
@@ -178,14 +189,14 @@ AnyTextSequence = Union[Sequence[str], "TextBlock"]
 class TextBlock:
     """A block of source code represented as a sequence of text lines.
 
-    This class also contains a context manager method (:meth:`indented`)
+    Check the provided context manager creator method (:meth:`indented`)
     for simple `indent - append - dedent` workflows.
 
     Args:
-        indent_level: Initial indentation level
-        indent_size: Number of characters per indentation level
-        indent_char: Character used in the indentation
-        end_line: Character or string used as new-line separator
+        indent_level: Initial indentation level.
+        indent_size: Number of characters per indentation level.
+        indent_char: Character used in the indentation.
+        end_line: Character or string used as new-line separator.
 
     """
 
@@ -250,6 +261,26 @@ class TextBlock:
 
     @contextlib.contextmanager
     def indented(self, steps: int = 1) -> Iterator["TextBlock"]:
+        """Context manager creator for temporary indentation of sources.
+
+        This context manager simplifies the usage of indent/dedent in
+        common `indent - append - dedent` workflows.
+
+        Examples:
+            >>> block = TextBlock();
+            >>> block.append('first line')  # doctest: +ELLIPSIS
+            <...>
+            >>> with block.indented():
+            ...     block.append('second line');  # doctest: +ELLIPSIS
+            <...>
+            >>> block.append('third line')  # doctest: +ELLIPSIS
+            <...>
+            >>> print(block.text)
+            first line
+                second line
+            third line
+
+        """
         self.indent(steps)
         yield self
         self.dedent(steps)
@@ -265,8 +296,11 @@ class TextBlock:
         """Indentation string for new lines (in the current state)."""
         return self.indent_char * (self.indent_level * self.indent_size)
 
-    def __iadd__(self, source_line: str) -> "TextBlock":
-        return self.append(source_line)
+    def __iadd__(self, source_line: Union[str, AnyTextSequence]) -> "TextBlock":
+        if isinstance(source_line, str):
+            return self.append(source_line)
+        else:
+            return self.extend(source_line)
 
     def __len__(self) -> int:
         return len(self.lines)
@@ -275,44 +309,18 @@ class TextBlock:
         return self.text
 
 
-class Template:
-    """Master Template class (to be subclasssed).
+TemplateT = TypeVar("TemplateT", bound="Template")
 
-    Subclassess must implement the `__init__` (with a type annotation for `definition`)
-    and `_render` methods.
 
+class Template(abc.ABC):
+    """Abstract class defining the Template interface.
+
+    Subclassess adapting this interface to different template engines will
+    only need to implement the abstract methods.
     """
 
-    _DEFINITION_TYPES: ClassVar[Dict[Type, Type["Template"]]] = {}
-
     @classmethod
-    def __init_subclass__(cls) -> None:
-        if "__init__" not in cls.__dict__ or not callable(cls.__dict__["__init__"]):
-            raise TypeError(
-                "Template implementations must define an annotated `__init__(self, definition, **kwargs)` method"
-            )
-        if "_render" not in cls.__dict__ or not callable(cls.__dict__["_render"]):
-            raise TypeError(
-                "Template implementations must define a `_render(self, **kwargs)` method"
-            )
-        init_annotations = cls.__init__.__annotations__
-        if "definition" not in init_annotations:
-            raise TypeError(f"Missing 'definition' annotation in '{cls.__name__}'.__init__()")
-
-        definition_cls = init_annotations["definition"]
-        assert isinstance(definition_cls, type)
-        assert definition_cls not in Template._DEFINITION_TYPES
-        Template._DEFINITION_TYPES[definition_cls] = cls
-
-    def __new__(cls, definition: Any, **kwargs: Any) -> "Template":
-        template_cls = Template._DEFINITION_TYPES.get(type(definition), None)
-        if not template_cls:
-            raise TypeError(f"Invalid template definition ({type(definition)}):\n{definition}")
-
-        return typing.cast("Template", super().__new__(template_cls))
-
-    @classmethod
-    def from_file(cls, file_path: Union[str, os.PathLike]) -> "Template":
+    def from_file(cls: Type[TemplateT], file_path: Union[str, os.PathLike]) -> "Template":
         if cls is Template:
             raise RuntimeError("This method can only be called in concrete Template subclasses")
 
@@ -320,16 +328,13 @@ class Template:
             definition = f.read()
         return cls(definition)
 
-    def __init__(self, definition: Any, **kwargs: Any) -> None:
-        raise NotImplementedError("__init__() must be implemented in concrete Template subclasses")
-
     def render(self, mapping: Optional[Mapping[str, str]] = None, **kwargs: Any) -> str:
         """Render the template.
 
         Args:
-            mapping (optional): A `dict` whose keys match the template placeholders.
+            mapping: A mapping whose keys match the template placeholders.
             **kwargs: placeholder values might be also provided as
-                keyword arguments, and they should take precedence over ``mapping``
+                keyword arguments, and they will take precedence over ``mapping``
                 values for duplicated keys.
 
         """
@@ -338,98 +343,143 @@ class Template:
         if kwargs:
             mapping = {**mapping, **kwargs}
 
-        return self._render(**mapping)
+        return self.render_template(**mapping)
 
-    def _render(self, **kwargs: Any) -> str:
-        raise NotImplementedError("_render() must be implemented in specific Template subclasses")
+    @abc.abstractmethod
+    def __init__(self, definition: Any, **kwargs: Any) -> None:
+        pass
+
+    @abc.abstractmethod
+    def render_template(self, **kwargs: Any) -> str:
+        pass
 
 
-class StrFormatTemplate(Template):
+class FormatTemplate(Template):
+    """Template adapter for :class:`StringFormatter`."""
+
     definition: str
+
+    _formatter_: ClassVar[string.Formatter] = utils.XStringFormatter()
 
     def __init__(self, definition: str, **kwargs: Any) -> None:
         self.definition = definition
 
-    def _render(self, **kwargs: Any) -> str:
-        return self.definition.format(**kwargs)
+    def render_template(self, **kwargs: Any) -> str:
+        return self._formatter_.format(self.definition, **kwargs)
 
 
 class StringTemplate(Template):
+    """Template adapter for `string.Template`."""
+
     definition: string.Template
 
-    def __init__(self, definition: string.Template, **kwargs: Any) -> None:
+    def __init__(self, definition: Union[str, string.Template], **kwargs: Any) -> None:
+        if isinstance(definition, str):
+            definition = string.Template(definition)
+        assert isinstance(definition, string.Template)
         self.definition = definition
 
-    def _render(self, **kwargs: Any) -> str:
+    def render_template(self, **kwargs: Any) -> str:
         return self.definition.substitute(**kwargs)
 
 
 class JinjaTemplate(Template):
+    """Template adapter for `jinja2.Template`."""
+
     definition: jinja2.Template
 
-    def __init__(self, definition: jinja2.Template, **kwargs: Any) -> None:
+    def __init__(self, definition: Union[str, jinja2.Template], **kwargs: Any) -> None:
+        if isinstance(definition, str):
+            definition = jinja2.Template(definition)
+        assert isinstance(definition, jinja2.Template)
         self.definition = definition
 
-    def _render(self, **kwargs: Any) -> str:
+    def render_template(self, **kwargs: Any) -> str:
         return self.definition.render(**kwargs)
 
 
 class MakoTemplate(Template):
+    """Template adapter for `mako.template.Template`."""
+
     definition: mako_tpl.Template
 
     def __init__(self, definition: mako_tpl.Template, **kwargs: Any) -> None:
+        if isinstance(definition, str):
+            definition = mako_tpl.Template(definition)
+        assert isinstance(definition, mako_tpl.Template)
         self.definition = definition
 
-    def _render(self, **kwargs: Any) -> str:
-        return typing.cast(str, self.definition.render(**kwargs))
+    def render_template(self, **kwargs: Any) -> str:
+        result = self.definition.render(**kwargs)
+        assert isinstance(result, str)
+        return result
 
 
 class TemplatedGenerator(NodeVisitor):
-    """A code generator visitor using :class:`TextTemplate` s."""
+    """A code generator visitor using :class:`TextTemplate` s.
 
-    _TEMPLATES: ClassVar[Dict[str, Template]]
+    The order followed to choose a `dump()` function for instances of
+    :class:`eve.Node` is the following:
+
+        1. A `self.visit_NODE_TYPE_NAME()` method where `NODE_TYPE_NAME`
+            matches `NODE_CLASS.__name__`, and `NODE_CLASS` is the
+            actual type of the node or any of its superclasses
+            following MRO order.
+        2. A `NODE_TYPE_NAME` class variable of type :class:`Template`,
+            where `NODE_TYPE_NAME` matches `NODE_CLASS.__name__`, and
+            `NODE_CLASS` is the actual type of the node or any of its
+            superclasses following MRO order.
+
+    When a template is used, the following keys will be passed to the template
+    instance:
+
+        * `**node_fields`: all the node children and attributes by name.
+        * `_attrs`: a `dict` instance with the results of visiting all
+            the node attributes.
+        * `_children`: a `dict` instance with the results of visiting all
+            the node children.
+        * `_this_node`: the actual node instance (before visiting children).
+        * `_this_generator`: the current generator instance.
+        * `_this_module`: the generator's module instance .
+        * `**kwargs`: the keyword arguments received by the visiting method.
+
+    Class variable templates cannot be used for instances of other types
+    (not :class:`eve.Node` subclasses). Step 2 will be therefore substituted
+    by a call to the :meth:`self.generic_dump()` method.
+
+    """
+
+    _templates_: ClassVar[Mapping[str, Template]]
 
     @classmethod
-    def __init_subclass__(cls) -> None:
-        cls_dict = {attr: getattr(cls, attr) for attr in dir(cls)}
-        cls._TEMPLATES = {
-            key[:-9]: value if isinstance(value, Template) else Template(value)
-            for key, value in cls_dict.items()
-            if key.endswith("_template")
-            and (isinstance(value, Template) or type(value) in Template._DEFINITION_TYPES)
-        }
+    def __init_subclass__(cls, *, inherit_templates: bool = True, **kwargs: Any) -> None:
+        # mypy has troubles with __init_subclass__: https://github.com/python/mypy/issues/4660
+        super().__init_subclass__(**kwargs)  # type: ignore
+        if "_templates_" in cls.__dict__:
+            raise TypeError(f"Invalid '_templates_' member in class {cls}")
+
+        templates: Dict[str, Template] = {}
+        if inherit_templates:
+            for templated_gen_class in reversed(cls.__mro__[1:]):
+                if (
+                    issubclass(templated_gen_class, TemplatedGenerator)
+                    and templated_gen_class is not TemplatedGenerator
+                ):
+                    templates.update(templated_gen_class._templates_)
+
+        templates.update(
+            {
+                key: value
+                for key, value in cls.__dict__.items()
+                if isinstance(value, Template) and not key.startswith("_") and not key.endswith("_")
+            }
+        )
+
+        cls._templates_ = types.MappingProxyType(templates)
 
     @classmethod
     def apply(cls, root: AnyTreeNode, **kwargs: Any) -> Union[str, Collection[str]]:
         """Public method to build a class instance and visit an IR node.
-
-        The order followed to choose a `dump()` function for instances of
-        :class:`eve.Node` is the following:
-
-            1. A `self.visit_NODE_TYPE_NAME()` method where `NODE_TYPE_NAME`
-               matches `NODE_CLASS.__name__`, and `NODE_CLASS` is the
-               actual type of the node or any of its superclasses
-               following MRO order.
-            2. A `Templates.NODE_TYPE_NAME` template where `NODE_TYPE_NAME`
-               matches `NODE_CLASS.__name__`, and `NODE_CLASS` is the
-               actual type of the node or any of its superclasses
-               following MRO order.
-
-        When a template is used, the following keys will be passed to the template
-        instance:
-
-            * `**node_fields`: all the node children and attributes by name.
-            * `_attrs`: a `dict` instance with the results of visiting all
-              the node attributes.
-            * `_children`: a `dict` instance with the results of visiting all
-              the node children.
-            * `_this_node`: the actual node instance (before visiting children).
-            * `_this_generator`: the current generator instance.
-            * `_this_module`: the generator's module instance .
-            * `**kwargs`: the keyword arguments received by the visiting method.
-
-        For primitive types (not :class:`eve.Node` subclasses),
-        the :meth:`self.generic_dump()` method will be used.
 
         Args:
             root: An IR node.
@@ -476,13 +526,13 @@ class TemplatedGenerator(NodeVisitor):
         return result
 
     def get_template(self, node: AnyTreeNode) -> Tuple[Optional[Template], Optional[str]]:
-        """Get a template for a node instance (see :meth:`apply`)."""
+        """Get a template for a node instance (see class documentation)."""
         template: Optional[Template] = None
         template_key: Optional[str] = None
         if isinstance(node, Node):
             for node_class in node.__class__.__mro__:
                 template_key = node_class.__name__
-                template = self._TEMPLATES.get(template_key, None)
+                template = self._templates_.get(template_key, None)
                 if template is not None or node_class is Node:
                     break
 
@@ -496,7 +546,7 @@ class TemplatedGenerator(NodeVisitor):
         transformed_attrs: Mapping[str, Any],
         **kwargs: Any,
     ) -> str:
-        """Render a template using node instance data (see :meth:`apply`)."""
+        """Render a template using node instance data (see class documentation)."""
 
         return template.render(
             **transformed_children,
@@ -514,3 +564,9 @@ class TemplatedGenerator(NodeVisitor):
 
     def transform_attrs(self, node: Node, **kwargs: Any) -> Dict[str, Any]:
         return {key: self.visit(value, **kwargs) for key, value in node.iter_attributes()}
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

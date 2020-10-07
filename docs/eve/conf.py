@@ -144,40 +144,23 @@ html_theme = "sphinx_material"
 html_theme_path = sphinx_material.html_theme_path()
 html_context = sphinx_material.get_html_context()
 
-# Material theme options (see theme.conf for more information)
-html_theme_options = {
-    # Set the name of the project to appear in the navigation.
-    "nav_title": "Eve Toolchain",
-    # Set the color and the accent color
-    "color_primary": "blue",
-    "color_accent": "light-blue",
-    # Set the repo location to get a badge with stats
-    "repo_url": "https://github.com/eth-cscs/project/",
-    "repo_name": "eve_toolchain",
-    # Visible levels of the global TOC; -1 means unlimited
-    "globaltoc_depth": 3,
-    # If False, expand all TOC entries
-    "globaltoc_collapse": False,
-    # If True, show hidden TOC entries
-    "globaltoc_includehidden": False,
-}
-# html_theme = "sphinx_rtd_theme"
-#
+html_theme = "sphinx_rtd_theme"
+
 # Theme-specific options for: sphinx_rtd_theme
-# html_theme_options = {
-#     "canonical_url": "",
-#     "analytics_id": "",
-#     "logo_only": False,
-#     "display_version": True,
-#     "prev_next_buttons_location": "bottom",
-#     "style_external_links": False,
-#     # Toc options
-#     "collapse_navigation": True,
-#     "sticky_navigation": True,
-#     "navigation_depth": 4,
-#     "includehidden": True,
-#     "titles_only": False,
-# }
+html_theme_options = {
+    "canonical_url": "",
+    "analytics_id": "",
+    "logo_only": False,
+    "display_version": True,
+    "prev_next_buttons_location": "bottom",
+    "style_external_links": False,
+    # Toc options
+    "collapse_navigation": True,
+    "sticky_navigation": True,
+    "navigation_depth": 4,
+    "includehidden": True,
+    "titles_only": False,
+}
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -301,7 +284,7 @@ texinfo_documents = [
         "Eve Documentation",
         "ETH Zurich",
         "eve",
-        "A stencil toolchain in pure Python.",
+        "Python infrastructure for building compiler toolchains.",
         "Miscellaneous",
     )
 ]

@@ -18,9 +18,10 @@ from types import MappingProxyType
 from typing import ClassVar, Mapping
 
 from devtools import debug  # noqa: F401
-from mako import template as mako_tpl
 
 from eve import NodeTranslator, codegen
+from eve.codegen import FormatTemplate as as_fmt
+from eve.codegen import MakoTemplate as as_mako
 from gtc import common
 from gtc.unstructured.usid import (
     Computation,
@@ -52,17 +53,7 @@ class SymbolTblHelper(NodeTranslator):
 
 
 class UsidCodeGenerator(codegen.TemplatedGenerator):
-    LOCATION_TYPE_TO_STR: ClassVar[
-        Mapping[common.LocationType, Mapping[str, str]]
-    ] = MappingProxyType(
-        {
-            common.LocationType.Vertex: "vertex",
-            common.LocationType.Edge: "edge",
-            common.LocationType.Cell: "cell",
-        }
-    )
-
-    DATA_TYPE_TO_STR: ClassVar[Mapping[common.LocationType, str]] = MappingProxyType(
+    DATA_TYPE_TO_STR: ClassVar[Mapping[common.DataType, str]] = MappingProxyType(
         {
             common.DataType.BOOLEAN: "bool",
             common.DataType.INT32: "int",
@@ -71,6 +62,15 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
             common.DataType.FLOAT64: "double",
         }
     )
+
+    LOCATION_TYPE_TO_STR: ClassVar[Mapping[common.LocationType, str]] = MappingProxyType(
+        {
+            common.LocationType.Vertex: "vertex",
+            common.LocationType.Edge: "edge",
+            common.LocationType.Cell: "cell",
+        }
+    )
+
     BUILTIN_LITERAL_TO_STR: ClassVar[Mapping[common.BuiltInLiteral, str]] = MappingProxyType(
         {
             common.BuiltInLiteral.MAX_VALUE: "std::numeric_limits<TODO>::max()",
@@ -80,13 +80,20 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         }
     )
 
+    @classmethod
+    def apply(cls, root, **kwargs) -> str:
+        symbol_tbl_resolved = SymbolTblHelper().visit(root)
+        generated_code = super().apply(symbol_tbl_resolved, **kwargs)
+        formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
+        return formatted_code
+
     def location_type_from_dimensions(self, dimensions):
         location_type = [dim for dim in dimensions if isinstance(dim, common.LocationType)]
         if len(location_type) != 1:
             raise ValueError("Doesn't contain a LocationType!")
         return location_type[0]
 
-    headers = [
+    headers_ = [
         "<gridtools/next/mesh.hpp>",
         "<gridtools/next/tmp_storage.hpp>",
         "<gridtools/next/unstructured.hpp>",
@@ -94,11 +101,11 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         "<gridtools/sid/composite.hpp>",
     ]
 
-    preface = ""
+    preface_ = ""
 
-    Connectivity_template = "auto {name} = gridtools::next::mesh::connectivity<{chain}>(mesh);"
+    Connectivity = as_fmt("auto {name} = gridtools::next::mesh::connectivity<{chain}>(mesh);")
 
-    NeighborChain_template = mako_tpl.Template(
+    NeighborChain = as_mako(
         """<%
             loc_strs = [_this_generator.LOCATION_TYPE_TO_STR[e] for e in _this_node.elements]
         %>
@@ -106,13 +113,13 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         """
     )
 
-    SidCompositeNeighborTableEntry_template = (
+    SidCompositeNeighborTableEntry = as_fmt(
         "gridtools::next::connectivity::neighbor_table({_this_node.connectivity_deref_.name})"
     )
 
-    SidCompositeEntry_template = "{name}"
+    SidCompositeEntry = as_fmt("{name}")
 
-    SidComposite_template = mako_tpl.Template(
+    SidComposite = as_mako(
         """
         auto ${ _this_node.field_name } = tu::make<gridtools::sid::composite::keys<${ ','.join([t.tag_name for t in _this_node.entries]) }>::values>(
         ${ ','.join(entries)});
@@ -160,18 +167,18 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
             **kwargs,
         )
 
-    FieldAccess_template = mako_tpl.Template(
+    FieldAccess = as_mako(
         """<%
             sid_deref = symbol_tbl_sids[_this_node.sid]
             sid_entry_deref = sid_deref.symbol_tbl[_this_node.name]
         %>*gridtools::device::at_key<${ sid_entry_deref.tag_name }>(${ sid_deref.ptr_name })"""
     )
 
-    AssignStmt_template = "{left} = {right};"
+    AssignStmt = as_fmt("{left} = {right};")
 
-    BinaryOp_template = "({left} {op} {right})"
+    BinaryOp = as_fmt("({left} {op} {right})")
 
-    NeighborLoop_template = mako_tpl.Template(
+    NeighborLoop = as_mako(
         """<%
             outer_sid_deref = symbol_tbl_sids[_this_node.outer_sid]
             sid_deref = symbol_tbl_sids[_this_node.sid] if _this_node.sid else None
@@ -199,15 +206,15 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         """
     )
 
-    Literal_template = mako_tpl.Template(
+    Literal = as_mako(
         """<%
             literal= _this_node.value if isinstance(_this_node.value, str) else _this_generator.BUILTIN_LITERAL_TO_STR[_this_node.value]
         %>(${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] })${ literal }"""
     )
 
-    VarAccess_template = "{name}"
+    VarAccess = as_fmt("{name}")
 
-    VarDecl_template = mako_tpl.Template(
+    VarDecl = as_mako(
         "${ _this_generator.DATA_TYPE_TO_STR[_this_node.vtype] } ${ name } = ${ init };"
     )
 
@@ -222,15 +229,15 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         return self.generic_visit(
             node,
             computation_fields=node.parameters + node.temporaries,
-            # cache_allocator=cache_allocator,
+            # cache_allocator=cache_allocator_,
             sid_tags=sid_tags,
             symbol_tbl_kernel=symbol_tbl_kernel,
             **kwargs,
         )
 
-    Computation_template = mako_tpl.Template(
-        """${_this_generator.preface}
-        ${ '\\n'.join('#include ' + header for header in _this_generator.headers) }
+    Computation = as_mako(
+        """${_this_generator.preface_}
+        ${ '\\n'.join('#include ' + header for header in _this_generator.headers_) }
 
         namespace ${ name }_impl_ {
             ${ ''.join(sid_tags) }
@@ -244,7 +251,7 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
             using namespace ${ name }_impl_;
 
             % if len(temporaries) > 0:
-                auto tmp_alloc = ${ _this_generator.cache_allocator }
+                auto tmp_alloc = ${ _this_generator.cache_allocator_ }
             % endif
             ${ ''.join(temporaries) }
 
@@ -258,33 +265,26 @@ class UsidCodeGenerator(codegen.TemplatedGenerator):
         loctype = self.LOCATION_TYPE_TO_STR[self.location_type_from_dimensions(node.dimensions)]
         return self.generic_visit(node, loctype=loctype, c_vtype=c_vtype, **kwargs)
 
-    Temporary_template = mako_tpl.Template(
+    Temporary = as_mako(
         """
         auto ${ name } = gridtools::next::make_simple_tmp_storage<${ loctype }, ${ c_vtype }>(
             (int)gridtools::next::connectivity::size(gridtools::next::mesh::connectivity<std::tuple<${ loctype }>>(mesh)), 1 /* TODO ksize */, tmp_alloc);"""
     )
 
-    @classmethod
-    def apply(cls, root, **kwargs) -> str:
-        symbol_tbl_resolved = SymbolTblHelper().visit(root)
-        generated_code = super().apply(symbol_tbl_resolved, **kwargs)
-        formatted_code = codegen.format_source("cpp", generated_code, style="LLVM")
-        return formatted_code
-
 
 class UsidGpuCodeGenerator(UsidCodeGenerator):
 
-    cache_allocator = (
+    cache_allocator_ = (
         "gridtools::sid::device::make_cached_allocator(&gridtools::cuda_util::cuda_malloc<char[]>);"
     )
 
-    headers = UsidCodeGenerator.headers + [
+    headers_ = UsidCodeGenerator.headers_ + [
         "<gridtools/next/cuda_util.hpp>",
         "<gridtools/common/cuda_util.hpp>",
     ]
 
-    preface = (
-        UsidCodeGenerator.preface
+    preface_ = (
+        UsidCodeGenerator.preface_
         + """
         #ifndef __CUDACC__
         #error "Tried to compile CUDA code with a regular C++ compiler."
@@ -292,7 +292,7 @@ class UsidGpuCodeGenerator(UsidCodeGenerator):
     """
     )
 
-    KernelCall_template = mako_tpl.Template(
+    KernelCall = as_mako(
         """
         {
             ${ ''.join(connectivities) }
@@ -306,7 +306,7 @@ class UsidGpuCodeGenerator(UsidCodeGenerator):
         """
     )
 
-    Kernel_template = mako_tpl.Template(
+    Kernel = as_mako(
         """<%
             prim_conn = symbol_tbl_conn[_this_node.primary_connectivity]
             prim_sid = symbol_tbl_sids[_this_node.primary_sid]
@@ -330,9 +330,9 @@ class UsidGpuCodeGenerator(UsidCodeGenerator):
 
 class UsidNaiveCodeGenerator(UsidCodeGenerator):
 
-    cache_allocator = "gridtools::sid::device::make_cached_allocator(&std::make_unique<char[]>);"
+    cache_allocator_ = "gridtools::sid::device::make_cached_allocator(&std::make_unique<char[]>);"
 
-    KernelCall_template = mako_tpl.Template(
+    KernelCall = as_mako(
         """
         {
             ${ ''.join(connectivities) }
@@ -344,7 +344,7 @@ class UsidNaiveCodeGenerator(UsidCodeGenerator):
         """
     )
 
-    Kernel_template = mako_tpl.Template(
+    Kernel = as_mako(
         """<%
             prim_conn = symbol_tbl_conn[_this_node.primary_connectivity]
             prim_sid = symbol_tbl_sids[_this_node.primary_sid]
