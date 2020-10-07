@@ -82,18 +82,29 @@ def data_collection(request):
     yield request.param
 
 
-# #f"abc {a['x']} def"
-# f'result={foo()}'
-# f'''{x
-# ... +1}'''
-# f'{fn(lst,2)} {fn(lst,3)}'
-# f'{fn(lst,2)} {fn(lst,3)}'
+@pytest.fixture(
+    params=[
+        "abc {a['x']} def",
+        "result={foo()}",
+        "{fn(lst,2)} {fn(lst,3)}",
+        "{fn(lst,2)} {fn(lst,3)}",
+        "{';'.join(str((i, d)) for i, d in enumerate(data_collection))}",
+    ]
+)
+def fstr_cases(request, data_collection):
+    def foo():
+        return "FOO_VALUE"
 
+    def fn(ll, incr):
+        result = ll[0]
+        ll[0] += incr
+        return result
 
-@pytest.fixture(params=[(), (0.12345, -1.12345, 2.12345, -3.12345, 4.12345), np.random.rand(5)])
-def fstr_definitions(request):
-    context = dict()
-    yield (request.param, context)
+    context = dict(a={"x": "(X)"}, foo=foo, fn=fn, lst=[0], data_collection=data_collection)
+    expected = eval(f"""(f"{request.param}")""", {}, context)
+    context["lst"] = [0]  # reset state
+
+    yield (request.param, context, expected)
 
 
 class TestXStringFormatter:
@@ -105,6 +116,9 @@ class TestXStringFormatter:
         assert fmt.format("a{}A", 0) == std_fmt.format("a{}A", 0)
         assert fmt.format("a{:*^5}A", 0) == std_fmt.format("a{:*^5}A", 0)
         assert fmt.format("a{:*^5.3}A", 0.12345) == std_fmt.format("a{:*^5.3}A", 0.12345)
+        assert fmt.format(
+            "a{:*^{width}.{precision}}A", 0.12345, width=6, precision=3
+        ) == std_fmt.format("a{:*^{width}.{precision}}A", 0.12345, width=6, precision=3)
         assert fmt.format("{data}", data=data_collection) == std_fmt.format(
             "{data}", data=data_collection
         )
@@ -112,41 +126,7 @@ class TestXStringFormatter:
             "{data:}", data=data_collection
         )
 
-    def test_with_expressions(self):
+    def test_with_expressions(self, fstr_cases):
         fmt = eve.utils.XStringFormatter()
-        std_fmt = string.Formatter()
 
-        assert fmt.format("aA") == std_fmt.format("aA")
-        assert fmt.format("a{}A", 0) == std_fmt.format("a{}A", 0)
-        assert fmt.format("a{:*^5}A", 0) == std_fmt.format("a{:*^5}A", 0)
-        assert fmt.format("a{:*^5.3}A", 0.12345) == std_fmt.format("a{:*^5.3}A", 0.12345)
-        assert fmt.format("{data}", data=data_collection) == std_fmt.format(
-            "{data}", data=data_collection
-        )
-        assert fmt.format("{data:}", data=data_collection) == std_fmt.format(
-            "{data:}", data=data_collection
-        )
-
-    # def test_collection(self, collection, joiner, item_template, collection_fmt):
-    #     fmt = eve.codegen.StringFormatter()
-    #     std_fmt = string.Formatter()
-
-    #     std_joiner = joiner.replace("^^", "^").replace("::", ":")
-    #     if item_template is None:
-    #         spec = "{data:" + joiner + ":" + collection_fmt + "}"
-    #         std_item_template = "{}"
-    #     else:
-    #         spec = "{data:" + joiner + "^[" + item_template + "]:" + collection_fmt + "}"
-    #         std_item_template = item_template.replace("{{", "{").replace("}}", "}")
-
-    #     std_spec = "{data:" + collection_fmt + "}"
-
-    #     assert fmt.format(spec, data=collection) == std_fmt.format(
-    #         std_spec, data=std_joiner.join(std_item_template.format(d) for d in collection)
-    #     )
-
-
-#     def test_wrong_collection(self):
-#         fmt = eve.codegen.StringFormatter()
-#         with pytest.raises(ValueError, match="scalar value"):
-#             fmt.format("{data::}", data=1.34)
+        assert fmt.format(fstr_cases[0], **fstr_cases[1]) == fstr_cases[2]

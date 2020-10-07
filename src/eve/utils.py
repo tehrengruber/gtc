@@ -184,21 +184,26 @@ class CaseStyleConverter:
         return name.split("-")
 
 
-# def _compile_str_format_re() -> re.Pattern:
-#     fmt_spec = "(.*)"
-#     joiner = r"((?:[^\^:]|\^\^|::)*)"
-#     item_template = r"((?:[^\]]|\]\])*)"
-#     spec = rf"{joiner}(?:\^\[{item_template}\])?:{fmt_spec}"
-
-#     return re.compile(spec)
-
-
 class XStringFormatter(string.Formatter):
     """Custom :class:`string.Formatter` implementation with f-string-like functionality.
 
-    Implementation is slightly more complicated than needed to preserve
-    compatibility with the standard :class:`string.Formatter`, in case
-    it needs to be extended.
+    Implementation follows as close as possible the implementation style
+    of :class:`string.Formatter` in the standard library.
+
+    Examples:
+        >>> fmt = XStringFormatter()
+        >>> data = [1.1, 2.22, 3.333, 4.444]
+
+        >>> fmt.format("{';'.join(str((i, d)) for i, d in enumerate(data))}", data=data)
+        '(0, 1.1);(1, 2.22);(2, 3.333);(3, 4.444)'
+
+    Note:
+        The current implementation is not 100% f-string compatible due to
+        limitations in the `format` specification parser (:meth:`string.Formatter.parser`).
+        Most flagrant limitation is that ``{`` and ``}`` characters are strictly forbidden
+        inside expressions.
+
+        See `PEP 498 <https://www.python.org/dev/peps/pep-0498/>`_ for more details.
 
     """
 
@@ -308,47 +313,3 @@ class XStringFormatter(string.Formatter):
 
         obj = self.get_value(field_name, args, kwargs)
         return obj, used_arg
-
-
-# class StringFormatter(string.Formatter):
-#     """Custom :class:`string.Formatter` implementation with f-string-like functionality.
-
-#     The format specification is expanded by adding an extra
-#     intermediate specification. If the normal string specification is:
-#     ``'{data:fmt_spec}'.format(data=[...])``
-#     using this class, it gets expanded as:
-#     ``'{data:joiner^[item_fmt_spec]:fmt_spec}'.format(data=...)``
-#     with the following meaning:
-#     ``'{data:fmt_spec}'.format(data=joiner.join(item_fmt_spec.format(item) for item in data))``
-
-#     Both `joiner` and `item_fmt_spec` are optional (with `''` and `{}` as respective defaults).
-#     Note that inside `item_fmt_spec`, `{}` need to be escaped with duplicates.
-
-#     Examples:
-#         >>> fmt = StringFormatter()
-#         >>> data = [1.1, 2.22, 3.333, 4.444]
-
-#         >>> fmt.format("{:/:}", data)
-#         '1.1/2.22/3.333/4.444'
-
-#         >>> fmt.format("{::}", data)
-#         '1.12.223.3334.444'
-
-#         >>> fmt.format("{:}", data)  # regular format without extensions
-#         '[1.1, 2.22, 3.333, 4.444]'
-
-#         >>> fmt.format("{:/:*^25}", data)
-#         '**1.1/2.22/3.333/4.444***'
-
-#         >>> fmt.format("{:/^[X]:}", data)
-#         'X/X/X/X'
-
-#         >>> fmt.format("{:/^[_{{:.2}}_]:}", data)
-#         '_1.1_/_2.2_/_3.3_/_4.4_'
-
-#         >>> fmt.format("{:/^[{{{{ {{:.2}} }}}}]:}", data)
-#         '{ 1.1 }/{ 2.2 }/{ 3.3 }/{ 4.4 }'
-
-#     """
-
-#     __FORMAT_RE = _compile_str_format_re()
