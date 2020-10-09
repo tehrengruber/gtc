@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
    :caption: Contents:
 
+   guides/fvm/fvm
    apiref
    indices
    license
