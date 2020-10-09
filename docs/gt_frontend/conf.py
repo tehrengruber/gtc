@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.abspath(src_dir))
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
-    "sphinx_material",
+    "sphinx_rtd_theme",
     "sphinx.ext.autodoc",
     "sphinx.ext.doctest",
     "sphinx.ext.napoleon",
@@ -138,46 +138,23 @@ napoleon_include_private_with_doc = True
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_theme = "sphinx_rtd_theme"
 
-# Sphinx material theme config
-html_theme = "sphinx_material"
-html_theme_path = sphinx_material.html_theme_path()
-html_context = sphinx_material.get_html_context()
-
-# Material theme options (see theme.conf for more information)
-html_theme_options = {
-    # Set the name of the project to appear in the navigation.
-    "nav_title": "GridTools Prototype Frontend",
-    # Set the color and the accent color
-    "color_primary": "blue",
-    "color_accent": "light-blue",
-    # Set the repo location to get a badge with stats
-    "repo_url": "https://github.com/GridTools/gtc",
-    "repo_name": "gtc",
-    # Visible levels of the global TOC; -1 means unlimited
-    "globaltoc_depth": 3,
-    # If False, expand all TOC entries
-    "globaltoc_collapse": False,
-    # If True, show hidden TOC entries
-    "globaltoc_includehidden": False,
-}
-# html_theme = "sphinx_rtd_theme"
-#
 # Theme-specific options for: sphinx_rtd_theme
-# html_theme_options = {
-#     "canonical_url": "",
-#     "analytics_id": "",
-#     "logo_only": False,
-#     "display_version": True,
-#     "prev_next_buttons_location": "bottom",
-#     "style_external_links": False,
-#     # Toc options
-#     "collapse_navigation": True,
-#     "sticky_navigation": True,
-#     "navigation_depth": 4,
-#     "includehidden": True,
-#     "titles_only": False,
-# }
+html_theme_options = {
+    "canonical_url": "",
+    "analytics_id": "",
+    "logo_only": False,
+    "display_version": True,
+    "prev_next_buttons_location": "bottom",
+    "style_external_links": False,
+    # Toc options
+    "collapse_navigation": True,
+    "sticky_navigation": True,
+    "navigation_depth": 4,
+    "includehidden": True,
+    "titles_only": False,
+}
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
