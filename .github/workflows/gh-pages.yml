@@ -3,7 +3,8 @@ name: gh-pages
 on:
     push:
         branches:
-            - gh-pages-deploy
+            - master
+            - documentation_*
 
 jobs:
     build:
