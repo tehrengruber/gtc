@@ -5,6 +5,8 @@
 
 .. comment include:: ../README.rst
 
+
+
 Contents:
 =========
 
@@ -15,6 +17,7 @@ Contents:
    guides/fvm/fvm
    apiref
    indices
+   language_reference
    license
    quickstart
 
