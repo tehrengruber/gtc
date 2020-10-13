@@ -19,13 +19,13 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v2.3.1 # If you're using actions/checkout@v2 you must set persist-credentials to false in most cases for the deployment to work correctly.
               with:
-                persist-credentials: false
+                persist-credentials:
+            - name: Install dependencies # rsync -> github-pages-deploy-action, jq -> PR id
+              run: apt-get update && apt-get install -y jq rsyncfalse
             - name: Test blub
               run: |
                 PR_ID=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
                 echo $PR_ID
-            - name: Install github-pages-deploy-action dependencies
-              run: apt-get update && apt-get install -y rsync
             - name: Install eve and dependencies
               run: |
                   python3 -m pip install .
