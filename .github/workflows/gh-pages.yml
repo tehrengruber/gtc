@@ -26,8 +26,8 @@ jobs:
               with:
                 trigger: '@deploy_docs'
                 reaction: heavy_check_mark
-                env:
-                    GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+              env:
+                GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
             - run: 'echo Found it!'
               if: steps.check_for_trigger.outputs.triggered == 'true'
             #
