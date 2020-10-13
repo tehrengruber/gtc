@@ -32,7 +32,7 @@ import jinja2
 from mako import template as mako_tpl
 
 from . import typing, utils
-from .concepts import Node
+from .concepts import Node, TreeNode
 from .typing import (
     Any,
     Callable,
@@ -50,7 +50,7 @@ from .typing import (
     TypeVar,
     Union,
 )
-from .visitors import AnyTreeNode, NodeVisitor
+from .visitors import NodeVisitor
 
 
 try:
@@ -478,7 +478,7 @@ class TemplatedGenerator(NodeVisitor):
         cls._templates_ = types.MappingProxyType(templates)
 
     @classmethod
-    def apply(cls, root: AnyTreeNode, **kwargs: Any) -> Union[str, Collection[str]]:
+    def apply(cls, root: TreeNode, **kwargs: Any) -> Union[str, Collection[str]]:
         """Public method to build a class instance and visit an IR node.
 
         Args:
@@ -495,14 +495,14 @@ class TemplatedGenerator(NodeVisitor):
         return typing.cast(Union[str, Collection[str]], cls().visit(root, **kwargs))
 
     @classmethod
-    def generic_dump(cls, node: AnyTreeNode, **kwargs: Any) -> str:
+    def generic_dump(cls, node: TreeNode, **kwargs: Any) -> str:
         """Class-specific ``dump()`` function for primitive types.
 
         This class could be redefined in the subclasses.
         """
         return str(node)
 
-    def generic_visit(self, node: AnyTreeNode, **kwargs: Any) -> Union[str, Collection[str]]:
+    def generic_visit(self, node: TreeNode, **kwargs: Any) -> Union[str, Collection[str]]:
         result: Union[str, Collection[str]] = ""
         if isinstance(node, Node):
             template, _ = self.get_template(node)
@@ -525,7 +525,7 @@ class TemplatedGenerator(NodeVisitor):
 
         return result
 
-    def get_template(self, node: AnyTreeNode) -> Tuple[Optional[Template], Optional[str]]:
+    def get_template(self, node: TreeNode) -> Tuple[Optional[Template], Optional[str]]:
         """Get a template for a node instance (see class documentation)."""
         template: Optional[Template] = None
         template_key: Optional[str] = None

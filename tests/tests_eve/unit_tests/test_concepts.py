@@ -31,11 +31,12 @@ class TestUIDGenerator:
         assert eve.UIDGenerator.get_unique_id(prefix="abcde").startswith("abcde")
 
     def test_reset(self):
-        eve.UIDGenerator.reset(3)
         i = eve.UIDGenerator.get_unique_id()
-        assert eve.UIDGenerator.get_unique_id() != i
-        eve.UIDGenerator.reset(3)
-        assert eve.UIDGenerator.get_unique_id() == i
+        counter = int(i)
+        eve.UIDGenerator.reset(counter + 1)
+        assert int(eve.UIDGenerator.get_unique_id()) == counter + 1
+        with pytest.warns(RuntimeWarning, match="Unsafe reset"):
+            eve.UIDGenerator.reset(counter)
 
 
 class TestSourceLocation:

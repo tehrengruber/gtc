@@ -23,7 +23,7 @@ from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set, Typ
 from pydantic import Field, validator  # noqa: F401
 
 from eve.concepts import FrozenNode, Node, SourceLocation, VType
-from eve.types import Bool, Bytes, Float, Int, IntEnum, Str, StrEnum
+from eve.type_definitions import Bool, Bytes, Float, Int, IntEnum, Str, StrEnum
 
 
 T = TypeVar("T")

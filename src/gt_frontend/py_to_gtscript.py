@@ -21,9 +21,8 @@ import typing
 
 import typing_inspect
 
-import eve.types
 import gtc.common
-from eve import UIDGenerator
+from eve import UIDGenerator, type_definitions
 
 from . import ast_node_matcher as anm
 from . import gtscript_ast
@@ -34,14 +33,14 @@ class PyToGTScript:
     @staticmethod
     def _all_subclasses(typ, *, module=None):
         """
-            Return all subclasses of a given type.
+        Return all subclasses of a given type.
 
-            The type must be one of
+        The type must be one of
 
-             - :class:`GTScriptAstNode` (returns all subclasses of the given class)
-             - :class:`Union` (return the subclasses of the united)
-             - :class:`ForwardRef` (resolve the reference given the specified module and return its subclasses)
-             - built-in python type: :class:`str`, :class:`int`, `type(None)` (return as is)
+         - :class:`GTScriptAstNode` (returns all subclasses of the given class)
+         - :class:`Union` (return the subclasses of the united)
+         - :class:`ForwardRef` (resolve the reference given the specified module and return its subclasses)
+         - built-in python type: :class:`str`, :class:`int`, `type(None)` (return as is)
         """
         if inspect.isclass(typ) and issubclass(typ, gtscript_ast.GTScriptASTNode):
             result = {
@@ -78,9 +77,9 @@ class PyToGTScript:
                 )
             return PyToGTScript._all_subclasses(getattr(module, type_name), module=module)
         elif typ in [
-            eve.types.StrictStr,
-            eve.types.StrictInt,
-            eve.types.StrictFloat,
+            type_definitions.StrictStr,
+            type_definitions.StrictInt,
+            type_definitions.StrictFloat,
             str,
             int,
             float,

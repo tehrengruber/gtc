@@ -364,7 +364,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
             float: common.DataType.FLOAT64,
         }
         return gtir.Literal(
-            value=str(node.value),  # type: ignore
+            value=str(node.value),
             vtype=py_dtype_to_eve[type(node.value)],
             location_type=location_stack[-1].chain.elements[-1],
         )
@@ -375,7 +375,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
             self.symbol_table[node.name], TemporaryField
         ):
             return gtir.FieldAccess(
-                name=node.name,  # type: ignore
+                name=node.name,
                 location_type=location_stack[-1].chain.elements[-1],
                 subscript=[gtir.LocationRef(name=location_stack[0].name)],
             )  # TODO(tehrengruber): just visit the subscript symbol
@@ -395,7 +395,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
             )
             # TODO(tehrengruber): just visit the index symbol
             return gtir.FieldAccess(
-                name=node.value.name,  # type: ignore
+                name=node.value.name,
                 subscript=[
                     gtir.LocationRef(name=index.name) for index in cast(List[Symbol], node.indices)
                 ],
@@ -495,7 +495,7 @@ class GTScriptToGTIR(eve.NodeTranslator):
                 temporary_field_decls.append(self._transform_field_type(name, type_))
 
         return gtir.Computation(
-            name=node.name,  # type: ignore
+            name=node.name,
             params=field_args,
             stencils=self.visit(node.stencils),
             declarations=temporary_field_decls,

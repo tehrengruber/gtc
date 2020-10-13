@@ -19,33 +19,22 @@
 
 import collections.abc
 import copy
-import dataclasses
-import enum
 import operator
 
-from .concepts import Node
-from .types import IntEnum, StrEnum
+from . import concepts
+from .concepts import NOTHING
 from .typing import (
     Any,
     Callable,
     ClassVar,
     Collection,
     Iterable,
-    List,
     MutableSequence,
     MutableSet,
-    Optional,
     Tuple,
     Type,
-    TypeVar,
     Union,
 )
-from .utils import NOTHING
-
-
-AnyNode = TypeVar("AnyNode", bound=Node)
-AnyTreeLeaf = Union[bool, bytes, int, float, str, IntEnum, StrEnum, Node, AnyNode]
-AnyTreeNode = Union[AnyTreeLeaf, Collection[AnyTreeLeaf]]
 
 
 class NodeVisitor:
@@ -72,27 +61,27 @@ class NodeVisitor:
 
     ATOMIC_COLLECTION_TYPES: ClassVar[Tuple[Type, ...]] = (str, bytes, bytearray)
 
-    def visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
+    def visit(self, node: concepts.TreeNode, **kwargs: Any) -> Any:
         visitor = self.generic_visit
 
         method_name = "visit_" + node.__class__.__name__
         if hasattr(self, method_name):
             visitor = getattr(self, method_name)
-        elif isinstance(node, Node):
+        elif isinstance(node, concepts.Node):
             for node_class in node.__class__.__mro__[1:]:
                 method_name = "visit_" + node_class.__name__
                 if hasattr(self, method_name):
                     visitor = getattr(self, method_name)
                     break
 
-                if node_class is Node:
+                if node_class is concepts.Node:
                     break
 
         return visitor(node, **kwargs)
 
-    def generic_visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
+    def generic_visit(self, node: concepts.TreeNode, **kwargs: Any) -> Any:
         items: Iterable[Tuple[Any, Any]] = []
-        if isinstance(node, Node):
+        if isinstance(node, concepts.Node):
             items = list(node.iter_children())
         elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
@@ -129,13 +118,13 @@ class NodeTranslator(NodeVisitor):
         assert memo is None or isinstance(memo, dict)
         self.memo = memo or {}
 
-    def generic_visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
+    def generic_visit(self, node: concepts.TreeNode, **kwargs: Any) -> Any:
         result: Any
-        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
+        if isinstance(node, (concepts.Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
-            tmp_items: Collection[AnyTreeNode] = []
-            if isinstance(node, Node):
+            tmp_items: Collection[concepts.TreeNode] = []
+            if isinstance(node, concepts.Node):
                 tmp_items = {
                     key: self.visit(value, **kwargs) for key, value in node.iter_children()
                 }
@@ -148,7 +137,7 @@ class NodeTranslator(NodeVisitor):
                 # Sequence or set: create a new container instance with the new values
                 tmp_items = [self.visit(value, **kwargs) for value in node]
                 result = node.__class__(  # type: ignore
-                    value for value in tmp_items if value is not NOTHING  # type: ignore
+                    value for value in tmp_items if value is not NOTHING
                 )
 
             elif isinstance(node, collections.abc.Mapping):
@@ -183,17 +172,17 @@ class NodeModifier(NodeVisitor):
        node = YourTransformer().visit(node)
     """
 
-    def generic_visit(self, node: AnyTreeNode, **kwargs: Any) -> Any:
+    def generic_visit(self, node: concepts.TreeNode, **kwargs: Any) -> Any:
         result: Any = node
-        if isinstance(node, (Node, collections.abc.Collection)) and not isinstance(
+        if isinstance(node, (concepts.Node, collections.abc.Collection)) and not isinstance(
             node, self.ATOMIC_COLLECTION_TYPES
         ):
             items: Iterable[Tuple[Any, Any]] = []
-            tmp_items: Collection[AnyTreeNode] = []
+            tmp_items: Collection[concepts.TreeNode] = []
             set_op: Union[Callable[[Any, str, Any], None], Callable[[Any, int, Any], None]]
             del_op: Union[Callable[[Any, str], None], Callable[[Any, int], None]]
 
-            if isinstance(node, Node):
+            if isinstance(node, concepts.Node):
                 items = list(node.iter_children())
                 set_op = setattr
                 del_op = delattr
@@ -201,7 +190,7 @@ class NodeModifier(NodeVisitor):
                 items = enumerate(node)
                 index_shift = 0
 
-                def set_op(container: MutableSequence, idx: int, value: AnyTreeNode) -> None:
+                def set_op(container: MutableSequence, idx: int, value: concepts.TreeNode) -> None:
                     container[idx - index_shift] = value
 
                 def del_op(container: MutableSequence, idx: int) -> None:
@@ -212,7 +201,7 @@ class NodeModifier(NodeVisitor):
             elif isinstance(node, collections.abc.MutableSet):
                 items = list(enumerate(node))
 
-                def set_op(container: MutableSet, idx: Any, value: AnyTreeNode) -> None:
+                def set_op(container: MutableSet, idx: Any, value: concepts.TreeNode) -> None:
                     container.add(value)
 
                 def del_op(container: MutableSet, idx: int) -> None:
@@ -227,104 +216,26 @@ class NodeModifier(NodeVisitor):
                 # Inmutable sequence or set: create a new container instance with the new values
                 tmp_items = [self.visit(value, **kwargs) for value in node]
                 result = node.__class__(  # type: ignore
-                    [value for value in tmp_items if value is not NOTHING]  # type: ignore
+                    [value for value in tmp_items if value is not concepts.NOTHING]
                 )
 
             elif isinstance(node, collections.abc.Mapping):
                 # Inmutable mapping: create a new mapping instance with the new values
                 tmp_items = {key: self.visit(value, **kwargs) for key, value in node.items()}
                 result = node.__class__(  # type: ignore
-                    {key: value for key, value in tmp_items.items() if value is not NOTHING}
+                    {
+                        key: value
+                        for key, value in tmp_items.items()
+                        if value is not concepts.NOTHING
+                    }
                 )
 
             # Finally, in case current node object is mutable, process selected items (if any)
             for key, value in items:
                 new_value = self.visit(value, **kwargs)
-                if new_value is NOTHING:
+                if new_value is concepts.NOTHING:
                     del_op(result, key)
                 elif new_value != value:
                     set_op(result, key, new_value)
 
         return result
-
-
-@enum.unique
-class PathItemKind(enum.Enum):
-    CLASS = 1
-    COLLECTION = 2
-
-
-@dataclasses.dataclass(frozen=True)
-class PathItem:
-    node: AnyTreeNode
-    kind: PathItemKind
-    member: Union[str, int]
-
-
-@dataclasses.dataclass(frozen=True)
-class PathInfo:
-    items: List[PathItem] = dataclasses.field(default_factory=list)
-
-    def append(self, item: PathItem) -> "PathInfo":
-        return PathInfo([*self.items, item])
-
-    @property
-    def root(self) -> Optional[PathItem]:
-        return self.items[-1] if self.items else None
-
-    @property
-    def is_root(self) -> bool:
-        return len(self.items) == 0
-
-    def __iter__(self) -> Iterable[PathItem]:
-        return iter(self.items)
-
-
-class PathNodeVisitor:
-    """Simple node visitor with path information based on :class:`ast.NodeVisitor`.
-    """
-
-    # @classmethod
-    # def __init_subclass__(cls, *, path_info=False, **kwargs: Any):
-    #     if path_info:
-
-    ATOMIC_COLLECTION_TYPES = (str, bytes, bytearray)
-
-    def visit(
-        self, node: AnyTreeNode, *, path_info: Optional[PathInfo] = None, **kwargs: Any
-    ) -> Any:
-        if path_info is None:
-            path_info = PathInfo()
-
-        visitor = self.generic_visit
-        if isinstance(node, Node):
-            for node_class in node.__class__.__mro__:
-                method_name = "visit_" + node_class.__name__
-                if hasattr(self, method_name):
-                    visitor = getattr(self, method_name)
-                    break
-
-                if node_class is Node:
-                    break
-
-        return visitor(node, path_info=path_info, **kwargs)
-
-    def generic_visit(self, node: AnyTreeNode, *, path_info: PathInfo, **kwargs: Any) -> Any:
-        items: Iterable[Tuple[Any, Any]] = []
-
-        if isinstance(node, Node):
-            items = list(node.iter_children())
-            item_kind: PathItemKind = PathItemKind.CLASS
-        elif isinstance(node, (collections.abc.Sequence, collections.abc.Set)) and not isinstance(
-            node, self.ATOMIC_COLLECTION_TYPES
-        ):
-            items = enumerate(node)
-            item_kind = PathItemKind.COLLECTION
-        elif isinstance(node, collections.abc.Mapping):
-            items = node.items()
-            item_kind = PathItemKind.COLLECTION
-
-        # Process selected items (if any)
-        for name, value in items:
-            path_item = PathItem(node, item_kind, name)
-            self.visit(value, path_info=path_info.append(path_item), **kwargs)
