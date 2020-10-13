@@ -4,7 +4,7 @@ on:
     push:
         branches:
             - master
-            - gh_pages_deploy
+            - gh-pages-deploy
         pull_request:
             branches:
                 - master
