@@ -21,7 +21,9 @@ jobs:
               with:
                 persist-credentials: false
             - name: Test blub
-              run: cat $GITHUB_EVENT_PATH
+              run: |
+                PR_ID=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
+                echo $PR_ID
             - name: Install github-pages-deploy-action dependencies
               run: apt-get update && apt-get install -y rsync
             - name: Install eve and dependencies
