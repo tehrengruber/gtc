@@ -5,6 +5,8 @@
 
 .. comment include:: ../README.rst
 
+REMOVE
+
 Contents:
 =========
 
