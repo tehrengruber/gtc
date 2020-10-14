@@ -59,8 +59,13 @@ jobs:
                 LATEST_UPSTREAM_COMMIT=$(git ls-remote $REMOTE_URL | grep $GITHUB_REF\$ | cut -f 1)
                 CURRENT_COMMIT=$(git rev-parse HEAD)
                 git fetch origin $LATEST_UPSTREAM_COMMIT
+                # check if current state differs from upstream state (we don't compare commit hashes directly because
+                #  this is error prone for PRs
+                set +e;
                 git diff --quiet --exit-code $LATEST_UPSTREAM_COMMIT
-                if [ $? -eq 0 ]; then
+                IS_MOST_RECENT=$?
+                set -e
+                if [ $IS_MOST_RECENT -eq 0 ]; then
                   echo "::set-output name=is_most_recent::true"
                 else
                   echo "::warning::Documentation deployment skipped since the current commit ($CURRENT_COMMIT) differs from the most recent on this branch ($LATEST_UPSTREAM_COMMIT)"
