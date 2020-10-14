@@ -51,10 +51,6 @@ jobs:
                 mv ../docs/eve/_build/html/ eve
                 mv ../docs/gtc/_build/html/ gtc
                 mv ../docs/gt_frontend/_build/html/ gt_frontend
-            - name: Capture current branch name
-              shell: bash
-              id: current_branch
-              run: echo "::set-output name=name::$(git branch --show-current)"
             - name: Check if current commit is the most recent one on this branch
               shell: bash
               id: check_if_most_recent_upstream
@@ -75,7 +71,8 @@ jobs:
                   if ! [[ "$PR_ID" =~ ^[0-9]+$ ]]; then exit 1; fi
                   TARGET_FOLDER="docs/pr/${PR_ID}"
                 else
-                  TARGET_FOLDER="docs/branches/$(git branch --show-current)"
+                  if [[ "$(git branch --show-current)" != "master" ]]; then exit 2; fi
+                  TARGET_FOLDER="docs/latest"
                 fi
                 echo "Deployment target folder: $TARGET_FOLDER"
                 echo "::set-output name=path::$TARGET_FOLDER"
