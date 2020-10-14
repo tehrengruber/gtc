@@ -57,7 +57,7 @@ jobs:
               run: |
                 REMOTE_URL=$(git remote get-url origin)
                 LATEST_UPSTREAM_COMMIT=$(git ls-remote $REMOTE_URL | grep $GITHUB_REF\$ | cut -f 1)
-                CURRENT_COMMIT=$(git rev-parse HEAD) #1
+                CURRENT_COMMIT=$(git rev-parse HEAD)
                 git fetch origin $LATEST_UPSTREAM_COMMIT
                 git diff --quiet --exit-code $LATEST_UPSTREAM_COMMIT
                 if [ $? -eq 0 ]; then
