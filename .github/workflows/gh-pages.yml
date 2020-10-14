@@ -58,9 +58,6 @@ jobs:
                 REMOTE_URL=$(git remote get-url origin)
                 LATEST_UPSTREAM_COMMIT=$(git ls-remote $REMOTE_URL | grep $GITHUB_REF\$ | cut -f 1)
                 CURRENT_COMMIT=$(git rev-parse HEAD)
-                echo $(git ls-remote $REMOTE_URL | grep $GITHUB_REF)
-                echo bla
-                echo $(git ls-remote $REMOTE_URL)
                 if [ "$LATEST_UPSTREAM_COMMIT" = "$CURRENT_COMMIT" ]; then
                   echo "::set-output name=is_most_recent::true"
                 else
